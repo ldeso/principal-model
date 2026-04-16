@@ -47,7 +47,7 @@ like a market-maker that has shorted a stream of forwards on the token: it
 locked in a sale price and now has to cover it at an unknown cost. The key
 question for the business is: *given how the token price is expected to move,
 which model makes more money, which one loses more in a bad scenario, and how
-much does pre-buying inventory (the "hedge ratio" `α`) reduce that risk?*
+much does pre-buying inventory (the "hedge ratio" $\alpha$) reduce that risk?*
 
 The companion research note (`research-note.md`) derives the math. This
 notebook runs the numbers: it simulates thousands of possible futures for the
@@ -79,7 +79,7 @@ notebook, has three jobs:
    CVaR, loss probability — all defined below) depend on the full
    distribution, not just its first two moments. We estimate those
    empirically.
-3. **Let the reader explore.** The `(α, μ, σ)` grid at the bottom of the
+3. **Let the reader explore.** The $(\alpha, \mu, \sigma)$ grid at the bottom of the
    page is interactive: drag the sliders to see how the tail of the
    principal book responds to drift, volatility, and the hedge ratio.
 
@@ -96,11 +96,11 @@ npm run sweep -- --seed 42
 **What you will see below.** Four kinds of plots: (1) a scorecard table of
 closed-form vs Monte Carlo P&L moments with tail metrics, (2) overlaid P&L
 distributions for the three stochastic models, (3) diagnostics on the shared
-random kernel `I_T := ∫₀ᵀ S_t dt` (the time-integral of the simulated price;
+random kernel $I_T := \int_0^T S_t\,dt$ (the time-integral of the simulated price;
 both the fee and back-to-back books turn out to be linear functions of this
 single quantity, so it is worth looking at directly), and (4) parameter
-sweeps showing how tail risk and the break-even quote `Q*` respond to drift
-`μ`, volatility `σ`, and hedge ratio `α`.
+sweeps showing how tail risk and the break-even quote $Q^*$ respond to drift
+$\mu$, volatility $\sigma$, and hedge ratio $\alpha$.
 :::
 
 ### Mini-glossary
@@ -110,18 +110,18 @@ repeatedly on this page:
 
 - **Geometric Brownian Motion (GBM).** A standard model for prices that
   evolve by random percentage moves (not random dollar moves). Two
-  parameters: `μ` is the expected growth rate per year ("drift"), `σ` is
+  parameters: $\mu$ is the expected growth rate per year ("drift"), $\sigma$ is
   the size of the random jitter per year ("volatility"). This is the same
   model underneath Black–Scholes.
 - **Monte Carlo simulation.** Rolling the dice many thousands of times.
   Here each "roll" is a full random trajectory of the token price over the
-  horizon `T`, and we compute the company's P&L along that trajectory.
+  horizon $T$, and we compute the company's P&L along that trajectory.
   Averaging over thousands of trajectories gives us an estimate of
   expected P&L; looking at the worst outcomes gives us tail risk.
-- **Hedge ratio α.** The fraction of the tokens the company pre-buys at
-  day zero instead of buying just-in-time. `α = 0` means no pre-buying at
-  all (maximum exposure to price); `α = 1` means buying the whole year's
-  supply at inception (fully pre-hedged, zero terminal risk); `α = 0.5`
+- **Hedge ratio $\alpha$.** The fraction of the tokens the company pre-buys at
+  day zero instead of buying just-in-time. $\alpha = 0$ means no pre-buying at
+  all (maximum exposure to price); $\alpha = 1$ means buying the whole year's
+  supply at inception (fully pre-hedged, zero terminal risk); $\alpha = 0.5$
   means half now, half later.
 
 ### Notation cheat-sheet
@@ -133,38 +133,38 @@ this page, and after that the formulas should parse on sight.
 
 | Symbol | Meaning | Units |
 | --- | --- | --- |
-| `S_t` | kVCM / USD spot price at time `t` | USD / kVCM |
-| `P` | protocol price (constant) | kVCM / tonne |
-| `π_t := P·S_t` | USD protocol price per tonne | USD / tonne |
-| `λ` | deterministic retirement flow | tonnes / year |
-| `T` | horizon | years |
-| `N := λ·T` | total tonnes retired over `[0,T]` | tonnes |
-| `f` | fee rate | dimensionless |
-| `Q` | fixed USD quote per tonne (principal model) | USD / tonne |
-| `α ∈ [0,1]` | pre-purchase (hedge) fraction | dimensionless |
-| `I_T := ∫₀ᵀ S_t dt` | time-integral of GBM, the shared random kernel | (USD/kVCM)·year |
-| `R_fee = f·P·λ·I_T` | fee-based revenue | USD |
-| `Π_b2b = Q·N − P·λ·I_T` | back-to-back (α=0) P&L | USD |
-| `Π_matched = N·(Q − P·S_0)` | matched pre-purchase (α=1), deterministic | USD |
-| `Π_α = (1−α)·Π_b2b + α·Π_matched` | partial pre-purchase (α∈[0,1]) | USD |
-| `Q* = (1+f)·P·S_0·(e^{μT}−1)/(μT)` | break-even quote equating `E[Π_b2b] = E[R_fee]` | USD / tonne |
+| $S_t$ | kVCM / USD spot price at time $t$ | USD / kVCM |
+| $P$ | protocol price (constant) | kVCM / tonne |
+| $\pi_t := P \cdot S_t$ | USD protocol price per tonne | USD / tonne |
+| $\lambda$ | deterministic retirement flow | tonnes / year |
+| $T$ | horizon | years |
+| $N := \lambda \cdot T$ | total tonnes retired over $[0,T]$ | tonnes |
+| $f$ | fee rate | dimensionless |
+| $Q$ | fixed USD quote per tonne (principal model) | USD / tonne |
+| $\alpha \in [0,1]$ | pre-purchase (hedge) fraction | dimensionless |
+| $I_T := \int_0^T S_t\,dt$ | time-integral of GBM, the shared random kernel | (USD/kVCM)·year |
+| $R_{\mathrm{fee}} = f \cdot P \cdot \lambda \cdot I_T$ | fee-based revenue | USD |
+| $\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$ | back-to-back ($\alpha=0$) P&L | USD |
+| $\Pi_{\mathrm{matched}} = N \cdot (Q - P \cdot S_0)$ | matched pre-purchase ($\alpha=1$), deterministic | USD |
+| $\Pi_\alpha = (1-\alpha) \cdot \Pi_{\mathrm{b2b}} + \alpha \cdot \Pi_{\mathrm{matched}}$ | partial pre-purchase ($\alpha \in [0,1]$) | USD |
+| $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T}-1)/(\mu T)$ | break-even quote equating $\mathbb{E}[\Pi_{\mathrm{b2b}}] = \mathbb{E}[R_{\mathrm{fee}}]$ | USD / tonne |
 
 Quick reading guide for the less-obvious symbols:
 
-- `P` is a **protocol constant**: how many tokens the protocol wants per
+- $P$ is a **protocol constant**: how many tokens the protocol wants per
   tonne of CO₂ retired. It doesn't move. The *dollar* price per tonne
-  `π_t = P·S_t` moves only because the token price `S_t` moves.
-- `I_T` is the **area under the price curve over the horizon** — if you
-  sketched `S_t` against time for `t ∈ [0,T]`, `I_T` is the area under
+  $\pi_t = P \cdot S_t$ moves only because the token price $S_t$ moves.
+- $I_T$ is the **area under the price curve over the horizon** — if you
+  sketched $S_t$ against time for $t \in [0,T]$, $I_T$ is the area under
   that sketch. It shows up repeatedly because integrating the price over
   a period of time is exactly what "pay the running market rate for a
   steady flow of tonnes" costs.
-- `R_fee`, `Π_b2b`, `Π_matched`, `Π_α` are the four different P&L
-  variables compared in the §4 table below. `R_fee` is revenue (always
-  ≥ 0); the `Π`'s are profit-and-loss (can be negative).
-- `Q*` is the "fair" per-tonne quote for the principal model — the price
+- $R_{\mathrm{fee}}$, $\Pi_{\mathrm{b2b}}$, $\Pi_{\mathrm{matched}}$, $\Pi_\alpha$ are the four different P&L
+  variables compared in the §4 table below. $R_{\mathrm{fee}}$ is revenue (always
+  $\geq 0$); the $\Pi$'s are profit-and-loss (can be negative).
+- $Q^*$ is the "fair" per-tonne quote for the principal model — the price
   at which its expected P&L matches the fee model's. The last section of
-  this report plots how `Q*` depends on `μ` and `T`.
+  this report plots how $Q^*$ depends on $\mu$ and $T$.
 
 ## Single-run outputs
 
@@ -176,6 +176,7 @@ view across many parameter combinations.
 
 Loaded from `data/run-42.json` — produced by `npm run simulate -- --seed 42`.
 
+
 ```{ojs}
 //| echo: false
 run = FileAttachment("data/run-42.json").json()
@@ -184,20 +185,20 @@ run = FileAttachment("data/run-42.json").json()
 ### Run parameters
 
 The scorecard below echoes the parameters used for this run. Each tile is
-a single number the simulator took as an input (or, in the case of `Q*`,
+a single number the simulator took as an input (or, in the case of $Q^*$,
 computed directly from the other inputs). Some worth flagging:
 
 - **Monte Carlo paths** is how many random trajectories were simulated.
   More paths = tighter statistics on the tails, at a linear cost in
   runtime.
-- **μ, σ, T** define the price process: an expected growth rate, an
+- **$\mu, \sigma, T$** define the price process: an expected growth rate, an
   annualised volatility, and a horizon in years.
-- **λ** is the steady retirement flow in tonnes/year — the "throughput"
+- **$\lambda$** is the steady retirement flow in tonnes/year — the "throughput"
   of the business.
-- **f, Q, α** are the three business levers: the fee markup, the fixed
+- **$f, Q, \alpha$** are the three business levers: the fee markup, the fixed
   principal quote, and the hedge ratio.
-- **Q\*** is the closed-form break-even quote — if the operator picks
-  `Q = Q*`, the fee and back-to-back principal books will have **equal
+- **$Q^*$** is the closed-form break-even quote — if the operator picks
+  $Q = Q^*$, the fee and back-to-back principal books will have **equal
   expected P&L**, but as §5 below shows, their *distributions* are still
   very different. Matching means does not match risk.
 
@@ -230,49 +231,49 @@ The table has two logical halves:
    note derives in closed form — expected P&L and its standard deviation
    — we print **both** the closed-form value and the Monte Carlo
    estimate. If our simulator is correct, these two should agree. The
-   `z` column formalises that: it is the MC mean's distance from the
+   $z$ column formalises that: it is the MC mean's distance from the
    closed form, measured in standard errors of the MC mean. Rule of
-   thumb: `|z| ≤ 2` looks healthy, `|z| > 3` is worth investigating.
+   thumb: $|z| \leq 2$ looks healthy, $|z| > 3$ is worth investigating.
 2. **Risk metrics (second block).** Quantities that can't be computed
    from the first two moments alone: VaR, CVaR, loss probability, and a
    Sharpe-like ratio. These come straight from the empirical
    distribution of simulated P&Ls.
 
-All P&L numbers are in **USD over the horizon `T`** (not annualised, not
+All P&L numbers are in **USD over the horizon $T$** (not annualised, not
 per-tonne).
 
 <div class="legend-table">
 
 | column | meaning |
 | --- | --- |
-| `E[Π] (cf) / (mc)` | expected P&L — closed form vs Monte Carlo |
-| `±CI95` | ±95% half-width of the MC mean |
-| `SD (cf) / (mc)` | standard deviation of P&L |
-| `z` | `(MC−cf) / stderr`; MC sanity check |
-| `VaR95 / VaR99` | loss threshold exceeded with 5% / 1% probability |
-| `CVaR95 / CVaR99` | expected loss in the worst 5% / 1% tail |
-| `P[Π<0]` | probability of a losing realisation |
-| `Sharpe` | `E[Π] / SD[Π]`, invariant under `f`-scaling for fee model |
+| $\mathbb{E}[\Pi]$ (cf) / (mc) | expected P&L — closed form vs Monte Carlo |
+| $\pm \mathrm{CI}_{95}$ | ±95% half-width of the MC mean |
+| SD (cf) / (mc) | standard deviation of P&L |
+| $z$ | $(\text{MC} - \text{cf}) / \text{stderr}$; MC sanity check |
+| $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | loss threshold exceeded with 5% / 1% probability |
+| $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | expected loss in the worst 5% / 1% tail |
+| $\mathbb{P}[\Pi<0]$ | probability of a losing realisation |
+| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$, invariant under $f$-scaling for fee model |
 
 </div>
 
 **Risk metrics in plain English.**
 
-- **VaR₉₅ (Value-at-Risk at 95%).** A loss number. "With 5% probability
-  we lose at least VaR₉₅." It's the 5th-percentile of P&L, sign-flipped.
+- **$\mathrm{VaR}_{95}$ (Value-at-Risk at 95%).** A loss number. "With 5% probability
+  we lose at least $\mathrm{VaR}_{95}$." It's the 5th-percentile of P&L, sign-flipped.
   A common executive-summary number, but it deliberately does **not**
   tell you how bad the worst 5% are — only the threshold at which that
   5% begins.
-- **CVaR₉₅ (Conditional VaR, also "Expected Shortfall").** The average
-  loss *inside* that worst 5%. If VaR₉₅ is the door to the tail, CVaR₉₅
+- **$\mathrm{CVaR}_{95}$ (Conditional VaR, also "Expected Shortfall").** The average
+  loss *inside* that worst 5%. If $\mathrm{VaR}_{95}$ is the door to the tail, $\mathrm{CVaR}_{95}$
   is the average depth of the room beyond. CVaR is a strictly more
   informative risk measure than VaR when the tail is fat or skewed.
-- **VaR₉₉ / CVaR₉₉.** Same, but the worst 1% rather than the worst 5%.
+- **$\mathrm{VaR}_{99} / \mathrm{CVaR}_{99}$.** Same, but the worst 1% rather than the worst 5%.
   Use these for rarer but more severe events.
-- **P[Π < 0].** The probability the book simply loses money at the
+- **$\mathbb{P}[\Pi < 0]$.** The probability the book simply loses money at the
   horizon. A blunt headline metric.
-- **Sharpe-like = E[Π] / SD[Π].** Expected reward per unit of risk —
-  higher is better. For the fee model this number is invariant in `f`
+- **Sharpe-like $= \mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$.** Expected reward per unit of risk —
+  higher is better. For the fee model this number is invariant in $f$
   (doubling the fee doubles both mean and SD), so it captures
   *structural* risk/reward, not the pricing dial.
 
@@ -284,10 +285,10 @@ per-tonne).
   randomness at all, so SD, CI95, and z are zero to machine precision,
   and VaR/CVaR simply echo the sign of the one deterministic P&L.
 - Row `principal_3b`: the unhedged principal book. This is the row
-  where the loss tail is real — compare its CVaR₉₉ against the others
+  where the loss tail is real — compare its $\mathrm{CVaR}_{99}$ against the others
   to see how much a bad price path costs.
 - Row `principal_3c`: the partially-hedged book. Expect its SD and
-  CVaR to be smaller than `3b`'s by roughly `(1−α)²` — the variance
+  CVaR to be smaller than `3b`'s by roughly $(1-\alpha)^2$ — the variance
   formula from Phase A §3c.
 
 ```{ojs}
@@ -336,33 +337,33 @@ but visually.
 How to read a panel:
 
 - The **horizontal axis** is the book's terminal P&L in USD over the
-  horizon `T`. Negative values are losses.
+  horizon $T$. Negative values are losses.
 - The **bars** are a histogram of simulated P&L outcomes, rescaled as
   an empirical density.
 - The **solid black vertical rule** sits at the closed-form expected
-  P&L `E[Π]`. If Monte Carlo is converged, the visual centre of the
+  P&L $\mathbb{E}[\Pi]$. If Monte Carlo is converged, the visual centre of the
   histogram should land right on it.
-- The **dashed grey vertical rule** sits at `Π = 0` — the break-even
+- The **dashed grey vertical rule** sits at $\Pi = 0$ — the break-even
   line. Whatever mass of the histogram sits to the left of it is the
-  loss probability `P[Π<0]` reported in the table.
+  loss probability $\mathbb{P}[\Pi<0]$ reported in the table.
 
 What to notice on each panel:
 
-- **Fee book** (`R_fee = f·P·λ·I_T`). Pure revenue: the formula has no
+- **Fee book** ($R_{\mathrm{fee}} = f \cdot P \cdot \lambda \cdot I_T$). Pure revenue: the formula has no
   minus sign, so this random variable is non-negative by construction.
   The histogram sits entirely in the right half-plane (no mass to the
-  left of `Π = 0`). Its shape is right-skewed — a long right tail —
-  because it inherits the right-skew of `I_T` (see next section).
-- **Principal 3b** (back-to-back, α = 0). Same random kernel `I_T`, but
+  left of $\Pi = 0$). Its shape is right-skewed — a long right tail —
+  because it inherits the right-skew of $I_T$ (see next section).
+- **Principal 3b** (back-to-back, $\alpha = 0$). Same random kernel $I_T$, but
   it enters with a **minus** sign, so the distribution is the mirror of
   the fee book's: upside is capped (best case: token price collapses to
-  zero, company gets the full fixed payment `Q·N`), downside is
+  zero, company gets the full fixed payment $Q \cdot N$), downside is
   unbounded (worst case: token rallies, company has to buy expensively
   to fill the contract). This left-skewed loss tail is the central
   risk concern of the whole research project.
-- **Principal 3c** (partial, α = 0.5 in this run). Same qualitative
-  shape as 3b, but narrower by a factor of `(1−α)² = 0.25` on variance,
-  i.e. `(1−α) = 0.5` on standard deviation. This is the visual
+- **Principal 3c** (partial, $\alpha = 0.5$ in this run). Same qualitative
+  shape as 3b, but narrower by a factor of $(1-\alpha)^2 = 0.25$ on variance,
+  i.e. $(1-\alpha) = 0.5$ on standard deviation. This is the visual
   demonstration that pre-buying tokens shrinks the loss tail.
 
 ```{ojs}
@@ -397,33 +398,33 @@ Plot.plot({
 })
 ```
 
-_Solid black rule on each panel: closed-form `E[Π]`. Dashed grey rule:
-break-even `Π = 0`._
+_Solid black rule on each panel: closed-form $\mathbb{E}[\Pi]$. Dashed grey rule:
+break-even $\Pi = 0$._
 
-### I_T histogram vs. Dufresne closed-form moments
+### $I_T$ histogram vs. Dufresne closed-form moments
 
-`I_T := ∫₀ᵀ S_t dt` is the time-integral of the simulated price: the
+$I_T := \int_0^T S_t\,dt$ is the time-integral of the simulated price: the
 area under the price-vs-time curve over the horizon. Why does this one
 random number deserve its own plot?
 
 Because every book's P&L turns out to be a simple linear function of
-`I_T`. The fee book's revenue is `f·P·λ·I_T`. The back-to-back
-principal book's P&L is `Q·N − P·λ·I_T`. The partially-hedged book is
-an affine combination of those two. So `I_T` is the **one random
+$I_T$. The fee book's revenue is $f \cdot P \cdot \lambda \cdot I_T$. The back-to-back
+principal book's P&L is $Q \cdot N - P \cdot \lambda \cdot I_T$. The partially-hedged book is
+an affine combination of those two. So $I_T$ is the **one random
 variable** that drives everything stochastic in this notebook; every
 other distribution is just a rescaling or reflection of this one.
 
 Dufresne (2001) gives closed-form formulas for the mean and variance of
-`I_T`, but not for its full distribution — `I_T` is **not**
-log-normally distributed, even though `S_t` is, so tail quantiles have
+$I_T$, but not for its full distribution — $I_T$ is **not**
+log-normally distributed, even though $S_t$ is, so tail quantiles have
 to be estimated by Monte Carlo. This plot is that estimate:
 
-- **Histogram bars** are the simulated density of `I_T` across all
+- **Histogram bars** are the simulated density of $I_T$ across all
   paths.
 - **Solid black rule** is the Dufresne closed-form mean
-  `E[I_T] = S_0·(e^{μT}−1)/μ`. If the simulator is correct, it should
+  $\mathbb{E}[I_T] = S_0 \cdot (e^{\mu T}-1)/\mu$. If the simulator is correct, it should
   land on the visual centre of the histogram.
-- **Dashed black rules** are `E[I_T] ± SD[I_T]` — roughly a one-sigma
+- **Dashed black rules** are $\mathbb{E}[I_T] \pm \mathrm{SD}[I_T]$ — roughly a one-sigma
   band. A well-behaved histogram puts ~68% of its mass between them.
 
 ```{ojs}
@@ -457,14 +458,14 @@ Plot.plot({
 })
 ```
 
-_Solid black: `E[I_T]` (Dufresne closed form). Dashed black: `E[I_T] ± SD[I_T]`._
+_Solid black: $\mathbb{E}[I_T]$ (Dufresne closed form). Dashed black: $\mathbb{E}[I_T] \pm \mathrm{SD}[I_T]$._
 
 ### Sample GBM paths — matched-book NAV view (§3a)
 
-The matched pre-purchase book (α = 1) has a **deterministic** P&L at
-the horizon — the operator locked in a sale price `Q` per tonne and
-also locked in a purchase cost `P·S_0` per tonne at day zero, so the
-final number doesn't depend on the random path `S_t` at all.
+The matched pre-purchase book ($\alpha = 1$) has a **deterministic** P&L at
+the horizon — the operator locked in a sale price $Q$ per tonne and
+also locked in a purchase cost $P \cdot S_0$ per tonne at day zero, so the
+final number doesn't depend on the random path $S_t$ at all.
 
 So why worry? Because in the *meantime* the business is carrying the
 token inventory on its balance sheet, and that inventory's mark-to-
@@ -476,30 +477,30 @@ fine.
 
 The Phase A note defines this mark-to-market inventory value as
 
-```
-V_t = (N · P) · (1 − t/T) · S_t.
-```
+$$
+V_t = (N \cdot P) \cdot (1 - t/T) \cdot S_t.
+$$
 
 Read the formula in parts:
 
-- `N · P` is the total number of tokens originally bought.
-- `(1 − t/T)` is the fraction **still** in inventory at time `t` — it
+- $N \cdot P$ is the total number of tokens originally bought.
+- $(1 - t/T)$ is the fraction **still** in inventory at time $t$ — it
   starts at 1 (all of them) and decays linearly to 0 at the horizon,
-  because retirements burn them at the constant rate `λ`.
-- `S_t` is the current dollar price per token.
+  because retirements burn them at the constant rate $\lambda$.
+- $S_t$ is the current dollar price per token.
 
-So `V_t = (tokens still held) × (current price per token)` — ordinary
-mark-to-market. At `t = 0` it equals `V_0 = N·P·S_0`, the original
-purchase cost. At `t = T` it equals zero, because the last token has
+So $V_t = (\text{tokens still held}) \times (\text{current price per token})$ — ordinary
+mark-to-market. At $t = 0$ it equals $V_0 = N \cdot P \cdot S_0$, the original
+purchase cost. At $t = T$ it equals zero, because the last token has
 been retired and there is no inventory left to value.
 
-The plot shows a handful of sampled paths of `V_t`:
+The plot shows a handful of sampled paths of $V_t$:
 
 - **Grey lines** are random trajectories — each one is a possible
   future history of the NAV.
 - **Orange line** is the first path, highlighted so one trajectory is
   easy to follow with the eye.
-- Notice that **every path pins to zero at `t = T`** regardless of
+- Notice that **every path pins to zero at $t = T$** regardless of
   whether the token price went up or down. That is the burn schedule
   doing its work.
 - The scary bit is the **dip in the middle**. Even a path that
@@ -537,28 +538,28 @@ Plot.plot({
 ```
 
 _Grey lines: sampled Monte Carlo NAV paths. Orange line: the first path,
-highlighted for visibility. `V_T` is pinned to zero by the burn schedule
-regardless of `S_T`._
+highlighted for visibility. $V_T$ is pinned to zero by the burn schedule
+regardless of $S_T$._
 
 ### NAV shortfall vs. schedule (§3a)
 
 For the matched book, the relevant solvency question is: "If the token
-price had stayed flat at `S_0` the whole time, the NAV would have decayed
-along a straight line from `N·P·S_0` down to zero. How far *below* that
+price had stayed flat at $S_0$ the whole time, the NAV would have decayed
+along a straight line from $N \cdot P \cdot S_0$ down to zero. How far *below* that
 straight line did the actual NAV dip, in the worst case?"
 
 Phrased as a formula, that is
 
-```
-D := max_{t ≤ T}  [ N·P·(1 − t/T) · (S_0 − S_t) ]₊
-```
+$$
+D := \max_{t \leq T} \left[ N \cdot P \cdot (1 - t/T) \cdot (S_0 - S_t) \right]_+
+$$
 
-where `[x]₊` means `max(x, 0)` — we only count the part where the actual
+where $[x]_+$ means $\max(x, 0)$ — we only count the part where the actual
 NAV is **below** the no-price-move schedule, not above it (an upward
 excursion is a paper gain, not a solvency risk).
 
 This histogram is the empirical distribution of that maximum shortfall
-`D` across all simulated paths:
+$D$ across all simulated paths:
 
 - **The x-axis** is dollars of shortfall relative to the flat-price
   schedule. Further right = deeper dip = worse.
@@ -599,17 +600,17 @@ book even though its terminal P&L is deterministic._
 The single-run view above fixes all parameters and looks at the
 distribution. This section does the opposite: it **fixes the book**
 (principal 3c, the partially-hedged one) and a single risk summary
-(CVaR₉₅), and then sweeps the business parameters `(α, μ, σ)` to see
+($\mathrm{CVaR}_{95}$), and then sweeps the business parameters $(\alpha, \mu, \sigma)$ to see
 how that risk summary responds.
 
 Loaded from `data/sweep.json` — a grid of Monte Carlo runs over
-`(α, μ, σ)`. Use the controls below to slice the grid. The plots below
-track `CVaR95` for the **principal 3c** (partial pre-purchase) book.
-Reminder: **CVaR₉₅ is the expected loss in the worst 5% of outcomes,
+$(\alpha, \mu, \sigma)$. Use the controls below to slice the grid. The plots below
+track $\mathrm{CVaR}_{95}$ for the **principal 3c** (partial pre-purchase) book.
+Reminder: **$\mathrm{CVaR}_{95}$ is the expected loss in the worst 5% of outcomes,
 so larger numbers are worse.** A reader can think of the two plots
 below as "how bad does the worst-5% outcome get, as I dial each knob?"
 
-All P&L sweep quantities are in USD over horizon `T`.
+All P&L sweep quantities are in USD over horizon $T$.
 
 ```{ojs}
 //| echo: false
@@ -626,14 +627,14 @@ viewof pickAlpha = Inputs.range([0,1], { step: 0.25, value: 0.5, label: "hedge r
 viewof pickMu = Inputs.select(sweep.grid.mus, { value: 0.05, label: "drift μ (/yr)" })
 ```
 
-### Tail risk vs volatility σ  (fixed α, μ)
+### Tail risk vs volatility $\sigma$ (fixed $\alpha, \mu$)
 
-Holding `α` (the hedge ratio) and `μ` (the drift) fixed at the values
-chosen above, this line shows how the CVaR₉₅ of the 3c book grows as
-we crank up `σ` (volatility).
+Holding $\alpha$ (the hedge ratio) and $\mu$ (the drift) fixed at the values
+chosen above, this line shows how the $\mathrm{CVaR}_{95}$ of the 3c book grows as
+we crank up $\sigma$ (volatility).
 
 **Intuition.** Volatility is the size of the random jitter in the token
-price. More jitter means the integral `I_T` is more spread out, which
+price. More jitter means the integral $I_T$ is more spread out, which
 means the principal book's P&L is more spread out, which means its
 left tail is fatter — so the average loss inside that tail is bigger.
 We therefore expect the curve below to be monotonically increasing
@@ -663,29 +664,29 @@ Plot.plot({
 })
 ```
 
-_Sensitivity of the 3c tail to `σ` at the selected `(α, μ)`. A monotone rise
-is the expected signature — vol directly inflates `Var[I_T]` and hence the
-tail of `Π_α`._
+_Sensitivity of the 3c tail to $\sigma$ at the selected $(\alpha, \mu)$. A monotone rise
+is the expected signature — vol directly inflates $\mathrm{Var}[I_T]$ and hence the
+tail of $\Pi_\alpha$._
 
-### Tail risk vs hedge ratio α  (fixed μ, σ at grid[1])
+### Tail risk vs hedge ratio $\alpha$ (fixed $\mu$, $\sigma$ at grid[1])
 
 This is the plot that answers the business question "how much do I
 reduce my loss tail by pre-buying more tokens up front?"
 
-It fixes `μ` at the selected value and `σ` at the **second** value in
+It fixes $\mu$ at the selected value and $\sigma$ at the **second** value in
 the grid (a middle-of-the-road volatility so the shape is easy to
-read), then sweeps `α` from 0 (fully back-to-back, no pre-buying) to 1
+read), then sweeps $\alpha$ from 0 (fully back-to-back, no pre-buying) to 1
 (fully matched, entire year's supply bought today).
 
-Phase A §3c showed that `Var[Π_α] = (1 − α)² · Var[Π_b2b]`. Since CVaR
+Phase A §3c showed that $\mathrm{Var}[\Pi_\alpha] = (1-\alpha)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}]$. Since CVaR
 scales roughly with standard deviation in a broad family of
-distributions, the CVaR₉₅ curve should collapse **quadratically**
-toward zero as `α → 1`. Visually: expect a smooth convex curve that
+distributions, the $\mathrm{CVaR}_{95}$ curve should collapse **quadratically**
+toward zero as $\alpha \to 1$. Visually: expect a smooth convex curve that
 bends down steeply, not a straight line. That's the signature of the
-`(1 − α)²` factor.
+$(1-\alpha)^2$ factor.
 
-At `α = 1` the book is fully pre-hedged and terminal P&L is
-deterministic; at that point the CVaR₉₅ drops to the sign of the one
+At $\alpha = 1$ the book is fully pre-hedged and terminal P&L is
+deterministic; at that point the $\mathrm{CVaR}_{95}$ drops to the sign of the one
 deterministic P&L (a single value, not a tail).
 
 This plot is the visual answer to: *"Pre-buying tokens is the natural
@@ -716,28 +717,28 @@ Plot.plot({
 })
 ```
 
-## Break-even quote surface Q*(μ, T)
+## Break-even quote surface $Q^*(\mu, T)$
 
 This section answers the pricing question: "If I were going to switch
-from the fee model to the principal model, what per-tonne quote `Q`
+from the fee model to the principal model, what per-tonne quote $Q$
 would I need to charge so that my **expected** revenue is the same?"
-The answer is `Q*`, and it depends on how the operator expects the
-token price to drift (`μ`) and how long the contract runs (`T`).
+The answer is $Q^*$, and it depends on how the operator expects the
+token price to drift ($\mu$) and how long the contract runs ($T$).
 
-`Q*` is the USD quote that equalises the *expected* P&L of the
+$Q^*$ is the USD quote that equalises the *expected* P&L of the
 back-to-back principal book with the fee-based book:
 
-```
-Q* = (1 + f) · P · S_0 · (e^{μT} − 1) / (μ T).
-```
+$$
+Q^* = (1 + f) \cdot P \cdot S_0 \cdot \frac{e^{\mu T} - 1}{\mu T}.
+$$
 
 To make the picture easier to read, we divide both sides by
-`(1+f)·P·S_0` — this removes the uninteresting scaling (which is just
+$(1+f) \cdot P \cdot S_0$ — this removes the uninteresting scaling (which is just
 today's fee-quote per tonne) and leaves behind the interesting shape:
 
-```
-Q* / ((1+f)·P·S_0)  =  (e^{μT} − 1) / (μT).
-```
+$$
+\frac{Q^*}{(1+f) \cdot P \cdot S_0} = \frac{e^{\mu T} - 1}{\mu T}.
+$$
 
 The ratio on the right is **dimensionless** — it is the factor by
 which the principal quote has to exceed the fee quote to compensate
@@ -748,17 +749,17 @@ undercut the fee model because the token is expected to cheapen."
 
 On the plot:
 
-- Each coloured line is one value of drift `μ` from the grid (see
+- Each coloured line is one value of drift $\mu$ from the grid (see
   legend). Colour goes from low-to-high drift via the viridis ramp.
-- The **dashed horizontal rule at 1.0** is the `μ = 0` limit: if the
+- The **dashed horizontal rule at 1.0** is the $\mu = 0$ limit: if the
   token price is expected to stay flat, the principal operator should
-  quote the fee quote `(1+f)·P·S_0` and the ratio is exactly 1.
-- Lines for `μ > 0` sit **above** the dashed line (principal model
+  quote the fee quote $(1+f) \cdot P \cdot S_0$ and the ratio is exactly 1.
+- Lines for $\mu > 0$ sit **above** the dashed line (principal model
   must charge more to cover expected appreciation).
-- Lines for `μ < 0` sit **below** the dashed line (principal model
+- Lines for $\mu < 0$ sit **below** the dashed line (principal model
   can charge less because it expects the token to cheapen, saving on
   inventory costs).
-- The **longer the horizon `T`**, the more compound growth piles up,
+- The **longer the horizon $T$**, the more compound growth piles up,
   and the further the line moves away from 1. Short horizons barely
   depart from the dashed line at all.
 
@@ -804,9 +805,9 @@ Plot.plot({
 })
 ```
 
-_Curves for each drift `μ` in the grid. Positive drift lifts `Q*` above the
+_Curves for each drift $\mu$ in the grid. Positive drift lifts $Q^*$ above the
 fee-based quote (principal must charge more to compensate for expected
-kVCM appreciation); negative drift pushes it below. The `μ = 0` curve
+kVCM appreciation); negative drift pushes it below. The $\mu = 0$ curve
 collapses onto the dashed unit line._
 
 ## Reading notes
@@ -816,41 +817,41 @@ report later.
 
 **On the numbers you see:**
 
-- All closed-form / Monte Carlo agreement checks live in the `z` column
+- All closed-form / Monte Carlo agreement checks live in the $z$ column
   of the §4 table — a single glance should tell you whether the MC is
-  well-converged at the current `nPaths`. Consistently large `|z|`
+  well-converged at the current `nPaths`. Consistently large $|z|$
   values are the first thing to investigate; they almost always point
   to either a bug in the simulator or too few paths for the statistic
   you're reading.
-- The fee and back-to-back books share the *same* random kernel `I_T`,
-  so their variance ratio is the exact algebraic multiple `(P/f)²`. If
+- The fee and back-to-back books share the *same* random kernel $I_T$,
+  so their variance ratio is the exact algebraic multiple $(P/f)^2$. If
   you ever read a ratio that disagrees with that constant, you are
   looking at either a simulator bug or a distribution other than the
   one this report claims to be showing.
-- All P&L numbers are **totals over the horizon `T`**, not annualised
+- All P&L numbers are **totals over the horizon $T$**, not annualised
   and not per-tonne. If you want a per-tonne number, divide by
-  `N = λ·T`.
-- "Loss" throughout means "the P&L random variable Π came out
-  negative." The fee book's P&L variable `R_fee` is really a revenue,
+  $N = \lambda \cdot T$.
+- "Loss" throughout means "the P&L random variable $\Pi$ came out
+  negative." The fee book's P&L variable $R_{\mathrm{fee}}$ is really a revenue,
   so it is never negative — its VaR/CVaR as printed are the *low end*
   of revenue, not a loss against zero.
 
 **On the business take-aways:**
 
-- The fee book has revenue that is always ≥ 0 but strictly dependent
+- The fee book has revenue that is always $\geq 0$ but strictly dependent
   on token price: when the token is cheap, revenue is small. No
   catastrophe, but no upside beyond the fee markup either.
 - The unhedged principal book (3b) has a capped upside and an
   unbounded downside. It is structurally short the token. The more
   the operator believes the token will rally, the worse this model
-  looks — and the break-even quote `Q*` plot above makes that
+  looks — and the break-even quote $Q^*$ plot above makes that
   explicit.
-- Pre-buying tokens (moving α from 0 toward 1) is the natural hedge
-  for the principal book: variance shrinks as `(1 − α)²`, so even a
-  modest `α` buys a disproportionate reduction in tail risk. But
-  pre-buying ties up capital (`α · N · P · S_0`) and introduces
+- Pre-buying tokens (moving $\alpha$ from 0 toward 1) is the natural hedge
+  for the principal book: variance shrinks as $(1-\alpha)^2$, so even a
+  modest $\alpha$ buys a disproportionate reduction in tail risk. But
+  pre-buying ties up capital ($\alpha \cdot N \cdot P \cdot S_0$) and introduces
   interim NAV drawdown risk — quantified in the §3a plots.
-- At `Q = Q*`, the fee book and the back-to-back principal book have
+- At $Q = Q^*$, the fee book and the back-to-back principal book have
   equal *expected* P&L but very different distributions. The
   principal book trades its mean preservation for a left-skewed loss
   tail. This asymmetry is the single most important thing the report
@@ -868,5 +869,5 @@ report later.
   They are parameterizable hooks in the simulator (see `src/params.ts`)
   but are zeroed out in this report.
 - Nothing here is financial advice or a calibration against any real
-  token. Use the framework; plug in your own `(μ, σ)` calibrated from
+  token. Use the framework; plug in your own $(\mu, \sigma)$ calibrated from
   data before making any business decision.

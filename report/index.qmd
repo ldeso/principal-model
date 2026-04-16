@@ -21,7 +21,7 @@ each choice carry?
 
 Mathematical framework, closed-form moments of the integrated GBM, and a
 tail-risk metric menu for the fee model and the three principal variants
-(pre-buy, back-to-back, and generalised hedge ratio `α`).
+(pre-buy, back-to-back, and generalised hedge ratio $\alpha$).
 
 [Read the note →](phase-a.qmd)
 :::
@@ -31,7 +31,7 @@ tail-risk metric menu for the fee model and the three principal variants
 
 TypeScript Monte Carlo reproduction of the Phase A closed forms, with
 VaR / CVaR tail estimates and an Observable-powered notebook for exploring
-`(α, μ, σ, f, Q, T)`.
+$(\alpha, \mu, \sigma, f, Q, T)$.
 
 [Open the simulator →](report.qmd)
 :::

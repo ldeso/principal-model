@@ -38,9 +38,9 @@ npm test
 Artifacts are written to `report/data/`:
 
 - `run-<seed>.json` — single-run: params, closed-form metrics, MC metrics,
-  I_T histogram, sampled paths, sub-sampled P&L traces.
-- `sweep.json` — grid over (α, μ, σ) with per-cell MC metrics.
-- `qstar-surface.json` — Q\*(μ, T) closed-form surface.
+  $I_T$ histogram, sampled paths, sub-sampled P&L traces.
+- `sweep.json` — grid over $(\alpha, \mu, \sigma)$ with per-cell MC metrics.
+- `qstar-surface.json` — $Q^*(\mu, T)$ closed-form surface.
 
 ### CLI flags
 
@@ -49,8 +49,8 @@ Artifacts are written to `report/data/`:
 | `--seed N` | PRNG seed |
 | `--paths N` | override `nPaths` |
 | `--steps N` | override `nSteps` |
-| `--alpha x` | override α |
-| `--mu x` / `--sigma x` | override μ, σ |
+| `--alpha x` | override $\alpha$ |
+| `--mu x` / `--sigma x` | override $\mu$, $\sigma$ |
 | `--f x` / `--Q x` / `--T x` | override fee, quote, horizon |
 | `--sweep` | additionally write `sweep.json` |
 
@@ -82,15 +82,15 @@ report/
 
 ## Verification notes
 
-- `Var[Π_b2b] / Var[R_fee] = (P / f)²` — same I_T kernel, rescaled (§3b).
-- `α = 1` collapses Π_α to the deterministic matched P&L path-by-path.
-- `α = 0` makes Π_α coincide with Π_b2b path-by-path.
-- `Q = Q*` equalises `E[R_fee]` and `E[Π_b2b]` (§5).
-- `μ = 0` ⇒ `Q* = (1 + f) · P · S_0` to machine precision.
-- The §3a NAV drawdown reports `max_t [N·P·(1−t/T)·(S_0 − S_t)]+` —
+- $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] = (P / f)^2$ — same $I_T$ kernel, rescaled (§3b).
+- $\alpha = 1$ collapses $\Pi_\alpha$ to the deterministic matched P&L path-by-path.
+- $\alpha = 0$ makes $\Pi_\alpha$ coincide with $\Pi_{\mathrm{b2b}}$ path-by-path.
+- $Q = Q^*$ equalises $\mathbb{E}[R_{\mathrm{fee}}]$ and $\mathbb{E}[\Pi_{\mathrm{b2b}}]$ (§5).
+- $\mu = 0 \Rightarrow Q^* = (1 + f) \cdot P \cdot S_0$ to machine precision.
+- The §3a NAV drawdown reports $\max_t [N \cdot P \cdot (1-t/T) \cdot (S_0 - S_t)]_+$ —
   shortfall against the deterministic decay schedule — because the
-  literal `max_t (V_0 − V_t)` from the note is pinned to V_0 under
-  the `V_T = 0` burn convention. See `src/risk.ts` for details.
+  literal $\max_t (V_0 - V_t)$ from the note is pinned to $V_0$ under
+  the $V_T = 0$ burn convention. See `src/risk.ts` for details.
 
 ## References
 

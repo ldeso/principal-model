@@ -12,25 +12,25 @@ This is **Phase A** of a three-phase roadmap:
 
 | Symbol | Meaning |
 | --- | --- |
-| `S_t` | kVCM/USD spot price at time `t` |
-| `P` | Protocol price (constant) in kVCM per tonne |
-| `π_t := P · S_t` | USD protocol price per tonne |
-| `λ` | Deterministic retirement flow, tonnes / unit time |
-| `T` | Horizon |
-| `N := λ · T` | Total tonnes retired over `[0, T]` |
-| `f` | Fee rate (e.g. 0.05) |
-| `Q` | Fixed USD quote per tonne in the principal model |
-| `α ∈ [0, 1]` | Fraction of inventory pre-purchased (principal, generalized) |
+| $S_t$ | kVCM/USD spot price at time $t$ |
+| $P$ | Protocol price (constant) in kVCM per tonne |
+| $\pi_t := P \cdot S_t$ | USD protocol price per tonne |
+| $\lambda$ | Deterministic retirement flow, tonnes / unit time |
+| $T$ | Horizon |
+| $N := \lambda \cdot T$ | Total tonnes retired over $[0, T]$ |
+| $f$ | Fee rate (e.g. 0.05) |
+| $Q$ | Fixed USD quote per tonne in the principal model |
+| $\alpha \in [0, 1]$ | Fraction of inventory pre-purchased (principal, generalized) |
 
-**Price dynamics.** `S_t` follows Geometric Brownian Motion under the physical measure:
+**Price dynamics.** $S_t$ follows Geometric Brownian Motion under the physical measure:
 
-```
-dS_t = μ · S_t · dt + σ · S_t · dW_t,    S_0 given.
-```
+$$
+dS_t = \mu \cdot S_t \cdot dt + \sigma \cdot S_t \cdot dW_t, \quad S_0 \text{ given.}
+$$
 
-Because `P` is a constant multiplier, `π_t = P · S_t` is itself GBM with the same `(μ, σ)`.
+Because $P$ is a constant multiplier, $\pi_t = P \cdot S_t$ is itself GBM with the same $(\mu, \sigma)$.
 
-**Demand.** Retirement flow is deterministic at rate `λ` tonnes / unit time. The sole source of randomness in the baseline is the kVCM price.
+**Demand.** Retirement flow is deterministic at rate $\lambda$ tonnes / unit time. The sole source of randomness in the baseline is the kVCM price.
 
 **Ignored in the baseline.** Risk-free discounting, gas, on-chain slippage, order-flow stochasticity. Each is re-introduced in a later phase (see §6).
 
@@ -38,108 +38,122 @@ Because `P` is a constant multiplier, `π_t = P · S_t` is itself GBM with the s
 
 Both models' P&L are linear functionals of the **integral of the GBM**:
 
-```
-I_T := ∫₀ᵀ S_t dt.
-```
+$$
+I_T := \int_0^T S_t\,dt.
+$$
 
 Its first two moments are known in closed form (Dufresne, 2001):
 
-```
-E[I_T]  = S_0 · (e^{μT} − 1) / μ,                                                   μ ≠ 0    (→ S_0 · T as μ → 0)
+$$
+\mathbb{E}[I_T] = S_0 \cdot \frac{e^{\mu T} - 1}{\mu}, \quad \mu \neq 0 \quad (\to S_0 \cdot T \text{ as } \mu \to 0)
+$$
 
-E[I_T²] = (2 · S_0²) / (μ + σ²)
-          · [ (e^{(2μ + σ²)T} − 1) / (2μ + σ²)  −  (e^{μT} − 1) / μ ],
+$$
+\mathbb{E}[I_T^2] = \frac{2 S_0^2}{\mu + \sigma^2} \left[ \frac{e^{(2\mu + \sigma^2) T} - 1}{2\mu + \sigma^2} - \frac{e^{\mu T} - 1}{\mu} \right],
+$$
 
-Var[I_T] = E[I_T²] − E[I_T]².
-```
+$$
+\mathrm{Var}[I_T] = \mathbb{E}[I_T^2] - \mathbb{E}[I_T]^2.
+$$
 
-The distribution of `I_T` is not log-normal, so tail metrics (VaR, CVaR) are obtained by Monte Carlo; the moments above serve as closed-form anchors and Monte Carlo sanity checks.
+The distribution of $I_T$ is not log-normal, so tail metrics (VaR, CVaR) are obtained by Monte Carlo; the moments above serve as closed-form anchors and Monte Carlo sanity checks.
 
 ## 2. Fee-based model
 
-The company quotes clients `(1 + f) · π_t` and remits `π_t` to the protocol, keeping `f · π_t` per tonne.
+The company quotes clients $(1 + f) \cdot \pi_t$ and remits $\pi_t$ to the protocol, keeping $f \cdot \pi_t$ per tonne.
 
-**Total revenue over `[0, T]`:**
+**Total revenue over $[0, T]$:**
 
-```
-R_fee = ∫₀ᵀ f · π_t · λ dt = f · P · λ · I_T.
-```
+$$
+R_{\mathrm{fee}} = \int_0^T f \cdot \pi_t \cdot \lambda\,dt = f \cdot P \cdot \lambda \cdot I_T.
+$$
 
 **Moments:**
 
-```
-E[R_fee]   = f · P · λ · E[I_T].
-Var[R_fee] = (f · P · λ)² · Var[I_T].
-```
+$$
+\mathbb{E}[R_{\mathrm{fee}}] = f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T].
+$$
+
+$$
+\mathrm{Var}[R_{\mathrm{fee}}] = (f \cdot P \cdot \lambda)^2 \cdot \mathrm{Var}[I_T].
+$$
 
 **Properties.**
 
-- `R_fee ≥ 0` almost surely.
-- Top-line volatility is fully driven by `σ` — the company has no balance-sheet exposure and holds no inventory.
-- Scales linearly in `f`, so the risk-adjusted return per unit fee is invariant in `f`.
+- $R_{\mathrm{fee}} \geq 0$ almost surely.
+- Top-line volatility is fully driven by $\sigma$ — the company has no balance-sheet exposure and holds no inventory.
+- Scales linearly in $f$, so the risk-adjusted return per unit fee is invariant in $f$.
 
 ## 3. Principal model
 
-The company sets a fixed USD quote `Q` at `t = 0`. Three variants of inventory sourcing, in increasing order of risk:
+The company sets a fixed USD quote $Q$ at $t = 0$. Three variants of inventory sourcing, in increasing order of risk:
 
-### 3a. Fully matched pre-purchase (α = 1)
+### 3a. Fully matched pre-purchase ($\alpha = 1$)
 
-At `t = 0` buy exactly `N · P` kVCM at spot `S_0`; cost `C = N · P · S_0`. Burn against deterministic demand over `[0, T]`.
+At $t = 0$ buy exactly $N \cdot P$ kVCM at spot $S_0$; cost $C = N \cdot P \cdot S_0$. Burn against deterministic demand over $[0, T]$.
 
 **Terminal P&L:**
 
-```
-Π_matched = N · (Q − P · S_0),
-```
+$$
+\Pi_{\mathrm{matched}} = N \cdot (Q - P \cdot S_0),
+$$
 
 which is **deterministic** — no terminal kVCM risk.
 
-Risk still exists *interim*. The mark-to-market inventory value at time `t` is
+Risk still exists *interim*. The mark-to-market inventory value at time $t$ is
 
-```
-V_t = (N · P) · (1 − t/T) · S_t,
-```
+$$
+V_t = (N \cdot P) \cdot (1 - t/T) \cdot S_t,
+$$
 
-which is a scaled GBM decayed by a deterministic burn schedule. Solvency, margin-call, or accounting-covenant concerns live in the distribution of `max_{t ≤ T} (V_0 − V_t)` (max drawdown). This is tracked by Monte Carlo in Phase B.
+which is a scaled GBM decayed by a deterministic burn schedule. Solvency, margin-call, or accounting-covenant concerns live in the distribution of $\max_{t \leq T} (V_0 - V_t)$ (max drawdown). This is tracked by Monte Carlo in Phase B.
 
-### 3b. Back-to-back acquisition (α = 0)
+### 3b. Back-to-back acquisition ($\alpha = 0$)
 
-The company quotes `Q` at `t = 0` but buys kVCM at spot for each retirement. Per-tonne realized P&L is `Q − P · S_t`.
+The company quotes $Q$ at $t = 0$ but buys kVCM at spot for each retirement. Per-tonne realized P&L is $Q - P \cdot S_t$.
 
 **Total P&L:**
 
-```
-Π_b2b = ∫₀ᵀ (Q − P · S_t) · λ dt = Q · N − P · λ · I_T.
-```
+$$
+\Pi_{\mathrm{b2b}} = \int_0^T (Q - P \cdot S_t) \cdot \lambda\,dt = Q \cdot N - P \cdot \lambda \cdot I_T.
+$$
 
 **Moments:**
 
-```
-E[Π_b2b]   = Q · N − P · λ · E[I_T].
-Var[Π_b2b] = (P · λ)² · Var[I_T].
-```
+$$
+\mathbb{E}[\Pi_{\mathrm{b2b}}] = Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T].
+$$
 
-Note that `Var[Π_b2b]` coincides with `Var[R_fee]` up to the rescaling factor `(P / f)² · f² = P²` — i.e. the two models share **the same random kernel** `I_T`. Phase B can therefore reuse a single Monte Carlo simulation of `I_T` and rescale.
+$$
+\mathrm{Var}[\Pi_{\mathrm{b2b}}] = (P \cdot \lambda)^2 \cdot \mathrm{Var}[I_T].
+$$
 
-**Payoff shape.** `Π_b2b` is linearly *decreasing* in `I_T`: upside is capped at `Q · N` (reached as `S_t → 0`), downside is unbounded if kVCM rallies. Equivalent to shorting a continuous strip of forwards on kVCM struck at `Q / P`.
+Note that $\mathrm{Var}[\Pi_{\mathrm{b2b}}]$ coincides with $\mathrm{Var}[R_{\mathrm{fee}}]$ up to the rescaling factor $(P / f)^2 \cdot f^2 = P^2$ — i.e. the two models share **the same random kernel** $I_T$. Phase B can therefore reuse a single Monte Carlo simulation of $I_T$ and rescale.
 
-### 3c. Partial pre-purchase (α ∈ [0, 1])
+**Payoff shape.** $\Pi_{\mathrm{b2b}}$ is linearly *decreasing* in $I_T$: upside is capped at $Q \cdot N$ (reached as $S_t \to 0$), downside is unbounded if kVCM rallies. Equivalent to shorting a continuous strip of forwards on kVCM struck at $Q / P$.
 
-Buy `α · N · P` kVCM at `S_0`, source the rest back-to-back. Then
+### 3c. Partial pre-purchase ($\alpha \in [0, 1]$)
 
-```
-Π_α = α · N · (Q − P · S_0)  +  (1 − α) · (Q · N − P · λ · I_T)
-     = Q · N  −  P · λ · [ α · S_0 · T  +  (1 − α) · I_T ].
-```
+Buy $\alpha \cdot N \cdot P$ kVCM at $S_0$, source the rest back-to-back. Then
 
-Mean and variance interpolate linearly in `α`:
+$$
+\begin{aligned}
+\Pi_\alpha &= \alpha \cdot N \cdot (Q - P \cdot S_0) + (1 - \alpha) \cdot (Q \cdot N - P \cdot \lambda \cdot I_T) \\
+&= Q \cdot N - P \cdot \lambda \cdot \left[ \alpha \cdot S_0 \cdot T + (1 - \alpha) \cdot I_T \right].
+\end{aligned}
+$$
 
-```
-E[Π_α]   = (1 − α) · E[Π_b2b] + α · Π_matched,
-Var[Π_α] = (1 − α)² · Var[Π_b2b].
-```
+Mean and variance interpolate linearly in $\alpha$:
 
-`α` is the company's hedge ratio against spot. `α = 1` gives a deterministic P&L (fully hedged at inception); `α = 0` is the unhedged short-forward strip.
+$$
+\mathbb{E}[\Pi_\alpha] = (1 - \alpha) \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}] + \alpha \cdot \Pi_{\mathrm{matched}},
+$$
+
+$$
+\mathrm{Var}[\Pi_\alpha] = (1 - \alpha)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}].
+$$
+
+$\alpha$ is the company's hedge ratio against spot. $\alpha = 1$ gives a deterministic P&L (fully hedged at inception); $\alpha = 0$ is the unhedged short-forward strip.
 
 ## 4. Risk quantification
 
@@ -147,50 +161,50 @@ For each model, the Phase B simulator should report:
 
 | Metric | How |
 | --- | --- |
-| `E[Π]`, `Var[Π]`, `SD[Π]` | Closed form from §2–3 |
-| `VaR_95`, `VaR_99` | Monte Carlo empirical quantile of `−Π` |
-| `CVaR_95`, `CVaR_99` | Monte Carlo tail mean of `−Π` |
-| `P[Π < 0]` | Monte Carlo |
-| `Sharpe-like = E[Π] / SD[Π]` | Closed form |
-| Max NAV drawdown (principal 3a only) | Monte Carlo on `V_t` path |
+| $\mathbb{E}[\Pi]$, $\mathrm{Var}[\Pi]$, $\mathrm{SD}[\Pi]$ | Closed form from §2–3 |
+| $\mathrm{VaR}_{95}$, $\mathrm{VaR}_{99}$ | Monte Carlo empirical quantile of $-\Pi$ |
+| $\mathrm{CVaR}_{95}$, $\mathrm{CVaR}_{99}$ | Monte Carlo tail mean of $-\Pi$ |
+| $\mathbb{P}[\Pi < 0]$ | Monte Carlo |
+| Sharpe-like $= \mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ | Closed form |
+| Max NAV drawdown (principal 3a only) | Monte Carlo on $V_t$ path |
 
 ### Itô dynamics and delta
 
-Applying the Itô product rule to the cumulative P&L process, the instantaneous sensitivity of *remaining* P&L to the spot `S_t` is:
+Applying the Itô product rule to the cumulative P&L process, the instantaneous sensitivity of *remaining* P&L to the spot $S_t$ is:
 
-```
-Fee-based:     ∂ E[R_fee − R(t) | F_t] / ∂ S_t  =  f · P · λ · (e^{μ(T−t)} − 1) / μ
-                                                 ≈ f · P · λ · (T − t)   for μT small.
+$$
+\text{Fee-based:} \quad \frac{\partial\,\mathbb{E}[R_{\mathrm{fee}} - R(t) \mid \mathcal{F}_t]}{\partial S_t} = f \cdot P \cdot \lambda \cdot \frac{e^{\mu(T-t)} - 1}{\mu} \approx f \cdot P \cdot \lambda \cdot (T - t) \text{ for } \mu T \text{ small.}
+$$
 
-Principal 3b:  ∂ E[Π_b2b − Π(t) | F_t] / ∂ S_t  =  − P · λ · (e^{μ(T−t)} − 1) / μ
-                                                 ≈ − P · λ · (T − t).
-```
+$$
+\text{Principal 3b:} \quad \frac{\partial\,\mathbb{E}[\Pi_{\mathrm{b2b}} - \Pi(t) \mid \mathcal{F}_t]}{\partial S_t} = -P \cdot \lambda \cdot \frac{e^{\mu(T-t)} - 1}{\mu} \approx -P \cdot \lambda \cdot (T - t).
+$$
 
 Signs are opposite: the fee book is **long** kVCM beta; the back-to-back principal book is **short** kVCM beta. The matched principal book has zero delta (fully pre-hedged by physical inventory).
 
-This is the handle for Phase C hedging: the natural static hedge for the principal back-to-back book is to hold `(P · λ) · (T − t)` tokens of spot kVCM at each time `t` — which is exactly the matched-pre-purchase strategy (§3a) amortized to the remaining horizon.
+This is the handle for Phase C hedging: the natural static hedge for the principal back-to-back book is to hold $(P \cdot \lambda) \cdot (T - t)$ tokens of spot kVCM at each time $t$ — which is exactly the matched-pre-purchase strategy (§3a) amortized to the remaining horizon.
 
 ## 5. Direct comparison
 
 | | Fee-based | Principal 3a (matched) | Principal 3b (back-to-back) |
 | --- | --- | --- | --- |
-| `E[P&L]` | `f · P · λ · E[I_T]` | `N · (Q − P · S_0)` | `Q · N − P · λ · E[I_T]` |
-| `Var[P&L]` | `(f P λ)² · Var[I_T]` | `0` (terminal) | `(P λ)² · Var[I_T]` |
+| $\mathbb{E}[\text{P\&L}]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ |
+| $\mathrm{Var}[\text{P\&L}]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ |
 | kVCM exposure | long | none (terminal), long (interim NAV) | short |
 | Downside | bounded below by 0 | deterministic | unbounded |
-| Capital requirement | none | `N · P · S_0` | none |
+| Capital requirement | none | $N \cdot P \cdot S_0$ | none |
 
 ### Break-even quote
 
 The principal back-to-back model matches the fee-based model's *expected* revenue when
 
-```
-Q* = (1 + f) · P · E[I_T] / T = (1 + f) · P · S_0 · (e^{μT} − 1) / (μ T).
-```
+$$
+Q^* = (1 + f) \cdot P \cdot \mathbb{E}[I_T] / T = (1 + f) \cdot P \cdot S_0 \cdot \frac{e^{\mu T} - 1}{\mu T}.
+$$
 
-As `μ → 0`, `Q* → (1 + f) · P · S_0` — the fee-based time-zero quote. For `μ > 0` the principal model must quote *above* that to compensate for expected kVCM appreciation; for `μ < 0` it quotes below.
+As $\mu \to 0$, $Q^* \to (1 + f) \cdot P \cdot S_0$ — the fee-based time-zero quote. For $\mu > 0$ the principal model must quote *above* that to compensate for expected kVCM appreciation; for $\mu < 0$ it quotes below.
 
-**Asymmetry observation.** Even at `Q = Q*`, the two books have radically different risk profiles: the fee book has bounded positive-only revenue, while the back-to-back principal book has the same variance but a *left-skewed* loss tail. Matching means does not match distributions.
+**Asymmetry observation.** Even at $Q = Q^*$, the two books have radically different risk profiles: the fee book has bounded positive-only revenue, while the back-to-back principal book has the same variance but a *left-skewed* loss tail. Matching means does not match distributions.
 
 ## 6. Limitations and next steps
 
@@ -205,5 +219,5 @@ As `μ → 0`, `Q* → (1 + f) · P · S_0` — the fee-based time-zero quote. F
 
 ## References
 
-- Dufresne, D. (2001). *The integral of geometric Brownian motion.* Advances in Applied Probability, 33(1), 223–241. — closed-form moments of `I_T`.
+- Dufresne, D. (2001). *The integral of geometric Brownian motion.* Advances in Applied Probability, 33(1), 223–241. — closed-form moments of $I_T$.
 - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, §3.4. — simulation of path integrals of GBM.
