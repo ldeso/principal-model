@@ -22,15 +22,70 @@ format:
 </style>
 ```
 
+## What this report is about (for new readers)
+
+Imagine a company that helps businesses retire tonnes of carbon-offset credits
+on a blockchain protocol (here, Klima). To retire one tonne, the company must
+first buy the protocol's token on the open market, and the token's dollar
+price moves around every day. The company has to decide **how to charge
+customers** and **how to source inventory**, and those two choices together
+determine how much money it makes and how much risk it runs.
+
+This notebook compares two business designs for that company:
+
+- **Fee-based.** The company quotes the customer a markup on top of the live
+  token price and buys just-in-time. It never holds a big inventory and it
+  never takes a directional bet, but its revenue rises and falls with the
+  token price.
+- **Principal.** The company quotes the customer a **fixed dollar price per
+  tonne today**, locking in the sale — and then takes on the job of finding
+  the tokens. That can be done by (3a) buying all the tokens up front, (3b)
+  buying them one-by-one as retirements happen, or (3c) any blend of the two.
+
+The fee model behaves like a commission-taker. The principal model behaves
+like a market-maker that has shorted a stream of forwards on the token: it
+locked in a sale price and now has to cover it at an unknown cost. The key
+question for the business is: *given how the token price is expected to move,
+which model makes more money, which one loses more in a bad scenario, and how
+much does pre-buying inventory (the "hedge ratio" `α`) reduce that risk?*
+
+The companion research note (`research-note.md`) derives the math. This
+notebook runs the numbers: it simulates thousands of possible futures for the
+token price, computes the company's profit and loss (P&L) in each one, and
+plots the distributions.
+
+::: {.callout-note-lite}
+**Minimum background to read this page.** Familiarity with probability
+(mean, standard deviation, quantiles) and with Monte Carlo simulation
+helps, but the prose in each section explains what every plot is showing
+and what a "good" or "bad" pattern looks like. Readers who want the
+derivations should keep `research-note.md` open alongside; readers who just
+want the business intuition can skim past the equations.
+:::
+
 ## Overview
 
-This notebook is the **Phase B** companion to `research-note.md`. It reproduces
-the §2–§5 closed-form P&L moments, estimates the §4 tail-risk metrics by Monte
-Carlo, and lets the reader explore the `(α, μ, σ)` grid interactively. All
-Monte Carlo computation happens in TypeScript (`src/`); this page only reads
-the emitted JSON and visualises it.
+This notebook is the **Phase B** companion to `research-note.md` (Phase A,
+the mathematical note). Phase A wrote down closed-form formulas for the
+mean and variance of every book's P&L under a standard price model
+(Geometric Brownian Motion, or GBM — see the next section). Phase B, this
+notebook, has three jobs:
 
-Regenerate the data before previewing:
+1. **Cross-check the math.** For quantities the Phase A note gives in
+   closed form, we also compute them by Monte Carlo simulation. If the
+   two disagree, one of them is wrong. The `z` column in the §4 table is
+   a numerical sanity check built exactly for this purpose.
+2. **Fill in what closed form cannot give.** Tail-risk metrics (VaR,
+   CVaR, loss probability — all defined below) depend on the full
+   distribution, not just its first two moments. We estimate those
+   empirically.
+3. **Let the reader explore.** The `(α, μ, σ)` grid at the bottom of the
+   page is interactive: drag the sliders to see how the tail of the
+   principal book responds to drift, volatility, and the hedge ratio.
+
+All Monte Carlo computation happens in TypeScript (`src/`); this page only
+reads the emitted JSON and visualises it. If you are running the report
+locally, regenerate the data before previewing:
 
 ```sh
 npm run simulate -- --seed 42
@@ -41,15 +96,40 @@ npm run sweep -- --seed 42
 **What you will see below.** Four kinds of plots: (1) a scorecard table of
 closed-form vs Monte Carlo P&L moments with tail metrics, (2) overlaid P&L
 distributions for the three stochastic models, (3) diagnostics on the shared
-random kernel `I_T := ∫₀ᵀ S_t dt`, and (4) parameter sweeps showing how tail
-risk and the break-even quote `Q*` respond to drift `μ`, volatility `σ`, and
-hedge ratio `α`.
+random kernel `I_T := ∫₀ᵀ S_t dt` (the time-integral of the simulated price;
+both the fee and back-to-back books turn out to be linear functions of this
+single quantity, so it is worth looking at directly), and (4) parameter
+sweeps showing how tail risk and the break-even quote `Q*` respond to drift
+`μ`, volatility `σ`, and hedge ratio `α`.
 :::
+
+### Mini-glossary
+
+If you are coming from outside quant finance, these three concepts come up
+repeatedly on this page:
+
+- **Geometric Brownian Motion (GBM).** A standard model for prices that
+  evolve by random percentage moves (not random dollar moves). Two
+  parameters: `μ` is the expected growth rate per year ("drift"), `σ` is
+  the size of the random jitter per year ("volatility"). This is the same
+  model underneath Black–Scholes.
+- **Monte Carlo simulation.** Rolling the dice many thousands of times.
+  Here each "roll" is a full random trajectory of the token price over the
+  horizon `T`, and we compute the company's P&L along that trajectory.
+  Averaging over thousands of trajectories gives us an estimate of
+  expected P&L; looking at the worst outcomes gives us tail risk.
+- **Hedge ratio α.** The fraction of the tokens the company pre-buys at
+  day zero instead of buying just-in-time. `α = 0` means no pre-buying at
+  all (maximum exposure to price); `α = 1` means buying the whole year's
+  supply at inception (fully pre-hedged, zero terminal risk); `α = 0.5`
+  means half now, half later.
 
 ### Notation cheat-sheet
 
 A brief reminder of the symbols used throughout (full derivations in
-`research-note.md` §1–§5):
+`research-note.md` §1–§5). Most symbols have a short English name in
+parentheses: read the table once top-to-bottom the first time you use
+this page, and after that the formulas should parse on sight.
 
 | Symbol | Meaning | Units |
 | --- | --- | --- |
@@ -69,7 +149,30 @@ A brief reminder of the symbols used throughout (full derivations in
 | `Π_α = (1−α)·Π_b2b + α·Π_matched` | partial pre-purchase (α∈[0,1]) | USD |
 | `Q* = (1+f)·P·S_0·(e^{μT}−1)/(μT)` | break-even quote equating `E[Π_b2b] = E[R_fee]` | USD / tonne |
 
+Quick reading guide for the less-obvious symbols:
+
+- `P` is a **protocol constant**: how many tokens the protocol wants per
+  tonne of CO₂ retired. It doesn't move. The *dollar* price per tonne
+  `π_t = P·S_t` moves only because the token price `S_t` moves.
+- `I_T` is the **area under the price curve over the horizon** — if you
+  sketched `S_t` against time for `t ∈ [0,T]`, `I_T` is the area under
+  that sketch. It shows up repeatedly because integrating the price over
+  a period of time is exactly what "pay the running market rate for a
+  steady flow of tonnes" costs.
+- `R_fee`, `Π_b2b`, `Π_matched`, `Π_α` are the four different P&L
+  variables compared in the §4 table below. `R_fee` is revenue (always
+  ≥ 0); the `Π`'s are profit-and-loss (can be negative).
+- `Q*` is the "fair" per-tonne quote for the principal model — the price
+  at which its expected P&L matches the fee model's. The last section of
+  this report plots how `Q*` depends on `μ` and `T`.
+
 ## Single-run outputs
+
+This section looks at **one** set of parameters — one drift, one
+volatility, one horizon, one hedge ratio — and shows the full P&L
+distribution the simulator produces for each book. Think of it as the
+"zoomed-in" view. The later parameter-sweep section is the "zoomed-out"
+view across many parameter combinations.
 
 Loaded from `data/run-42.json` — produced by `npm run simulate -- --seed 42`.
 
@@ -80,10 +183,23 @@ run = FileAttachment("data/run-42.json").json()
 
 ### Run parameters
 
-The scorecard below echoes the parameters used for this run. `Q*` is the
-closed-form break-even quote — if `Q` matches `Q*` the fee-based and
-back-to-back principal books have equal expected P&L (but not equal
-distributions, per §5).
+The scorecard below echoes the parameters used for this run. Each tile is
+a single number the simulator took as an input (or, in the case of `Q*`,
+computed directly from the other inputs). Some worth flagging:
+
+- **Monte Carlo paths** is how many random trajectories were simulated.
+  More paths = tighter statistics on the tails, at a linear cost in
+  runtime.
+- **μ, σ, T** define the price process: an expected growth rate, an
+  annualised volatility, and a horizon in years.
+- **λ** is the steady retirement flow in tonnes/year — the "throughput"
+  of the business.
+- **f, Q, α** are the three business levers: the fee markup, the fixed
+  principal quote, and the hedge ratio.
+- **Q\*** is the closed-form break-even quote — if the operator picks
+  `Q = Q*`, the fee and back-to-back principal books will have **equal
+  expected P&L**, but as §5 below shows, their *distributions* are still
+  very different. Matching means does not match risk.
 
 ```{ojs}
 //| echo: false
@@ -103,14 +219,27 @@ html`<div class="metric-grid">
 
 ### §4 — P&L moments: closed-form vs Monte Carlo
 
-Each row is one of the four models from the research note. The first block
-of columns cross-checks the Monte Carlo mean against the Dufresne-based
-closed form: `±CI95` is the ±95% half-width of the MC mean, and `z` is
-`(MC − closed) / stderr`. For large `nPaths` the MC mean should land within
-its own CI and `|z|` should rarely exceed 2. The second block of columns
-reports the risk quantities the closed form does not cover — empirical VaR,
-CVaR, loss probability, and the Sharpe-like ratio `E[Π] / SD[Π]`. All P&L
-numbers are USD over the horizon `T`.
+This is the central scorecard. Each row is one of the four books from
+the research note (the fee book, and three principal variants: fully
+matched `3a`, fully back-to-back `3b`, and partially hedged `3c`), and
+each column is a summary statistic of that book's P&L distribution.
+
+The table has two logical halves:
+
+1. **Sanity check (first block of columns).** For quantities the Phase A
+   note derives in closed form — expected P&L and its standard deviation
+   — we print **both** the closed-form value and the Monte Carlo
+   estimate. If our simulator is correct, these two should agree. The
+   `z` column formalises that: it is the MC mean's distance from the
+   closed form, measured in standard errors of the MC mean. Rule of
+   thumb: `|z| ≤ 2` looks healthy, `|z| > 3` is worth investigating.
+2. **Risk metrics (second block).** Quantities that can't be computed
+   from the first two moments alone: VaR, CVaR, loss probability, and a
+   Sharpe-like ratio. These come straight from the empirical
+   distribution of simulated P&Ls.
+
+All P&L numbers are in **USD over the horizon `T`** (not annualised, not
+per-tonne).
 
 <div class="legend-table">
 
@@ -127,8 +256,39 @@ numbers are USD over the horizon `T`.
 
 </div>
 
-`principal_3a` is deterministic at horizon, so SD, CI95, and z are zero by
-construction; VaR/CVaR simply reflect the sign of the matched P&L.
+**Risk metrics in plain English.**
+
+- **VaR₉₅ (Value-at-Risk at 95%).** A loss number. "With 5% probability
+  we lose at least VaR₉₅." It's the 5th-percentile of P&L, sign-flipped.
+  A common executive-summary number, but it deliberately does **not**
+  tell you how bad the worst 5% are — only the threshold at which that
+  5% begins.
+- **CVaR₉₅ (Conditional VaR, also "Expected Shortfall").** The average
+  loss *inside* that worst 5%. If VaR₉₅ is the door to the tail, CVaR₉₅
+  is the average depth of the room beyond. CVaR is a strictly more
+  informative risk measure than VaR when the tail is fat or skewed.
+- **VaR₉₉ / CVaR₉₉.** Same, but the worst 1% rather than the worst 5%.
+  Use these for rarer but more severe events.
+- **P[Π < 0].** The probability the book simply loses money at the
+  horizon. A blunt headline metric.
+- **Sharpe-like = E[Π] / SD[Π].** Expected reward per unit of risk —
+  higher is better. For the fee model this number is invariant in `f`
+  (doubling the fee doubles both mean and SD), so it captures
+  *structural* risk/reward, not the pricing dial.
+
+**Reading tips.**
+
+- Row `fee`: revenue only (never negative), so VaR/CVaR are negative
+  numbers, i.e. "worst case is still a gain, just a smaller one."
+- Row `principal_3a`: by construction the matched book has no terminal
+  randomness at all, so SD, CI95, and z are zero to machine precision,
+  and VaR/CVaR simply echo the sign of the one deterministic P&L.
+- Row `principal_3b`: the unhedged principal book. This is the row
+  where the loss tail is real — compare its CVaR₉₉ against the others
+  to see how much a bad price path costs.
+- Row `principal_3c`: the partially-hedged book. Expect its SD and
+  CVaR to be smaller than `3b`'s by roughly `(1−α)²` — the variance
+  formula from Phase A §3c.
 
 ```{ojs}
 //| echo: false
@@ -168,19 +328,42 @@ Inputs.table(run.rows, {
 
 ### P&L distributions
 
-Each panel is one stochastic model's empirical density of terminal P&L,
-from a sub-sampled Monte Carlo cloud. The vertical black rule is the
-closed-form mean `E[Π]`; the dashed grey rule is `Π = 0`, so the mass to
-the left of it is the loss probability reported in the table.
+The table above summarises each book with a handful of statistics. This
+plot shows the whole distribution behind those statistics — one panel
+per stochastic book. The shapes tell the same story the numbers told,
+but visually.
 
-- **Fee book** (`R_fee = f·P·λ·I_T`): non-negative by construction, so mass
-  sits entirely in the right half-plane. Distribution is right-skewed — a
-  rescaled image of the `I_T` distribution.
-- **Principal 3b** (back-to-back, α = 0): linear *decreasing* in `I_T`, so
-  the same kernel produces a left-skewed loss tail. Upside is capped at
-  `Q·N` (reached as `S_t → 0`), downside is unbounded.
-- **Principal 3c** (partial, α = 0.5 in this run): variance scales as
-  `(1−α)²` relative to 3b, so the density is narrower.
+How to read a panel:
+
+- The **horizontal axis** is the book's terminal P&L in USD over the
+  horizon `T`. Negative values are losses.
+- The **bars** are a histogram of simulated P&L outcomes, rescaled as
+  an empirical density.
+- The **solid black vertical rule** sits at the closed-form expected
+  P&L `E[Π]`. If Monte Carlo is converged, the visual centre of the
+  histogram should land right on it.
+- The **dashed grey vertical rule** sits at `Π = 0` — the break-even
+  line. Whatever mass of the histogram sits to the left of it is the
+  loss probability `P[Π<0]` reported in the table.
+
+What to notice on each panel:
+
+- **Fee book** (`R_fee = f·P·λ·I_T`). Pure revenue: the formula has no
+  minus sign, so this random variable is non-negative by construction.
+  The histogram sits entirely in the right half-plane (no mass to the
+  left of `Π = 0`). Its shape is right-skewed — a long right tail —
+  because it inherits the right-skew of `I_T` (see next section).
+- **Principal 3b** (back-to-back, α = 0). Same random kernel `I_T`, but
+  it enters with a **minus** sign, so the distribution is the mirror of
+  the fee book's: upside is capped (best case: token price collapses to
+  zero, company gets the full fixed payment `Q·N`), downside is
+  unbounded (worst case: token rallies, company has to buy expensively
+  to fill the contract). This left-skewed loss tail is the central
+  risk concern of the whole research project.
+- **Principal 3c** (partial, α = 0.5 in this run). Same qualitative
+  shape as 3b, but narrower by a factor of `(1−α)² = 0.25` on variance,
+  i.e. `(1−α) = 0.5` on standard deviation. This is the visual
+  demonstration that pre-buying tokens shrinks the loss tail.
 
 ```{ojs}
 //| echo: false
@@ -219,12 +402,29 @@ break-even `Π = 0`._
 
 ### I_T histogram vs. Dufresne closed-form moments
 
-`I_T := ∫₀ᵀ S_t dt` is the shared random kernel driving both the fee book
-and the principal back-to-back book. Its first two moments are known in
-closed form (Dufresne, 2001), but the distribution itself is not log-normal,
-so tail quantities must be estimated numerically. This plot is a Monte Carlo
-histogram of `I_T` — the solid rule verifies that the empirical mean matches
-Dufresne's `E[I_T] = S_0·(e^{μT}−1)/μ`; the dashed rules sit at `E[I_T] ± SD`.
+`I_T := ∫₀ᵀ S_t dt` is the time-integral of the simulated price: the
+area under the price-vs-time curve over the horizon. Why does this one
+random number deserve its own plot?
+
+Because every book's P&L turns out to be a simple linear function of
+`I_T`. The fee book's revenue is `f·P·λ·I_T`. The back-to-back
+principal book's P&L is `Q·N − P·λ·I_T`. The partially-hedged book is
+an affine combination of those two. So `I_T` is the **one random
+variable** that drives everything stochastic in this notebook; every
+other distribution is just a rescaling or reflection of this one.
+
+Dufresne (2001) gives closed-form formulas for the mean and variance of
+`I_T`, but not for its full distribution — `I_T` is **not**
+log-normally distributed, even though `S_t` is, so tail quantiles have
+to be estimated by Monte Carlo. This plot is that estimate:
+
+- **Histogram bars** are the simulated density of `I_T` across all
+  paths.
+- **Solid black rule** is the Dufresne closed-form mean
+  `E[I_T] = S_0·(e^{μT}−1)/μ`. If the simulator is correct, it should
+  land on the visual centre of the histogram.
+- **Dashed black rules** are `E[I_T] ± SD[I_T]` — roughly a one-sigma
+  band. A well-behaved histogram puts ~68% of its mass between them.
 
 ```{ojs}
 //| echo: false
@@ -261,19 +461,50 @@ _Solid black: `E[I_T]` (Dufresne closed form). Dashed black: `E[I_T] ± SD[I_T]`
 
 ### Sample GBM paths — matched-book NAV view (§3a)
 
-The Phase A note defines the mark-to-market inventory value for the fully
-matched pre-purchase book (α = 1) as
+The matched pre-purchase book (α = 1) has a **deterministic** P&L at
+the horizon — the operator locked in a sale price `Q` per tonne and
+also locked in a purchase cost `P·S_0` per tonne at day zero, so the
+final number doesn't depend on the random path `S_t` at all.
+
+So why worry? Because in the *meantime* the business is carrying the
+token inventory on its balance sheet, and that inventory's mark-to-
+market value moves with the token price. If the token price tanks in
+month three, the accounting value of the remaining tokens falls — and
+that can trigger margin calls, covenant breaches, or simply painful
+quarterly reporting, even if by the horizon the book is mathematically
+fine.
+
+The Phase A note defines this mark-to-market inventory value as
 
 ```
 V_t = (N · P) · (1 − t/T) · S_t.
 ```
 
-This is a scaled GBM attenuated by the linear burn schedule. `V_0 = N·P·S_0`
-is the purchase cost; `V_T = 0` because inventory has been fully retired by
-the horizon. The plot shows a handful of sampled paths of `V_t` — the
-highlighted orange line is the first path, the grey lines are the rest.
-Interim drawdowns in `V_t` are the solvency concern even though terminal
-P&L is deterministic.
+Read the formula in parts:
+
+- `N · P` is the total number of tokens originally bought.
+- `(1 − t/T)` is the fraction **still** in inventory at time `t` — it
+  starts at 1 (all of them) and decays linearly to 0 at the horizon,
+  because retirements burn them at the constant rate `λ`.
+- `S_t` is the current dollar price per token.
+
+So `V_t = (tokens still held) × (current price per token)` — ordinary
+mark-to-market. At `t = 0` it equals `V_0 = N·P·S_0`, the original
+purchase cost. At `t = T` it equals zero, because the last token has
+been retired and there is no inventory left to value.
+
+The plot shows a handful of sampled paths of `V_t`:
+
+- **Grey lines** are random trajectories — each one is a possible
+  future history of the NAV.
+- **Orange line** is the first path, highlighted so one trajectory is
+  easy to follow with the eye.
+- Notice that **every path pins to zero at `t = T`** regardless of
+  whether the token price went up or down. That is the burn schedule
+  doing its work.
+- The scary bit is the **dip in the middle**. Even a path that
+  recovers to a reasonable terminal NAV can touch a painful low
+  partway through. The next plot quantifies that.
 
 ```{ojs}
 //| echo: false
@@ -311,16 +542,35 @@ regardless of `S_T`._
 
 ### NAV shortfall vs. schedule (§3a)
 
-For the matched book, a meaningful solvency statistic is the worst
-_shortfall against the expected decay schedule_:
+For the matched book, the relevant solvency question is: "If the token
+price had stayed flat at `S_0` the whole time, the NAV would have decayed
+along a straight line from `N·P·S_0` down to zero. How far *below* that
+straight line did the actual NAV dip, in the worst case?"
+
+Phrased as a formula, that is
 
 ```
 D := max_{t ≤ T}  [ N·P·(1 − t/T) · (S_0 − S_t) ]₊
 ```
 
-i.e., the deepest excursion of `V_t` below its pre-hedged deterministic
-path. This histogram is the empirical distribution of `D` across paths.
-Values on the x-axis are USD losses relative to schedule.
+where `[x]₊` means `max(x, 0)` — we only count the part where the actual
+NAV is **below** the no-price-move schedule, not above it (an upward
+excursion is a paper gain, not a solvency risk).
+
+This histogram is the empirical distribution of that maximum shortfall
+`D` across all simulated paths:
+
+- **The x-axis** is dollars of shortfall relative to the flat-price
+  schedule. Further right = deeper dip = worse.
+- **The dashed black rule** is the 95th percentile — a number that, on
+  average, will be exceeded on 1 out of every 20 years simulated.
+- **The solid black rule** is the 99th percentile — exceeded on 1 out
+  of every 100. These two percentiles are the natural stress thresholds
+  the treasury team would want to size its capital buffer against.
+
+Even though the matched book has deterministic **terminal** P&L, this
+plot shows why it is not "risk-free" in any practical sense: a large
+interim drawdown is a real operational event.
 
 ```{ojs}
 //| echo: false
@@ -346,11 +596,20 @@ book even though its terminal P&L is deterministic._
 
 ## Parameter sweep
 
+The single-run view above fixes all parameters and looks at the
+distribution. This section does the opposite: it **fixes the book**
+(principal 3c, the partially-hedged one) and a single risk summary
+(CVaR₉₅), and then sweeps the business parameters `(α, μ, σ)` to see
+how that risk summary responds.
+
 Loaded from `data/sweep.json` — a grid of Monte Carlo runs over
 `(α, μ, σ)`. Use the controls below to slice the grid. The plots below
-track `CVaR95` for the **principal 3c** (partial pre-purchase) book:
-CVaR95 is the expected loss in the worst 5% of outcomes, so larger values
-are worse. All P&L sweep quantities are in USD.
+track `CVaR95` for the **principal 3c** (partial pre-purchase) book.
+Reminder: **CVaR₉₅ is the expected loss in the worst 5% of outcomes,
+so larger numbers are worse.** A reader can think of the two plots
+below as "how bad does the worst-5% outcome get, as I dial each knob?"
+
+All P&L sweep quantities are in USD over horizon `T`.
 
 ```{ojs}
 //| echo: false
@@ -369,9 +628,17 @@ viewof pickMu = Inputs.select(sweep.grid.mus, { value: 0.05, label: "drift μ (/
 
 ### Tail risk vs volatility σ  (fixed α, μ)
 
-Holding `α` and `μ` fixed at the values chosen above, this line shows how
-the CVaR95 of the 3c book grows with volatility `σ`. The relationship is
-roughly monotone: more kVCM vol → a fatter left tail on P&L.
+Holding `α` (the hedge ratio) and `μ` (the drift) fixed at the values
+chosen above, this line shows how the CVaR₉₅ of the 3c book grows as
+we crank up `σ` (volatility).
+
+**Intuition.** Volatility is the size of the random jitter in the token
+price. More jitter means the integral `I_T` is more spread out, which
+means the principal book's P&L is more spread out, which means its
+left tail is fatter — so the average loss inside that tail is bigger.
+We therefore expect the curve below to be monotonically increasing
+(higher volatility → worse tail loss). That's a useful sanity check:
+if the line is non-monotone or flat, something is wrong upstream.
 
 ```{ojs}
 //| echo: false
@@ -402,12 +669,28 @@ tail of `Π_α`._
 
 ### Tail risk vs hedge ratio α  (fixed μ, σ at grid[1])
 
-This slice fixes `μ` at the selected value and `σ` at the **second** grid
-value, then sweeps `α` from 0 (fully back-to-back) to 1 (fully matched).
-Since `Var[Π_α] = (1−α)² · Var[Π_b2b]`, the CVaR95 curve should collapse
-quadratically toward zero as `α → 1` — this is the visual confirmation
-that pre-purchasing inventory is the natural hedge for the back-to-back
-book.
+This is the plot that answers the business question "how much do I
+reduce my loss tail by pre-buying more tokens up front?"
+
+It fixes `μ` at the selected value and `σ` at the **second** value in
+the grid (a middle-of-the-road volatility so the shape is easy to
+read), then sweeps `α` from 0 (fully back-to-back, no pre-buying) to 1
+(fully matched, entire year's supply bought today).
+
+Phase A §3c showed that `Var[Π_α] = (1 − α)² · Var[Π_b2b]`. Since CVaR
+scales roughly with standard deviation in a broad family of
+distributions, the CVaR₉₅ curve should collapse **quadratically**
+toward zero as `α → 1`. Visually: expect a smooth convex curve that
+bends down steeply, not a straight line. That's the signature of the
+`(1 − α)²` factor.
+
+At `α = 1` the book is fully pre-hedged and terminal P&L is
+deterministic; at that point the CVaR₉₅ drops to the sign of the one
+deterministic P&L (a single value, not a tail).
+
+This plot is the visual answer to: *"Pre-buying tokens is the natural
+hedge for the back-to-back principal book."* The curve below is the
+dose-response curve for that hedge.
 
 ```{ojs}
 //| echo: false
@@ -435,6 +718,12 @@ Plot.plot({
 
 ## Break-even quote surface Q*(μ, T)
 
+This section answers the pricing question: "If I were going to switch
+from the fee model to the principal model, what per-tonne quote `Q`
+would I need to charge so that my **expected** revenue is the same?"
+The answer is `Q*`, and it depends on how the operator expects the
+token price to drift (`μ`) and how long the contract runs (`T`).
+
 `Q*` is the USD quote that equalises the *expected* P&L of the
 back-to-back principal book with the fee-based book:
 
@@ -442,10 +731,36 @@ back-to-back principal book with the fee-based book:
 Q* = (1 + f) · P · S_0 · (e^{μT} − 1) / (μ T).
 ```
 
-Normalising by `(1+f)·P·S_0` removes the trivial scaling and leaves only
-the drift-horizon shape `(e^{μT}−1)/(μT)`. The dashed horizontal rule is
-the `μ = 0` limit: at zero drift, `Q* = (1+f)·P·S_0`, i.e. the fee-based
-time-zero quote.
+To make the picture easier to read, we divide both sides by
+`(1+f)·P·S_0` — this removes the uninteresting scaling (which is just
+today's fee-quote per tonne) and leaves behind the interesting shape:
+
+```
+Q* / ((1+f)·P·S_0)  =  (e^{μT} − 1) / (μT).
+```
+
+The ratio on the right is **dimensionless** — it is the factor by
+which the principal quote has to exceed the fee quote to compensate
+for expected price drift. A value of 1.0 means "quote the same as the
+fee model"; a value above 1.0 means "charge a premium to cover
+expected token appreciation"; a value below 1.0 means "can afford to
+undercut the fee model because the token is expected to cheapen."
+
+On the plot:
+
+- Each coloured line is one value of drift `μ` from the grid (see
+  legend). Colour goes from low-to-high drift via the viridis ramp.
+- The **dashed horizontal rule at 1.0** is the `μ = 0` limit: if the
+  token price is expected to stay flat, the principal operator should
+  quote the fee quote `(1+f)·P·S_0` and the ratio is exactly 1.
+- Lines for `μ > 0` sit **above** the dashed line (principal model
+  must charge more to cover expected appreciation).
+- Lines for `μ < 0` sit **below** the dashed line (principal model
+  can charge less because it expects the token to cheapen, saving on
+  inventory costs).
+- The **longer the horizon `T`**, the more compound growth piles up,
+  and the further the line moves away from 1. Short horizons barely
+  depart from the dashed line at all.
 
 ```{ojs}
 //| echo: false
@@ -496,12 +811,62 @@ collapses onto the dashed unit line._
 
 ## Reading notes
 
-- All closed-form / Monte Carlo agreement checks live in the `z` column of
-  the §4 table — a single glance should tell you whether the MC is
-  well-converged at the current `nPaths`.
-- The fee and back-to-back books share the *same* random kernel `I_T`, so
-  variance ratios are exact algebraic multiples (`(P/f)²`) — deviations
-  would indicate a simulator bug.
-- This notebook is Phase B; Phase C extensions (jump diffusion, Poisson
-  demand, historical calibration, dynamic hedging) are intentionally out
-  of scope here.
+A few things to keep in mind while skimming or coming back to this
+report later.
+
+**On the numbers you see:**
+
+- All closed-form / Monte Carlo agreement checks live in the `z` column
+  of the §4 table — a single glance should tell you whether the MC is
+  well-converged at the current `nPaths`. Consistently large `|z|`
+  values are the first thing to investigate; they almost always point
+  to either a bug in the simulator or too few paths for the statistic
+  you're reading.
+- The fee and back-to-back books share the *same* random kernel `I_T`,
+  so their variance ratio is the exact algebraic multiple `(P/f)²`. If
+  you ever read a ratio that disagrees with that constant, you are
+  looking at either a simulator bug or a distribution other than the
+  one this report claims to be showing.
+- All P&L numbers are **totals over the horizon `T`**, not annualised
+  and not per-tonne. If you want a per-tonne number, divide by
+  `N = λ·T`.
+- "Loss" throughout means "the P&L random variable Π came out
+  negative." The fee book's P&L variable `R_fee` is really a revenue,
+  so it is never negative — its VaR/CVaR as printed are the *low end*
+  of revenue, not a loss against zero.
+
+**On the business take-aways:**
+
+- The fee book has revenue that is always ≥ 0 but strictly dependent
+  on token price: when the token is cheap, revenue is small. No
+  catastrophe, but no upside beyond the fee markup either.
+- The unhedged principal book (3b) has a capped upside and an
+  unbounded downside. It is structurally short the token. The more
+  the operator believes the token will rally, the worse this model
+  looks — and the break-even quote `Q*` plot above makes that
+  explicit.
+- Pre-buying tokens (moving α from 0 toward 1) is the natural hedge
+  for the principal book: variance shrinks as `(1 − α)²`, so even a
+  modest `α` buys a disproportionate reduction in tail risk. But
+  pre-buying ties up capital (`α · N · P · S_0`) and introduces
+  interim NAV drawdown risk — quantified in the §3a plots.
+- At `Q = Q*`, the fee book and the back-to-back principal book have
+  equal *expected* P&L but very different distributions. The
+  principal book trades its mean preservation for a left-skewed loss
+  tail. This asymmetry is the single most important thing the report
+  is trying to show.
+
+**On what this notebook does *not* do:**
+
+- This notebook is Phase B. Phase C extensions (jump diffusion,
+  Poisson demand, historical calibration against a real kVCM proxy,
+  dynamic hedging strategies) are intentionally out of scope here.
+  The current numbers assume idealised GBM price dynamics and a
+  deterministic retirement flow; those assumptions are the cleanest
+  ones under which closed-form results exist and can be cross-checked.
+- Gas, slippage, and discounting are not modelled in the baseline.
+  They are parameterizable hooks in the simulator (see `src/params.ts`)
+  but are zeroed out in this report.
+- Nothing here is financial advice or a calibration against any real
+  token. Use the framework; plug in your own `(μ, σ)` calibrated from
+  data before making any business decision.
