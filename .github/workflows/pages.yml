@@ -38,6 +38,19 @@ jobs:
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
 
+      - name: Initialise gh-pages branch if missing
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+            echo "gh-pages branch already present on origin"
+          else
+            echo "creating empty gh-pages branch"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name  "github-actions[bot]"
+            empty_tree=$(git mktree < /dev/null)
+            empty_commit=$(git commit-tree "$empty_tree" -m "Initialise gh-pages branch")
+            git push origin "$empty_commit:refs/heads/gh-pages"
+          fi
+
       - name: Render & publish to gh-pages
         uses: quarto-dev/quarto-actions/publish@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
