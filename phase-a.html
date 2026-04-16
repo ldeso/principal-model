@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Klima Protocol — Fee-Based vs.&nbsp;Principal Model – Klima Protocol — Fee vs. Principal</title>
+<title>Phase A — Research note – Klima Protocol — Fee vs.&nbsp;Principal</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -74,7 +74,7 @@ ul.task-list li input[type="checkbox"] {
 
 </head>
 
-<body class="nav-fixed fullcontent quarto-light">
+<body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -92,11 +92,11 @@ ul.task-list li input[type="checkbox"] {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./phase-a.html"> 
+    <a class="nav-link active" href="./phase-a.html" aria-current="page"> 
 <span class="menu-text">Phase A — Note</span></a>
   </li>  
   <li class="nav-item">
@@ -114,14 +114,31 @@ ul.task-list li input[type="checkbox"] {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#klima-protocol-fee-based-vs.-principal-model" id="toc-klima-protocol-fee-based-vs.-principal-model" class="nav-link active" data-scroll-target="#klima-protocol-fee-based-vs.-principal-model">Klima Protocol — Fee-Based vs.&nbsp;Principal Model</a>
+  <ul class="collapse">
+  <li><a href="#setup-and-notation" id="toc-setup-and-notation" class="nav-link" data-scroll-target="#setup-and-notation">1. Setup and notation</a></li>
+  <li><a href="#fee-based-model" id="toc-fee-based-model" class="nav-link" data-scroll-target="#fee-based-model">2. Fee-based model</a></li>
+  <li><a href="#principal-model" id="toc-principal-model" class="nav-link" data-scroll-target="#principal-model">3. Principal model</a></li>
+  <li><a href="#risk-quantification" id="toc-risk-quantification" class="nav-link" data-scroll-target="#risk-quantification">4. Risk quantification</a></li>
+  <li><a href="#direct-comparison" id="toc-direct-comparison" class="nav-link" data-scroll-target="#direct-comparison">5. Direct comparison</a></li>
+  <li><a href="#limitations-and-next-steps" id="toc-limitations-and-next-steps" class="nav-link" data-scroll-target="#limitations-and-next-steps">6. Limitations and next steps</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Klima Protocol — Fee-Based vs.&nbsp;Principal Model</h1>
-<p class="subtitle lead">Revenue and risk for a carbon-retirement intermediary</p>
+<h1 class="title">Phase A — Research note</h1>
+<p class="subtitle lead">Mathematical framework, closed-form moments, risk-metric menu</p>
 </div>
 
 
@@ -138,32 +155,293 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>A three-phase research programme that asks a single question: when a carbon-retirement intermediary sources tokens on the open market, should it charge a <strong>fee</strong> or quote a fixed <strong>principal</strong> price — and how much risk does each choice carry?</p>
-<section id="phases" class="level2">
-<h2 class="anchored" data-anchor-id="phases">Phases</h2>
-<div class="grid">
-<section id="phase-a-research-note" class="level3 g-col-12 g-col-md-6">
-<h3 class="anchored" data-anchor-id="phase-a-research-note"><a href="./phase-a.html">Phase A — Research note</a></h3>
-<p>Mathematical framework, closed-form moments of the integrated GBM, and a tail-risk metric menu for the fee model and the three principal variants (pre-buy, back-to-back, and generalised hedge ratio <code>α</code>).</p>
-<p><a href="./phase-a.html">Read the note →</a></p>
-</section>
-<section id="phase-b-interactive-simulator" class="level3 g-col-12 g-col-md-6">
-<h3 class="anchored" data-anchor-id="phase-b-interactive-simulator"><a href="./report.html">Phase B — Interactive simulator</a></h3>
-<p>TypeScript Monte Carlo reproduction of the Phase A closed forms, with VaR / CVaR tail estimates and an Observable-powered notebook for exploring <code>(α, μ, σ, f, Q, T)</code>.</p>
-<p><a href="./report.html">Open the simulator →</a></p>
-</section>
-</div>
-</section>
-<section id="source" class="level2">
-<h2 class="anchored" data-anchor-id="source">Source</h2>
+<section id="klima-protocol-fee-based-vs.-principal-model" class="level2">
+<h2 class="anchored" data-anchor-id="klima-protocol-fee-based-vs.-principal-model">Klima Protocol — Fee-Based vs.&nbsp;Principal Model</h2>
+<p>A research note on revenue and risk quantification for a carbon-retirement intermediary operating against the Klima Protocol.</p>
+<p>This is <strong>Phase A</strong> of a three-phase roadmap:</p>
 <ul>
-<li>Research note: <a href="https://github.com/ldeso-agents/principal-model/blob/main/research-note.md"><code>research-note.md</code></a></li>
-<li>Simulator: <a href="https://github.com/ldeso-agents/principal-model/tree/main/src"><code>src/</code></a> (Node ≥ 20, TypeScript, vitest)</li>
-<li>Reproducibility: seeded Mulberry32 PRNG; every figure in Phase B is regenerated from <code>report/data/*.json</code>.</li>
+<li>Phase A (this note) — mathematical framework, closed-form moments under GBM, risk-metric menu.</li>
+<li>Phase B — TypeScript simulation reproducing the results below.</li>
+<li>Phase C — jump-diffusion / regime-switching extensions, Poisson demand, historical calibration against a kVCM proxy, hedging strategies.</li>
 </ul>
-<p>Phase C (jump-diffusion, Poisson demand, calibration, dynamic hedging) is out of scope for this site.</p>
+<section id="setup-and-notation" class="level3">
+<h3 class="anchored" data-anchor-id="setup-and-notation">1. Setup and notation</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>S_t</code></td>
+<td>kVCM/USD spot price at time <code>t</code></td>
+</tr>
+<tr class="even">
+<td><code>P</code></td>
+<td>Protocol price (constant) in kVCM per tonne</td>
+</tr>
+<tr class="odd">
+<td><code>π_t := P · S_t</code></td>
+<td>USD protocol price per tonne</td>
+</tr>
+<tr class="even">
+<td><code>λ</code></td>
+<td>Deterministic retirement flow, tonnes / unit time</td>
+</tr>
+<tr class="odd">
+<td><code>T</code></td>
+<td>Horizon</td>
+</tr>
+<tr class="even">
+<td><code>N := λ · T</code></td>
+<td>Total tonnes retired over <code>[0, T]</code></td>
+</tr>
+<tr class="odd">
+<td><code>f</code></td>
+<td>Fee rate (e.g.&nbsp;0.05)</td>
+</tr>
+<tr class="even">
+<td><code>Q</code></td>
+<td>Fixed USD quote per tonne in the principal model</td>
+</tr>
+<tr class="odd">
+<td><code>α ∈ [0, 1]</code></td>
+<td>Fraction of inventory pre-purchased (principal, generalized)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Price dynamics.</strong> <code>S_t</code> follows Geometric Brownian Motion under the physical measure:</p>
+<pre><code>dS_t = μ · S_t · dt + σ · S_t · dW_t,    S_0 given.</code></pre>
+<p>Because <code>P</code> is a constant multiplier, <code>π_t = P · S_t</code> is itself GBM with the same <code>(μ, σ)</code>.</p>
+<p><strong>Demand.</strong> Retirement flow is deterministic at rate <code>λ</code> tonnes / unit time. The sole source of randomness in the baseline is the kVCM price.</p>
+<p><strong>Ignored in the baseline.</strong> Risk-free discounting, gas, on-chain slippage, order-flow stochasticity. Each is re-introduced in a later phase (see §6).</p>
+<section id="the-central-stochastic-object" class="level4">
+<h4 class="anchored" data-anchor-id="the-central-stochastic-object">The central stochastic object</h4>
+<p>Both models’ P&amp;L are linear functionals of the <strong>integral of the GBM</strong>:</p>
+<pre><code>I_T := ∫₀ᵀ S_t dt.</code></pre>
+<p>Its first two moments are known in closed form (Dufresne, 2001):</p>
+<pre><code>E[I_T]  = S_0 · (e^{μT} − 1) / μ,                                                   μ ≠ 0    (→ S_0 · T as μ → 0)
+
+E[I_T²] = (2 · S_0²) / (μ + σ²)
+          · [ (e^{(2μ + σ²)T} − 1) / (2μ + σ²)  −  (e^{μT} − 1) / μ ],
+
+Var[I_T] = E[I_T²] − E[I_T]².</code></pre>
+<p>The distribution of <code>I_T</code> is not log-normal, so tail metrics (VaR, CVaR) are obtained by Monte Carlo; the moments above serve as closed-form anchors and Monte Carlo sanity checks.</p>
+</section>
+</section>
+<section id="fee-based-model" class="level3">
+<h3 class="anchored" data-anchor-id="fee-based-model">2. Fee-based model</h3>
+<p>The company quotes clients <code>(1 + f) · π_t</code> and remits <code>π_t</code> to the protocol, keeping <code>f · π_t</code> per tonne.</p>
+<p><strong>Total revenue over <code>[0, T]</code>:</strong></p>
+<pre><code>R_fee = ∫₀ᵀ f · π_t · λ dt = f · P · λ · I_T.</code></pre>
+<p><strong>Moments:</strong></p>
+<pre><code>E[R_fee]   = f · P · λ · E[I_T].
+Var[R_fee] = (f · P · λ)² · Var[I_T].</code></pre>
+<p><strong>Properties.</strong></p>
+<ul>
+<li><code>R_fee ≥ 0</code> almost surely.</li>
+<li>Top-line volatility is fully driven by <code>σ</code> — the company has no balance-sheet exposure and holds no inventory.</li>
+<li>Scales linearly in <code>f</code>, so the risk-adjusted return per unit fee is invariant in <code>f</code>.</li>
+</ul>
+</section>
+<section id="principal-model" class="level3">
+<h3 class="anchored" data-anchor-id="principal-model">3. Principal model</h3>
+<p>The company sets a fixed USD quote <code>Q</code> at <code>t = 0</code>. Three variants of inventory sourcing, in increasing order of risk:</p>
+<section id="a.-fully-matched-pre-purchase-α-1" class="level4">
+<h4 class="anchored" data-anchor-id="a.-fully-matched-pre-purchase-α-1">3a. Fully matched pre-purchase (α = 1)</h4>
+<p>At <code>t = 0</code> buy exactly <code>N · P</code> kVCM at spot <code>S_0</code>; cost <code>C = N · P · S_0</code>. Burn against deterministic demand over <code>[0, T]</code>.</p>
+<p><strong>Terminal P&amp;L:</strong></p>
+<pre><code>Π_matched = N · (Q − P · S_0),</code></pre>
+<p>which is <strong>deterministic</strong> — no terminal kVCM risk.</p>
+<p>Risk still exists <em>interim</em>. The mark-to-market inventory value at time <code>t</code> is</p>
+<pre><code>V_t = (N · P) · (1 − t/T) · S_t,</code></pre>
+<p>which is a scaled GBM decayed by a deterministic burn schedule. Solvency, margin-call, or accounting-covenant concerns live in the distribution of <code>max_{t ≤ T} (V_0 − V_t)</code> (max drawdown). This is tracked by Monte Carlo in Phase B.</p>
+</section>
+<section id="b.-back-to-back-acquisition-α-0" class="level4">
+<h4 class="anchored" data-anchor-id="b.-back-to-back-acquisition-α-0">3b. Back-to-back acquisition (α = 0)</h4>
+<p>The company quotes <code>Q</code> at <code>t = 0</code> but buys kVCM at spot for each retirement. Per-tonne realized P&amp;L is <code>Q − P · S_t</code>.</p>
+<p><strong>Total P&amp;L:</strong></p>
+<pre><code>Π_b2b = ∫₀ᵀ (Q − P · S_t) · λ dt = Q · N − P · λ · I_T.</code></pre>
+<p><strong>Moments:</strong></p>
+<pre><code>E[Π_b2b]   = Q · N − P · λ · E[I_T].
+Var[Π_b2b] = (P · λ)² · Var[I_T].</code></pre>
+<p>Note that <code>Var[Π_b2b]</code> coincides with <code>Var[R_fee]</code> up to the rescaling factor <code>(P / f)² · f² = P²</code> — i.e.&nbsp;the two models share <strong>the same random kernel</strong> <code>I_T</code>. Phase B can therefore reuse a single Monte Carlo simulation of <code>I_T</code> and rescale.</p>
+<p><strong>Payoff shape.</strong> <code>Π_b2b</code> is linearly <em>decreasing</em> in <code>I_T</code>: upside is capped at <code>Q · N</code> (reached as <code>S_t → 0</code>), downside is unbounded if kVCM rallies. Equivalent to shorting a continuous strip of forwards on kVCM struck at <code>Q / P</code>.</p>
+</section>
+<section id="c.-partial-pre-purchase-α-0-1" class="level4">
+<h4 class="anchored" data-anchor-id="c.-partial-pre-purchase-α-0-1">3c. Partial pre-purchase (α ∈ [0, 1])</h4>
+<p>Buy <code>α · N · P</code> kVCM at <code>S_0</code>, source the rest back-to-back. Then</p>
+<pre><code>Π_α = α · N · (Q − P · S_0)  +  (1 − α) · (Q · N − P · λ · I_T)
+     = Q · N  −  P · λ · [ α · S_0 · T  +  (1 − α) · I_T ].</code></pre>
+<p>Mean and variance interpolate linearly in <code>α</code>:</p>
+<pre><code>E[Π_α]   = (1 − α) · E[Π_b2b] + α · Π_matched,
+Var[Π_α] = (1 − α)² · Var[Π_b2b].</code></pre>
+<p><code>α</code> is the company’s hedge ratio against spot. <code>α = 1</code> gives a deterministic P&amp;L (fully hedged at inception); <code>α = 0</code> is the unhedged short-forward strip.</p>
+</section>
+</section>
+<section id="risk-quantification" class="level3">
+<h3 class="anchored" data-anchor-id="risk-quantification">4. Risk quantification</h3>
+<p>For each model, the Phase B simulator should report:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>E[Π]</code>, <code>Var[Π]</code>, <code>SD[Π]</code></td>
+<td>Closed form from §2–3</td>
+</tr>
+<tr class="even">
+<td><code>VaR_95</code>, <code>VaR_99</code></td>
+<td>Monte Carlo empirical quantile of <code>−Π</code></td>
+</tr>
+<tr class="odd">
+<td><code>CVaR_95</code>, <code>CVaR_99</code></td>
+<td>Monte Carlo tail mean of <code>−Π</code></td>
+</tr>
+<tr class="even">
+<td><code>P[Π &lt; 0]</code></td>
+<td>Monte Carlo</td>
+</tr>
+<tr class="odd">
+<td><code>Sharpe-like = E[Π] / SD[Π]</code></td>
+<td>Closed form</td>
+</tr>
+<tr class="even">
+<td>Max NAV drawdown (principal 3a only)</td>
+<td>Monte Carlo on <code>V_t</code> path</td>
+</tr>
+</tbody>
+</table>
+<section id="itô-dynamics-and-delta" class="level4">
+<h4 class="anchored" data-anchor-id="itô-dynamics-and-delta">Itô dynamics and delta</h4>
+<p>Applying the Itô product rule to the cumulative P&amp;L process, the instantaneous sensitivity of <em>remaining</em> P&amp;L to the spot <code>S_t</code> is:</p>
+<pre><code>Fee-based:     ∂ E[R_fee − R(t) | F_t] / ∂ S_t  =  f · P · λ · (e^{μ(T−t)} − 1) / μ
+                                                 ≈ f · P · λ · (T − t)   for μT small.
+
+Principal 3b:  ∂ E[Π_b2b − Π(t) | F_t] / ∂ S_t  =  − P · λ · (e^{μ(T−t)} − 1) / μ
+                                                 ≈ − P · λ · (T − t).</code></pre>
+<p>Signs are opposite: the fee book is <strong>long</strong> kVCM beta; the back-to-back principal book is <strong>short</strong> kVCM beta. The matched principal book has zero delta (fully pre-hedged by physical inventory).</p>
+<p>This is the handle for Phase C hedging: the natural static hedge for the principal back-to-back book is to hold <code>(P · λ) · (T − t)</code> tokens of spot kVCM at each time <code>t</code> — which is exactly the matched-pre-purchase strategy (§3a) amortized to the remaining horizon.</p>
+</section>
+</section>
+<section id="direct-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="direct-comparison">5. Direct comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Fee-based</th>
+<th>Principal 3a (matched)</th>
+<th>Principal 3b (back-to-back)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>E[P&amp;L]</code></td>
+<td><code>f · P · λ · E[I_T]</code></td>
+<td><code>N · (Q − P · S_0)</code></td>
+<td><code>Q · N − P · λ · E[I_T]</code></td>
+</tr>
+<tr class="even">
+<td><code>Var[P&amp;L]</code></td>
+<td><code>(f P λ)² · Var[I_T]</code></td>
+<td><code>0</code> (terminal)</td>
+<td><code>(P λ)² · Var[I_T]</code></td>
+</tr>
+<tr class="odd">
+<td>kVCM exposure</td>
+<td>long</td>
+<td>none (terminal), long (interim NAV)</td>
+<td>short</td>
+</tr>
+<tr class="even">
+<td>Downside</td>
+<td>bounded below by 0</td>
+<td>deterministic</td>
+<td>unbounded</td>
+</tr>
+<tr class="odd">
+<td>Capital requirement</td>
+<td>none</td>
+<td><code>N · P · S_0</code></td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<section id="break-even-quote" class="level4">
+<h4 class="anchored" data-anchor-id="break-even-quote">Break-even quote</h4>
+<p>The principal back-to-back model matches the fee-based model’s <em>expected</em> revenue when</p>
+<pre><code>Q* = (1 + f) · P · E[I_T] / T = (1 + f) · P · S_0 · (e^{μT} − 1) / (μ T).</code></pre>
+<p>As <code>μ → 0</code>, <code>Q* → (1 + f) · P · S_0</code> — the fee-based time-zero quote. For <code>μ &gt; 0</code> the principal model must quote <em>above</em> that to compensate for expected kVCM appreciation; for <code>μ &lt; 0</code> it quotes below.</p>
+<p><strong>Asymmetry observation.</strong> Even at <code>Q = Q*</code>, the two books have radically different risk profiles: the fee book has bounded positive-only revenue, while the back-to-back principal book has the same variance but a <em>left-skewed</em> loss tail. Matching means does not match distributions.</p>
+</section>
+</section>
+<section id="limitations-and-next-steps" class="level3">
+<h3 class="anchored" data-anchor-id="limitations-and-next-steps">6. Limitations and next steps</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Baseline simplification</th>
+<th>Removed in</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Deterministic demand</td>
+<td>Phase C — compound-Poisson order flow</td>
+</tr>
+<tr class="even">
+<td>GBM price dynamics</td>
+<td>Phase C — Merton jump-diffusion and/or two-state regime switching</td>
+</tr>
+<tr class="odd">
+<td>No historical calibration</td>
+<td>Phase C — kVCM proxy (KLIMA, BCT, NCT)</td>
+</tr>
+<tr class="even">
+<td>No discounting, gas, or on-chain slippage</td>
+<td>Phase B — parameterized</td>
+</tr>
+<tr class="odd">
+<td>Static (or absent) hedging</td>
+<td>Phase C — dynamic delta hedge with inventory; perp/futures hedge if available</td>
+</tr>
+<tr class="even">
+<td>No credit / counterparty layer</td>
+<td>Not scoped</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="references" class="level3">
+<h3 class="anchored" data-anchor-id="references">References</h3>
+<ul>
+<li>Dufresne, D. (2001). <em>The integral of geometric Brownian motion.</em> Advances in Applied Probability, 33(1), 223–241. — closed-form moments of <code>I_T</code>.</li>
+<li>Glasserman, P. (2003). <em>Monte Carlo Methods in Financial Engineering</em>, §3.4. — simulation of path integrals of GBM.</li>
+</ul>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->
