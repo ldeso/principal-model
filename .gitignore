@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.vitest-cache/
+report/data/*.json
+!report/data/.gitkeep
+report/.quarto/
+report/_site/
+report/report_files/

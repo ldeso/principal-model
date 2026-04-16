@@ -1,0 +1,300 @@
+---
+title: "Phase B — Fee vs. Principal Simulator"
+subtitle: "Interactive companion to the research note"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    embed-resources: false
+---
+
+```{=html}
+<style>
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+  .metric-grid .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem; background: #fafafa; }
+  .metric-grid .card .label { font-size: 0.8rem; color: #555; }
+  .metric-grid .card .value { font-family: ui-monospace, monospace; font-size: 1.2rem; }
+</style>
+```
+
+This notebook reads JSON artifacts emitted by the TypeScript simulator
+(`npm run simulate -- --seed 42 && npm run sweep -- --seed 42`) and renders
+them interactively. All Monte Carlo computation happens in TypeScript — the
+notebook only visualises.
+
+## Single-run outputs
+
+```{ojs}
+//| echo: false
+run = FileAttachment("data/run-42.json").json()
+```
+
+```{ojs}
+//| echo: false
+html`<div class="metric-grid">
+  <div class="card"><div class="label">Paths</div><div class="value">${run.params.nPaths.toLocaleString()}</div></div>
+  <div class="card"><div class="label">Steps</div><div class="value">${run.params.nSteps}</div></div>
+  <div class="card"><div class="label">μ</div><div class="value">${run.params.mu}</div></div>
+  <div class="card"><div class="label">σ</div><div class="value">${run.params.sigma}</div></div>
+  <div class="card"><div class="label">Q</div><div class="value">${run.params.Q}</div></div>
+  <div class="card"><div class="label">α</div><div class="value">${run.params.alpha}</div></div>
+  <div class="card"><div class="label">Q* (break-even)</div><div class="value">${run.closed.QStar.toFixed(4)}</div></div>
+</div>`
+```
+
+### §4 — P&L moments: closed-form vs Monte Carlo
+
+The MC column should land within the ±95% CI of the closed-form mean. The
+`z` column is `(MC − closed) / stderr`; for large `nPaths`, |z| should rarely
+exceed 2.
+
+```{ojs}
+//| echo: false
+Inputs.table(run.rows, {
+  columns: ["name","closedFormMean","mcMean","mcCi95","closedFormSd","mcSd","zScore","var95","var99","cvar95","cvar99","probLoss","sharpe"],
+  header: {
+    name: "model",
+    closedFormMean: "E[Π] (cf)",
+    mcMean: "E[Π] (mc)",
+    mcCi95: "±CI95",
+    closedFormSd: "SD (cf)",
+    mcSd: "SD (mc)",
+    zScore: "z",
+    var95: "VaR95",
+    var99: "VaR99",
+    cvar95: "CVaR95",
+    cvar99: "CVaR99",
+    probLoss: "P[Π<0]",
+    sharpe: "Sharpe"
+  },
+  format: {
+    closedFormMean: x => x.toFixed(2),
+    mcMean: x => x.toFixed(2),
+    mcCi95: x => "±" + x.toFixed(2),
+    closedFormSd: x => x.toFixed(2),
+    mcSd: x => x.toFixed(2),
+    zScore: x => x.toFixed(2),
+    var95: x => x.toFixed(2),
+    var99: x => x.toFixed(2),
+    cvar95: x => x.toFixed(2),
+    cvar99: x => x.toFixed(2),
+    probLoss: x => x.toFixed(3),
+    sharpe: x => x === null ? "—" : x.toFixed(3)
+  }
+})
+```
+
+### P&L distributions
+
+```{ojs}
+//| echo: false
+pnlData = [
+  ...run.sampleTraces.fee.map(v => ({model: "fee", pnl: v})),
+  ...run.sampleTraces.b2b.map(v => ({model: "principal_3b", pnl: v})),
+  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v}))
+]
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 900,
+  height: 360,
+  marginLeft: 60,
+  x: { label: "P&L, USD" },
+  y: { label: "density" },
+  color: { legend: true, domain: ["fee","principal_3b","principal_3c"] },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
+    Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "model", fy: "model", thresholds: 60 })),
+    Plot.ruleX(run.rows.filter(r => ["fee","principal_3b","principal_3c"].includes(r.name)),
+      { x: "closedFormMean", fy: "name", stroke: "black", strokeWidth: 2 })
+  ]
+})
+```
+
+The black rule on each panel is `E[Π]` from the closed-form column.
+
+### I_T histogram vs. Dufresne closed-form moments
+
+```{ojs}
+//| echo: false
+itHist = {
+  const { edges, counts } = run.itSampleHistogram;
+  const total = counts.reduce((a,b) => a+b, 0);
+  return counts.map((c,i) => ({
+    x0: edges[i], x1: edges[i+1], density: c / (total * (edges[i+1]-edges[i]))
+  }));
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 720,
+  height: 300,
+  x: { label: "I_T" },
+  y: { label: "empirical density" },
+  marks: [
+    Plot.rectY(itHist, { x1: "x0", x2: "x1", y: "density", fill: "#4c78a8", fillOpacity: 0.7 }),
+    Plot.ruleX([run.closed.IT.mean], { stroke: "black" }),
+    Plot.ruleX([run.closed.IT.mean - Math.sqrt(run.closed.IT.variance),
+                run.closed.IT.mean + Math.sqrt(run.closed.IT.variance)],
+               { stroke: "black", strokeDasharray: "3 3" })
+  ]
+})
+```
+
+Solid rule: E[I_T] (Dufresne). Dashed rules: E[I_T] ± SD.
+
+### Sample GBM paths (N·P-scaled NAV view)
+
+```{ojs}
+//| echo: false
+pathRecords = run.sampledPaths.flatMap((path, idx) =>
+  path.map((s, k) => ({
+    t: k / run.params.nSteps,
+    S: s,
+    V: run.params.lambda * run.params.T * run.params.P * (1 - k / run.params.nSteps) * s,
+    id: idx
+  }))
+)
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 900,
+  height: 360,
+  x: { label: "t / T" },
+  y: { label: "V_t (3a matched-book NAV), USD" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(pathRecords, { x: "t", y: "V", z: "id", stroke: "#888", strokeOpacity: 0.3 }),
+    Plot.line(pathRecords.filter(r => r.id === 0), { x: "t", y: "V", stroke: "#c94" })
+  ]
+})
+```
+
+### NAV shortfall-vs-schedule (§3a)
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 720,
+  height: 280,
+  x: { label: "max_t  [N·P·(1−t/T)·(S_0−S_t)]+" },
+  y: { label: "frequency" },
+  marks: [
+    Plot.rectY(run.sampleTraces.navDrawdown, Plot.binX({y:"count"}, {x: d => d, fill:"#e45"})),
+    Plot.ruleX([run.drawdown.var95], { stroke: "black", strokeDasharray: "3 3" }),
+    Plot.ruleX([run.drawdown.var99], { stroke: "black" })
+  ]
+})
+```
+
+Dashed rule: 95th percentile. Solid: 99th.
+
+## Parameter sweep
+
+```{ojs}
+//| echo: false
+sweep = FileAttachment("data/sweep.json").json()
+```
+
+```{ojs}
+//| echo: false
+viewof pickAlpha = Inputs.range([0,1], { step: 0.25, value: 0.5, label: "α" })
+```
+
+```{ojs}
+//| echo: false
+viewof pickMu = Inputs.select(sweep.grid.mus, { value: 0.05, label: "μ" })
+```
+
+```{ojs}
+//| echo: false
+filteredBySigma = sweep.cells.filter(c => c.alpha === pickAlpha && c.mu === pickMu)
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 340,
+  marginLeft: 60,
+  x: { label: "σ", type: "linear" },
+  y: { label: "CVaR95 (3c partial)", zero: true },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, stroke: "#c53" }),
+    Plot.dot(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, fill: "#c53" })
+  ]
+})
+```
+
+```{ojs}
+//| echo: false
+byAlpha = sweep.cells.filter(c => c.mu === pickMu && c.sigma === sweep.grid.sigmas[1])
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 340,
+  x: { label: "α" },
+  y: { label: "CVaR95 (principal 3c)", zero: true },
+  caption: "Hedge ratio α vs tail risk — fixed μ selected above, σ = second grid value",
+  marks: [
+    Plot.line(byAlpha, { x: "alpha", y: d => d.partial.cvar95, stroke: "#35a" }),
+    Plot.dot(byAlpha, { x: "alpha", y: d => d.partial.cvar95, fill: "#35a" })
+  ]
+})
+```
+
+## Break-even quote surface Q*(μ, T)
+
+```{ojs}
+//| echo: false
+qstar = FileAttachment("data/qstar-surface.json").json()
+```
+
+```{ojs}
+//| echo: false
+qstarRecords = qstar.mus.flatMap((mu, i) =>
+  qstar.Ts.map((T, j) => ({ mu, T, Q: qstar.values[i][j] }))
+)
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 720,
+  height: 360,
+  marginLeft: 60,
+  x: { label: "T (years)" },
+  y: { label: "Q* / ((1+f)·P·S_0)" },
+  color: { legend: true, label: "μ" },
+  marks: [
+    Plot.ruleY([1], { stroke: "#888", strokeDasharray: "2 4" }),
+    Plot.line(qstarRecords, {
+      x: "T",
+      y: d => d.Q / ((1 + run.params.f) * run.params.P * run.params.S0),
+      stroke: "mu",
+      strokeWidth: 2
+    }),
+    Plot.dot(qstarRecords, {
+      x: "T",
+      y: d => d.Q / ((1 + run.params.f) * run.params.P * run.params.S0),
+      fill: "mu"
+    })
+  ]
+})
+```
+
+The μ = 0 curve collapses onto the dashed unit line — at zero drift,
+`Q* = (1+f)·P·S_0`, i.e., the fee-based time-zero quote.
