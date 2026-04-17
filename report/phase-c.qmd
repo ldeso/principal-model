@@ -1,6 +1,8 @@
 ---
 title: "Phase C — Interactive simulator"
 subtitle: "Live Monte Carlo on parameters of your choosing"
+date: today
+date-format: "YYYY-MM-DD"
 format:
   html:
     toc: true
@@ -817,10 +819,28 @@ viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG s
 
 ::: {.pc-main}
 
+```{=html}
+<meta name="pc-build-date" content="{{< meta date >}}">
+```
+
+```{ojs}
+//| echo: false
+buildDate = {
+  // Baked in at Quarto render time via the YAML `date: today` field
+  // (see the <meta name="pc-build-date"> tag emitted above). Falls back
+  // to the page-load date if the meta tag is missing or unparseable, so
+  // the chart still renders during local previews without a date field.
+  const el = document.querySelector('meta[name="pc-build-date"]');
+  const parsed = el ? new Date(el.content + "T00:00:00") : null;
+  return parsed && !isNaN(parsed.getTime()) ? parsed : new Date();
+}
+```
+
 ```{ojs}
 //| echo: false
 viewof customCurve = {
-  const nPoints = 201;
+  const TDaysVal = Tdays;
+  const nPoints = TDaysVal + 1;           // one drawable point per calendar day
   const width = 820;
   const height = 320;
   const margin = { top: 10, right: 12, bottom: 32, left: 58 };
@@ -828,12 +848,32 @@ viewof customCurve = {
   const plotH = height - margin.top - margin.bottom;
   const yMax = curveYMax;
   const S0Val = S0;
-  const TDaysVal = Tdays;
+  const endDate = buildDate;
   const history = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
     : [];
 
-  const values = new Float64Array(nPoints).fill(S0Val);
+  // Preserve the curve across re-runs triggered by Tdays changes: the
+  // rightmost sample is always "today", so when T grows we prepend fresh
+  // points on the left (initialised to S0), and when T shrinks we drop
+  // points off the left. `this` is the previous DOM node returned by
+  // this viewof cell, with the last emitted {values, nPoints} on .value.
+  const prevVal = this && this.value;
+  const prevValues = prevVal && prevVal.values;
+  const prevNPoints = prevVal && prevVal.nPoints;
+  const values = new Float64Array(nPoints);
+  if (prevValues && prevNPoints > 0) {
+    if (nPoints >= prevNPoints) {
+      const extra = nPoints - prevNPoints;
+      for (let k = 0; k < extra; k++) values[k] = S0Val;
+      for (let k = 0; k < prevNPoints; k++) values[extra + k] = prevValues[k];
+    } else {
+      const drop = prevNPoints - nPoints;
+      for (let k = 0; k < nPoints; k++) values[k] = prevValues[drop + k];
+    }
+  } else {
+    values.fill(S0Val);
+  }
 
   const container = document.createElement("div");
   container.className = "pc-curve-box";
@@ -888,10 +928,16 @@ viewof customCurve = {
     }
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const fmtDate = (d) =>
+      `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const dayMs = 86400000;
     for (let g = 0; g <= 5; g++) {
-      const tDay = (TDaysVal * g) / 5;
+      // g = 5 ⇒ today (rightmost); g = 0 ⇒ today − T days (leftmost).
+      const daysBack = Math.round((TDaysVal * (5 - g)) / 5);
+      const tickDate = new Date(endDate.getTime() - daysBack * dayMs);
       const x = margin.left + (g * plotW) / 5;
-      ctx.fillText(tDay.toFixed(0), x, margin.top + plotH + 6);
+      ctx.fillText(fmtDate(tickDate), x, margin.top + plotH + 6);
     }
 
     ctx.font = "12px sans-serif";
@@ -902,7 +948,7 @@ viewof customCurve = {
     ctx.fillText("S_t (USD / kVCM)", 0, 0);
     ctx.restore();
     ctx.textAlign = "center";
-    ctx.fillText("t (days)", margin.left + plotW / 2, height - 2);
+    ctx.fillText("date", margin.left + plotW / 2, height - 2);
 
     if (S0Val > 0 && S0Val <= yMax) {
       ctx.strokeStyle = "#2a7";
