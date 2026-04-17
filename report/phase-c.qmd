@@ -16,23 +16,17 @@ format:
   .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
   .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
 
-  /* Section layout: body content stays at Quarto's native body-column
-     width; the controls panel is pulled into the left gutter via a
-     negative margin on the grid container. Avoiding a .column-* escape
-     sidesteps Quarto's TOC-grid interactions (which were making the
-     text column too wide and introducing an extra vertical gap). */
-  .pc-section {
-    display: grid;
-    grid-template-columns: 320px 1.5rem minmax(0, 1fr);
-    align-items: start;
-    margin-left: calc(-320px - 1.5rem);
-  }
-  .pc-section > * { grid-column: 3; min-width: 0; }
+  /* Section layout: the controls panel is floated into the left gutter
+     with a negative margin and made sticky. Because .pc-section doesn't
+     establish a block-formatting context, the float doesn't contribute
+     to the section's height — so body content flows at its natural
+     height and the next heading starts right after the last content
+     block, not after the (often taller) sidebar. */
   .pc-section > .pc-controls {
-    grid-column: 1;
-    grid-row: 1 / -1;
+    float: left;
+    width: 320px;
+    margin-left: calc(-320px - 1.5rem);
     position: sticky; top: 0.75rem;
-    align-self: start;
     max-height: calc(100vh - 1.5rem);
     overflow-y: auto;
   }
@@ -50,10 +44,15 @@ format:
     white-space: normal !important;
     line-height: 1.2;
   }
-  /* Narrow screens: drop the grid, unstick the controls, reset margin. */
+  /* Narrow screens: un-float the controls so they stack above the content. */
   @media (max-width: 1100px) {
-    .pc-section { display: block; margin-left: 0; }
-    .pc-section > .pc-controls { position: static; max-height: none; }
+    .pc-section > .pc-controls {
+      float: none;
+      position: static;
+      width: auto;
+      margin-left: 0;
+      max-height: none;
+    }
   }
 
   .pc-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.6rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem; }
