@@ -16,59 +16,29 @@ format:
   .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
   .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
 
-  /* --- Sticky controls layout ---------------------------------------- */
-  /* Two-column grid: inputs pinned on the left, charts on the right.
-     Falls back to a single column on narrow screens. The grid itself
-     escapes the central body column via Quarto's `.column-screen-inset`,
-     so the sidebar sits outside the prose column on the left. The content
-     pane keeps a fixed max-width and the whole grid is centred on the
-     page, so the text column stays aligned with the surrounding prose
-     rather than stretching to the viewport edge. */
-  @media (min-width: 1100px) {
-    .pc-layout { display: grid; grid-template-columns: 320px minmax(0, 820px); gap: 1.5rem; justify-content: center; align-items: start; }
-    .pc-controls-pane {
-      position: sticky; top: 0.75rem;
-      max-height: calc(100vh - 1.5rem);
-      overflow-y: auto;
-      padding: 0.75rem 1rem 1rem;
-      border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
-      font-size: 0.9rem;
-    }
-    .pc-controls-pane h2 { font-size: 1.05rem; margin: 0.25rem 0 0.5rem; }
-    .pc-controls-pane h3 { font-size: 0.95rem; margin: 0.9rem 0 0.4rem; color: #333; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2rem; }
-    .pc-controls-pane p { font-size: 0.82rem; color: #555; margin: 0.25rem 0 0.6rem; }
-    .pc-controls-pane form { width: 100%; }
-    .pc-controls-pane label { font-size: 0.82rem; }
-    .pc-controls-pane input[type="range"] { width: 100%; }
+  /* Controls panel: lives in Quarto's `.column-margin` so the prose column
+     stays centred. Sticky so it tracks the reader as they scroll. */
+  .pc-controls {
+    position: sticky; top: 0.75rem;
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+    padding: 0.75rem 1rem 1rem;
+    border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
+    font-size: 0.85rem;
   }
-
-  /* Observable Inputs default to a fixed-width label with nowrap + ellipsis,
-     which truncates longer labels (e.g. "retirements (tonnes / day)"). Let
-     labels use their natural width and wrap if needed, and give the numeric
-     readout box enough room to show the full value. */
-  form[class*="oi-"] > label {
+  .pc-controls h3 { font-size: 0.9rem; margin: 0.9rem 0 0.4rem; color: #333; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2rem; }
+  .pc-controls p { font-size: 0.82rem; color: #555; margin: 0.25rem 0 0.6rem; }
+  /* Observable Inputs truncate long labels by default — let them wrap. */
+  .pc-controls form[class*="oi-"] > label {
     width: auto !important;
-    min-width: 140px;
-    max-width: 180px;
+    min-width: 90px; max-width: 130px;
     white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
     line-height: 1.2;
   }
-  form[class*="oi-"] > div > input[type="number"],
-  form[class*="oi-"] > div > input[type="text"] {
-    min-width: 5.5em;
-  }
-  .pc-controls-pane form[class*="oi-"] > label {
-    min-width: 130px;
-    max-width: 160px;
-  }
-  /* Compact "live readout" strip inside the sticky pane. */
+
   .pc-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.6rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem; }
   .pc-readout .k { color: #555; }
   .pc-readout .v { font-family: ui-monospace, monospace; text-align: right; }
-  /* Let Plot/Inputs.table SVGs shrink to fit the constrained content pane. */
-  .pc-content-pane svg, .pc-content-pane figure { max-width: 100%; }
 </style>
 ```
 
@@ -100,11 +70,7 @@ k / (N \cdot P),\; \text{basis} = \alpha \cdot N \cdot P \cdot S_0)$
 parametrisation is a special case of the new one.
 :::
 
-::: {.pc-layout .column-screen-inset}
-
-::: {.pc-controls-pane}
-## Controls
-
+::: {.column-margin .pc-controls}
 ### Price process
 
 ```{ojs}
@@ -193,8 +159,6 @@ html`<div class="pc-readout">
 ```
 
 :::
-
-::: {.pc-content-pane}
 
 Drift $\mu$ and variance $\sigma^2$ are annualised. The retirement rate
 $\lambda$ is specified per calendar day; internally we use a year as the
@@ -623,10 +587,6 @@ highlighted. Green dashed rule: time at which the pre-purchased inventory
 is exhausted — to the right of this line, retirements are sourced at
 spot._
 
-:::
-
-:::
-
 ## Custom price curve scenario
 
 The Monte Carlo above averages over a GBM's random futures. Sometimes you
@@ -676,11 +636,7 @@ historicalPrices = {
 }
 ```
 
-::: {.pc-layout .column-screen-inset}
-
-::: {.pc-controls-pane}
-## Curve controls
-
+::: {.column-margin .pc-controls}
 All sliders below mirror the ones in the previous section — moving either
 copy updates both, so the drawn-curve scenario and the Monte Carlo above
 stay on the same parameter set.
@@ -749,8 +705,6 @@ viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG s
 ```
 
 :::
-
-::: {.pc-content-pane}
 
 ```{ojs}
 //| echo: false
@@ -1133,10 +1087,6 @@ _The **drawn** column is the deterministic P&L implied by the trajectory
 you sketched; the **MC mean** column is $\mathbb{E}[\Pi]$ from the Monte
 Carlo above; the **diff** shows how this specific scenario compares to
 the average across random GBM futures._
-
-:::
-
-:::
 
 ## Notes
 
