@@ -25,7 +25,7 @@ format:
   /* Two-column grid: inputs pinned on the left, charts on the right.
      Falls back to a single column on narrow screens. */
   @media (min-width: 1100px) {
-    .pc-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+    .pc-layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
     .pc-controls-pane {
       position: sticky; top: 0.75rem;
       max-height: calc(100vh - 1.5rem);
@@ -40,6 +40,28 @@ format:
     .pc-controls-pane form { width: 100%; }
     .pc-controls-pane label { font-size: 0.82rem; }
     .pc-controls-pane input[type="range"] { width: 100%; }
+  }
+
+  /* Observable Inputs default to a fixed-width label with nowrap + ellipsis,
+     which truncates longer labels (e.g. "retirements (tonnes / day)"). Let
+     labels use their natural width and wrap if needed, and give the numeric
+     readout box enough room to show the full value. */
+  form[class*="oi-"] > label {
+    width: auto !important;
+    min-width: 140px;
+    max-width: 180px;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.2;
+  }
+  form[class*="oi-"] > div > input[type="number"],
+  form[class*="oi-"] > div > input[type="text"] {
+    min-width: 5.5em;
+  }
+  .pc-controls-pane form[class*="oi-"] > label {
+    min-width: 130px;
+    max-width: 160px;
   }
   /* Compact "live readout" strip inside the sticky pane. */
   .pc-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.6rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem; }
