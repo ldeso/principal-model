@@ -407,6 +407,40 @@ xTicksForHorizon = function (tdays) {
 
 ```{ojs}
 //| echo: false
+// Same step logic as xTicksForHorizon but anchored on the right edge
+// (day = tdays) rather than zero. Used by the custom-curve chart whose
+// x-axis maps day = tdays to "today" and day = 0 to "T days ago", so
+// the rightmost tick always lands on the build-time anchor regardless
+// of how T divides the step.
+xTicksAnchoredRight = function (tdays) {
+  let step;
+  if (tdays <= 60) step = 7;
+  else if (tdays <= 730) step = 30;
+  else step = 365;
+  const ticks = [];
+  for (let d = tdays; d >= 0; d -= step) ticks.push(d);
+  return ticks.reverse();
+}
+```
+
+```{ojs}
+//| echo: false
+// Render a date at a resolution appropriate for the horizon it sits on:
+// day+month for weekly ticks, month+year for monthly ticks, year only
+// for yearly ticks.
+formatTickDate = function (date, tdays) {
+  if (tdays <= 60) {
+    return date.toLocaleString("en-US", { month: "short", day: "numeric" });
+  }
+  if (tdays <= 730) {
+    return date.toLocaleString("en-US", { month: "short", year: "2-digit" });
+  }
+  return date.toLocaleString("en-US", { year: "numeric" });
+}
+```
+
+```{ojs}
+//| echo: false
 function simulate(inputs) {
   const { S0, mu, sigma, P, lambda, T, Q, fee, kPre, cBasis, nPaths, nSteps, seed } = inputs;
   const rng = makeRng(seed);
@@ -761,6 +795,24 @@ historicalPrices = {
 }
 ```
 
+```{ojs}
+//| echo: false
+// "Today" anchor for the custom-curve x-axis. Prefers the fetchedAt
+// timestamp baked into kvcm-historical.json by `npm run fetch:prices`
+// so the rightmost tick reflects build time rather than page-open
+// time; falls back to the current date if the build-time fetch is
+// missing. Captured once per page load so ticks don't shift while the
+// document is open.
+buildDate = {
+  const iso = historicalPrices && historicalPrices.fetchedAt;
+  if (iso) {
+    const parsed = new Date(iso);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+```
+
 :::: {.pc-section}
 
 ::: {.pc-controls}
@@ -838,7 +890,12 @@ viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG s
 ```{ojs}
 //| echo: false
 viewof customCurve = {
-  const nPoints = 201;
+  // One sample per day. The rightmost point is the build-time anchor
+  // (values[nPoints-1] = today) and the leftmost is (Tdays) days ago,
+  // so moving the horizon slider extends or trims the left edge
+  // without reshaping the already-drawn right edge.
+  const TDaysVal = Tdays;
+  const nPoints = TDaysVal + 1;
   const width = 820;
   const height = 320;
   const margin = { top: 10, right: 12, bottom: 32, left: 58 };
@@ -846,21 +903,30 @@ viewof customCurve = {
   const plotH = height - margin.top - margin.bottom;
   const yMax = curveYMax;
   const S0Val = S0;
-  const TDaysVal = Tdays;
   const history = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
     : [];
 
-  // Persist the drawn curve across cell re-runs. Observable re-evaluates
-  // this cell whenever any referenced input (Tdays, S0, curveYMax, ...)
-  // changes, which would otherwise blow away the user's drawing. Stashing
-  // on window survives those re-runs; nPoints is fixed so the shape match
-  // check is effectively a presence check.
-  const stateKey = "__pcCustomCurveValues";
-  const prior = window[stateKey];
-  const values = (prior && prior.length === nPoints)
-    ? Float64Array.from(prior)
-    : new Float64Array(nPoints).fill(S0Val);
+  // Persist the drawn curve indexed by days-ago (0 = build-time anchor)
+  // so shrinking and regrowing the horizon restores the previously
+  // drawn samples at the leftmost part of the curve. NaN marks "never
+  // drawn" so S₀ slider changes still refresh the initial fill for
+  // days that haven't been touched.
+  const MAX_TDAYS = 1095;
+  const masterKey = "__pcCustomCurveByDaysAgo";
+  let master = window[masterKey];
+  if (!(master instanceof Float64Array) || master.length !== MAX_TDAYS + 1) {
+    master = new Float64Array(MAX_TDAYS + 1);
+    master.fill(NaN);
+    window[masterKey] = master;
+  }
+
+  const values = new Float64Array(nPoints);
+  for (let i = 0; i < nPoints; i++) {
+    const daysAgo = nPoints - 1 - i;
+    const stored = master[daysAgo];
+    values[i] = isNaN(stored) ? S0Val : stored;
+  }
 
   const container = document.createElement("div");
   container.className = "pc-curve-box";
@@ -884,7 +950,10 @@ viewof customCurve = {
   const yToPrice = (y) =>
     Math.max(0, Math.min(yMax, yMax - ((y - margin.top) / plotH) * yMax));
 
-  const xTicks = xTicksForHorizon(TDaysVal);
+  const DAY_MS = 86400000;
+  const anchor = buildDate;
+  const dateForDay = (d) => new Date(anchor.getTime() - (TDaysVal - d) * DAY_MS);
+  const xTicks = xTicksAnchoredRight(TDaysVal);
   function redraw() {
     ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = "#e5e5e5";
@@ -915,11 +984,13 @@ viewof customCurve = {
       const y = margin.top + (g * plotH) / 5;
       ctx.fillText(priceVal.toFixed(3), margin.left - 6, y);
     }
-    ctx.textAlign = "center";
     ctx.textBaseline = "top";
     for (const d of xTicks) {
       const x = margin.left + (d / TDaysVal) * plotW;
-      ctx.fillText(d.toFixed(0), x, margin.top + plotH + 6);
+      const isRight = d === TDaysVal;
+      const isLeft = d === 0;
+      ctx.textAlign = isRight ? "right" : isLeft ? "left" : "center";
+      ctx.fillText(formatTickDate(dateForDay(d), TDaysVal), x, margin.top + plotH + 6);
     }
 
     ctx.font = "12px sans-serif";
@@ -930,7 +1001,7 @@ viewof customCurve = {
     ctx.fillText("S_t (USD / kVCM)", 0, 0);
     ctx.restore();
     ctx.textAlign = "center";
-    ctx.fillText("t (days)", margin.left + plotW / 2, height - 2);
+    ctx.fillText("date", margin.left + plotW / 2, height - 2);
 
     if (S0Val > 0 && S0Val <= yMax) {
       ctx.strokeStyle = "#2a7";
@@ -958,7 +1029,9 @@ viewof customCurve = {
   }
 
   function emit() {
-    window[stateKey] = Float64Array.from(values);
+    for (let i = 0; i < nPoints; i++) {
+      master[nPoints - 1 - i] = values[i];
+    }
     container.value = { values: Float64Array.from(values), nPoints };
     container.dispatchEvent(new CustomEvent("input", { bubbles: true }));
   }
@@ -1052,19 +1125,16 @@ viewof customCurve = {
   historicalBtn.textContent = history.length >= 2 ? "Historical" : "Historical (unavailable)";
   historicalBtn.disabled = history.length < 2;
   historicalBtn.addEventListener("click", () => {
-    // Fit the historical series to the current horizon: take the most
-    // recent Tdays days (or the whole fetched range if it's shorter) and
-    // interpolate them onto the nPoints grid. The drawn curve then spans
-    // the same [0, T] window the sliders see, instead of stretching the
-    // entire fetched range regardless of T.
-    const days = Math.min(history.length, Math.max(2, Math.round(TDaysVal) + 1));
-    const start = history.length - days;
+    // Right-align the daily historical series: the most recent sample
+    // lands on today (rightmost point) and earlier samples fill back
+    // in toward the left. If the fetched range doesn't reach all the
+    // way back to Tdays days ago, leave the older leftmost points at
+    // S₀ rather than stretching history to fill the gap.
+    const dayCount = history.length;
     for (let i = 0; i < nPoints; i++) {
-      const t = (i / (nPoints - 1)) * (days - 1);
-      const lo = Math.floor(t);
-      const hi = Math.min(days - 1, lo + 1);
-      const frac = t - lo;
-      values[i] = history[start + lo].value * (1 - frac) + history[start + hi].value * frac;
+      const daysAgo = nPoints - 1 - i;
+      const histIdx = dayCount - 1 - daysAgo;
+      values[i] = histIdx >= 0 ? history[histIdx].value : S0Val;
     }
     redraw();
     emit();
@@ -1075,7 +1145,6 @@ viewof customCurve = {
   container.appendChild(toolbar);
   container.appendChild(canvas);
   container.value = { values: Float64Array.from(values), nPoints };
-  window[stateKey] = Float64Array.from(values);
 
   redraw();
   return container;
@@ -1151,10 +1220,13 @@ customPathRecords = {
   const { base, realised, nPoints } = customScenario;
   const rows = [];
   const noisy = curveVar > 0;
+  const anchorMs = buildDate.getTime();
+  const DAY_MS = 86400000;
   for (let k = 0; k < nPoints; k++) {
-    const tDays = (k / (nPoints - 1)) * Tdays;
-    rows.push({ t: tDays, S: base[k], kind: "drawn (base)" });
-    if (noisy) rows.push({ t: tDays, S: realised[k], kind: "realised (+ noise)" });
+    const daysAgo = ((nPoints - 1 - k) / (nPoints - 1)) * Tdays;
+    const date = new Date(anchorMs - daysAgo * DAY_MS);
+    rows.push({ date, S: base[k], kind: "drawn (base)" });
+    if (noisy) rows.push({ date, S: realised[k], kind: "realised (+ noise)" });
   }
   return rows;
 }
@@ -1168,7 +1240,17 @@ Plot.plot({
   marginLeft: 58,
   marginBottom: 32,
   grid: true,
-  x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
+  x: {
+    label: "date",
+    domain: [
+      new Date(buildDate.getTime() - Tdays * 86400000),
+      buildDate,
+    ],
+    ticks: xTicksAnchoredRight(Tdays).map(
+      d => new Date(buildDate.getTime() - (Tdays - d) * 86400000),
+    ),
+    tickFormat: (d) => formatTickDate(d, Tdays),
+  },
   y: { label: "S_t (USD / kVCM)", zero: true, tickFormat: "~g" },
   color: {
     legend: true,
@@ -1177,7 +1259,7 @@ Plot.plot({
   },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(customPathRecords, { x: "t", y: "S", stroke: "kind", strokeOpacity: d => d.kind === "drawn (base)" ? 1 : 0.7 }),
+    Plot.line(customPathRecords, { x: "date", y: "S", stroke: "kind", strokeOpacity: d => d.kind === "drawn (base)" ? 1 : 0.7 }),
   ],
 })
 ```
