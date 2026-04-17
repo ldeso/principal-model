@@ -1198,7 +1198,6 @@ viewof customCurve = {
     redraw();
     emit();
   });
-  const tdaysView = viewof Tdays;
   const historicalBtn = document.createElement("button");
   historicalBtn.type = "button";
   historicalBtn.textContent = history.length >= 2 ? "Historical" : "Historical (unavailable)";
@@ -1206,29 +1205,26 @@ viewof customCurve = {
   historicalBtn.addEventListener("click", () => {
     // Right-align the daily historical series: the most recent sample
     // lands on today (rightmost point) and earlier samples fill back
-    // in toward the left. Write the full series into the persistent
-    // master first so resizing the horizon below can read it back.
+    // in toward the left.
     const dayCount = history.length;
-    for (let daysAgo = 0; daysAgo < dayCount && daysAgo <= MAX_TDAYS; daysAgo++) {
-      const histIdx = dayCount - 1 - daysAgo;
-      master[daysAgo] = history[histIdx].value;
-    }
+    const targetTdays = Math.max(30, Math.min(MAX_TDAYS, dayCount - 1));
+    const tdaysView = viewof Tdays;
 
-    // Snap horizon T to the span of available history so the drawn
-    // curve shows every historical sample, no more and no less. The
-    // range slider clamps at 30..1095.
-    const targetTdays = Math.max(30, Math.min(1095, dayCount - 1));
     if (Number(tdaysView.value) !== targetTdays) {
+      // Stash the series into master so the cell's re-run — triggered
+      // by the Tdays change below — picks it up without a second fill.
+      for (let daysAgo = 0; daysAgo <= targetTdays; daysAgo++) {
+        master[daysAgo] = history[dayCount - 1 - daysAgo].value;
+      }
       tdaysView.value = targetTdays;
       tdaysView.dispatchEvent(new CustomEvent("input", { bubbles: true }));
-      // The Tdays change invalidates this cell; the re-run reads master
-      // and rebuilds the canvas against the new horizon.
       return;
     }
 
+    // Idempotent re-click: Tdays already at target, so redraw in place.
     for (let i = 0; i < nPoints; i++) {
       const daysAgo = nPoints - 1 - i;
-      values[i] = master[daysAgo];
+      values[i] = history[dayCount - 1 - daysAgo].value;
     }
     redraw();
     emit();
