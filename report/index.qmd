@@ -27,13 +27,24 @@ tail-risk metric menu for the fee model and the three principal variants
 :::
 
 ::: {.g-col-12 .g-col-md-6}
-### [Phase B — Interactive simulator](report.qmd)
+### [Phase B — Simulator](report.qmd)
 
 TypeScript Monte Carlo reproduction of the Phase A closed forms, with
 VaR / CVaR tail estimates and an Observable-powered notebook for exploring
 $(\alpha, \mu, \sigma, f, Q, T)$.
 
 [Open the simulator →](report.qmd)
+:::
+
+::: {.g-col-12 .g-col-md-6}
+### [Phase C — Interactive](phase-c.qmd)
+
+Live Monte Carlo in the browser. Sliders for starting kVCM price,
+starting carbon price per tonne, drift and variance, initial kVCM
+inventory (tokens + cost basis), and constant retirements per day —
+the scaffolding for the jump-diffusion and calibration work to come.
+
+[Launch the interactive sim →](phase-c.qmd)
 :::
 
 :::
@@ -44,5 +55,7 @@ $(\alpha, \mu, \sigma, f, Q, T)$.
 - Simulator: [`src/`](https://github.com/ldeso-agents/principal-model/tree/main/src) (Node ≥ 20, TypeScript, vitest)
 - Reproducibility: seeded Mulberry32 PRNG; every figure in Phase B is regenerated from `report/data/*.json`.
 
-Phase C (jump-diffusion, Poisson demand, calibration, dynamic hedging) is out
-of scope for this site.
+Phase C scaffolding now lives at [phase-c.qmd](phase-c.qmd) — an
+interactive simulator whose price dynamics and demand model will be
+upgraded iteratively (jump-diffusion, Poisson demand, calibration,
+dynamic hedging).

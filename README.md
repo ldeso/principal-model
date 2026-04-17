@@ -1,13 +1,19 @@
-# principal-model — Phase B
+# principal-model — Phases B + C
 
 TypeScript simulator and interactive report for the research note *Klima
 Protocol — Fee-Based vs. Principal Model* (`research-note.md`, Phase A).
 
-This repository covers **Phase B**: reproduce the §1–§5 closed-form
-quantities computationally, estimate the §4 tail-risk metrics by Monte
-Carlo, and expose the results through a Quarto + Observable notebook.
-Phase C extensions (gas, slippage, jumps, calibration, dynamic hedging)
-are out of scope.
+- **Phase B** reproduces the §1–§5 closed-form quantities computationally,
+  estimates the §4 tail-risk metrics by Monte Carlo, and exposes the
+  results through a Quarto + Observable notebook.
+- **Phase C** is now underway: its first deliverable is
+  [`report/phase-c.qmd`](report/phase-c.qmd), a browser-native interactive
+  simulator. Every slider re-runs a fresh Monte Carlo on the parameters
+  of your choosing (starting kVCM price, starting carbon price per tonne,
+  drift and variance, initial inventory as tokens + cost basis, constant
+  retirements per day). Subsequent Phase C iterations will swap in richer
+  dynamics (jump diffusion, regime switching, Poisson demand,
+  calibration, dynamic hedging) behind the same UI.
 
 ## Requirements
 
@@ -57,10 +63,14 @@ Artifacts are written to `report/data/`:
 ## Interactive report
 
 ```sh
+# Phase B — pre-computed JSON, requires a simulate+sweep pass first.
+npm run simulate -- --seed 42
+npm run sweep    -- --seed 42
 quarto preview report/report.qmd
-```
 
-Regenerate the JSON (`npm run simulate` + `npm run sweep`) before previewing.
+# Phase C — live in-browser Monte Carlo, no JSON pre-pass needed.
+quarto preview report/phase-c.qmd
+```
 
 ## Layout
 
