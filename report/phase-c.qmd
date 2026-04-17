@@ -11,14 +11,10 @@ format:
 
 ```{=html}
 <style>
-  .phase-c-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
-  .phase-c-controls .group { display: flex; flex-direction: column; gap: 0.35rem; }
-  .phase-c-controls .group h4 { margin: 0 0 0.25rem; font-size: 0.95rem; color: #333; }
   .phase-c-derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
   .phase-c-derived .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.75rem; background: #fff; }
   .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
   .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
-  .callout-note-lite { border-left: 3px solid #4c78a8; background: #f3f7fb; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.95rem; }
 
   /* --- Sticky controls layout ---------------------------------------- */
   /* Two-column grid: inputs pinned on the left, charts on the right.
@@ -92,14 +88,16 @@ baseline price process is the same GBM used in [Phase B](report.qmd);
 subsequent Phase C iterations will swap in the richer dynamics behind the
 same UI.
 
-::: {.callout-note-lite}
-**What changes vs. [Phase B](report.qmd).** The pre-purchase hedge is now
-specified by the **raw inventory state** — a number of kVCM tokens and
-their USD cost basis — instead of the ratio $\alpha$. This removes the
-Phase B assumption that the tokens were bought today at $S_0$: you can
-seed the simulation with an inventory that was acquired earlier at a
-different price. The Phase B $(\alpha = k / (N \cdot P),\; \text{basis} = \alpha \cdot N \cdot P \cdot S_0)$ parametrisation
-is a special case of the new one.
+::: {.callout-note appearance="simple"}
+## What changes vs. [Phase B](report.qmd)
+
+The pre-purchase hedge is now specified by the **raw inventory state** —
+a number of kVCM tokens and their USD cost basis — instead of the ratio
+$\alpha$. This removes the Phase B assumption that the tokens were
+bought today at $S_0$: you can seed the simulation with an inventory
+that was acquired earlier at a different price. The Phase B $(\alpha =
+k / (N \cdot P),\; \text{basis} = \alpha \cdot N \cdot P \cdot S_0)$
+parametrisation is a special case of the new one.
 :::
 
 ::: {.pc-layout .column-screen-inset}
@@ -239,13 +237,15 @@ html`<div class="phase-c-derived">
 </div>`
 ```
 
-::: {.callout-note-lite}
-**Interpreting "coverage".** If the pre-purchased inventory covers 100% of
-the horizon's token demand, the book is fully matched (§3a-style). Below
-100%, the operator runs out of inventory part-way through the horizon and
-has to buy the remainder back-to-back at spot — that is where the left-tail
-risk appears. Above 100% (over-hedged) the excess tokens are marked-to-
-market at $S_T$ at the horizon.
+::: {.callout-note appearance="simple"}
+## Interpreting "coverage"
+
+If the pre-purchased inventory covers 100% of the horizon's token
+demand, the book is fully matched (§3a-style). Below 100%, the operator
+runs out of inventory part-way through the horizon and has to buy the
+remainder back-to-back at spot — that is where the left-tail risk
+appears. Above 100% (over-hedged) the excess tokens are marked-to-market
+at $S_T$ at the horizon.
 :::
 
 ## Core simulator
@@ -636,11 +636,12 @@ spike, a choppy flat — and the three book P&Ls are recomputed
 deterministically from that trajectory in real time, using the same
 parameters as the sliders in the left pane.
 
-::: {.callout-note-lite}
-**How the curve is used.** The drawn values $\tilde S_0, \tilde S_1,
-\ldots, \tilde S_n$ define the base trajectory. If the noise variance
-$\sigma^2_{\mathrm{noise}}$ is positive, each step is multiplied by an
-accumulated log-normal shock
+::: {.callout-note appearance="simple"}
+## How the curve is used
+
+The drawn values $\tilde S_0, \tilde S_1, \ldots, \tilde S_n$ define the
+base trajectory. If the noise variance $\sigma^2_{\mathrm{noise}}$ is
+positive, each step is multiplied by an accumulated log-normal shock
 $\exp\!\big(\sigma_{\mathrm{noise}}\sqrt{dt}\,Z_k - \tfrac12
 \sigma^2_{\mathrm{noise}}\,dt\big)$ (reusing the Phase C MC seed so runs
 are reproducible). Integrals on that realised path are computed by the
