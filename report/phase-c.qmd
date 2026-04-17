@@ -269,7 +269,7 @@ html`<div class="pc-readout">
   <div class="k">T (yr)</div><div class="v">${derived.T.toFixed(2)}</div>
   <div class="k">N (tonnes)</div><div class="v">${derived.N.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
   <div class="k">coverage</div><div class="v">${(derived.coverageFrac * 100).toFixed(1)}%</div>
-  <div class="k">Q* (USD/t)</div><div class="v">${derived.QStar.toFixed(2)}</div>
+  <div class="k">Q* (USD/t)</div><div class="v">${"$" + derived.QStar.toFixed(2)}</div>
 </div>`
 ```
 
@@ -346,7 +346,7 @@ html`<div class="phase-c-derived">
   <div class="card"><div class="label">coverage from inventory</div><div class="value">${(derived.coverageFrac * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">inventory runs out at (days)</div><div class="value">${isFinite(derived.coverageDays) ? Math.min(derived.coverageDays, Tdays).toFixed(1) : "∞"}</div></div>
   <div class="card"><div class="label">implied basis per token</div><div class="value">${kPre > 0 ? "$" + derived.impliedCost.toFixed(3) : "—"}</div></div>
-  <div class="card"><div class="label">break-even Q* (USD / tonne)</div><div class="value">${derived.QStar.toFixed(3)}</div></div>
+  <div class="card"><div class="label">break-even Q* (USD / tonne)</div><div class="value">${"$" + derived.QStar.toFixed(3)}</div></div>
 </div>`
 ```
 
@@ -679,13 +679,13 @@ Inputs.table(summaryRows, {
     sharpe: "Sharpe",
   },
   format: {
-    mean: x => x.toFixed(2),
-    sd: x => x.toFixed(2),
-    ci95: x => "±" + x.toFixed(2),
-    var95: x => x.toFixed(2),
-    var99: x => x.toFixed(2),
-    cvar95: x => x.toFixed(2),
-    cvar99: x => x.toFixed(2),
+    mean: x => "$" + x.toFixed(2),
+    sd: x => "$" + x.toFixed(2),
+    ci95: x => "±$" + x.toFixed(2),
+    var95: x => "$" + x.toFixed(2),
+    var99: x => "$" + x.toFixed(2),
+    cvar95: x => "$" + x.toFixed(2),
+    cvar99: x => "$" + x.toFixed(2),
     probLoss: x => x.toFixed(3),
     sharpe: x => x === null ? "—" : x.toFixed(3),
   }
@@ -721,7 +721,7 @@ Plot.plot({
   marginRight: 30,
   marginBottom: 50,
   grid: true,
-  x: { label: "terminal P&L (USD)", tickFormat: "~s" },
+  x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
   y: { label: "empirical density" },
   fy: { label: "book" },
   color: { legend: true, domain: ["fee","principal (custom)","principal (back-to-back)"] },
@@ -773,7 +773,7 @@ Plot.plot({
   marginBottom: 50,
   grid: true,
   x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
-  y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: "~s" },
+  y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: "$~s" },
   marks: [
     Plot.ruleY([0]),
     Plot.line(pathRecords, { x: "tDays", y: "S", z: "id", stroke: "#888", strokeOpacity: 0.35 }),
@@ -1080,7 +1080,7 @@ viewof customCurve = {
     for (let g = 0; g <= 5; g++) {
       const priceVal = yMax * (1 - g / 5);
       const y = margin.top + (g * plotH) / 5;
-      ctx.fillText(priceVal.toFixed(3), margin.left - 6, y);
+      ctx.fillText("$" + priceVal.toFixed(3), margin.left - 6, y);
     }
     ctx.textBaseline = "top";
     for (const d of xTicks) {
@@ -1368,9 +1368,9 @@ to cycle through different noise realisations._
 ```{ojs}
 //| echo: false
 html`<div class="phase-c-derived">
-  <div class="card"><div class="label">min / max drawn S</div><div class="value">${customScenario.minS.toFixed(4)} / ${customScenario.maxS.toFixed(4)}</div></div>
-  <div class="card"><div class="label">mean drawn S (I_T / T)</div><div class="value">${customScenario.meanS.toFixed(4)}</div></div>
-  <div class="card"><div class="label">terminal S_T</div><div class="value">${customScenario.ST.toFixed(4)}</div></div>
+  <div class="card"><div class="label">min / max drawn S</div><div class="value">${"$" + customScenario.minS.toFixed(4)} / ${"$" + customScenario.maxS.toFixed(4)}</div></div>
+  <div class="card"><div class="label">mean drawn S (I_T / T)</div><div class="value">${"$" + customScenario.meanS.toFixed(4)}</div></div>
+  <div class="card"><div class="label">terminal S_T</div><div class="value">${"$" + customScenario.ST.toFixed(4)}</div></div>
   <div class="card"><div class="label">tail integral ∫_{τT}^{T} S_t dt</div><div class="value">${customScenario.tailInt.toFixed(4)}</div></div>
 </div>`
 ```
@@ -1395,9 +1395,9 @@ Inputs.table(customRows, {
     diff: "drawn − MC mean",
   },
   format: {
-    pnl: x => x.toFixed(2),
-    mcMean: x => x.toFixed(2),
-    diff: x => (x >= 0 ? "+" : "") + x.toFixed(2),
+    pnl: x => "$" + x.toFixed(2),
+    mcMean: x => "$" + x.toFixed(2),
+    diff: x => (x >= 0 ? "+$" : "−$") + Math.abs(x).toFixed(2),
   },
 })
 ```
