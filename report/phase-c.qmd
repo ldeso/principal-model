@@ -984,6 +984,9 @@ viewof customCurve = {
   const history = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
     : [];
+  const sigmaN = Math.sqrt(curveVar);
+  const dt = derived.T / (nPoints - 1);
+  const seedVal = seed;
 
   // Persist the drawn curve indexed by days-ago (0 = build-time anchor)
   // so shrinking and regrowing the horizon restores the previously
@@ -1028,11 +1031,28 @@ viewof customCurve = {
   const yToPrice = (y) =>
     Math.max(0, Math.min(yMax, yMax - ((y - margin.top) / plotH) * yMax));
 
+  const realised = new Float64Array(nPoints);
+  function refreshRealised() {
+    if (sigmaN === 0) {
+      for (let k = 0; k < nPoints; k++) realised[k] = values[k];
+      return;
+    }
+    const rng = makeRng(seedVal);
+    let logNoise = 0;
+    realised[0] = values[0];
+    for (let k = 1; k < nPoints; k++) {
+      const z = rng.normal();
+      logNoise += sigmaN * Math.sqrt(dt) * z - 0.5 * sigmaN * sigmaN * dt;
+      realised[k] = values[k] * Math.exp(logNoise);
+    }
+  }
+
   const DAY_MS = 86400000;
   const anchor = buildDate;
   const dateForDay = (d) => new Date(anchor.getTime() - (TDaysVal - d) * DAY_MS);
   const xTicks = xTicksAnchoredRight(TDaysVal);
   function redraw() {
+    refreshRealised();
     ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = "#e5e5e5";
     ctx.lineWidth = 1;
@@ -1097,6 +1117,20 @@ viewof customCurve = {
       ctx.fillText("S₀", margin.left + 4, priceToY(S0Val) - 2);
     }
 
+    if (sigmaN > 0) {
+      ctx.strokeStyle = "#4c78a8";
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(indexToX(0), priceToY(Math.min(yMax, Math.max(0, realised[0]))));
+      for (let i = 1; i < nPoints; i++) {
+        ctx.lineTo(indexToX(i), priceToY(Math.min(yMax, Math.max(0, realised[i]))));
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     ctx.strokeStyle = "#c94";
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
@@ -1104,13 +1138,48 @@ viewof customCurve = {
     ctx.moveTo(indexToX(0), priceToY(values[0]));
     for (let i = 1; i < nPoints; i++) ctx.lineTo(indexToX(i), priceToY(values[i]));
     ctx.stroke();
+
+    if (sigmaN > 0) {
+      const lx = margin.left + plotW - 140;
+      const ly = margin.top + 8;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillRect(lx - 6, ly - 2, 140, 34);
+      ctx.strokeStyle = "#ccc";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(lx - 6, ly - 2, 140, 34);
+      ctx.font = "11px ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.strokeStyle = "#c94";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly + 5);
+      ctx.lineTo(lx + 18, ly + 5);
+      ctx.stroke();
+      ctx.fillStyle = "#333";
+      ctx.fillText("drawn (base)", lx + 22, ly + 5);
+      ctx.strokeStyle = "#4c78a8";
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly + 21);
+      ctx.lineTo(lx + 18, ly + 21);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#333";
+      ctx.fillText("realised (+ noise)", lx + 22, ly + 21);
+    }
   }
 
   function emit() {
     for (let i = 0; i < nPoints; i++) {
       master[nPoints - 1 - i] = values[i];
     }
-    container.value = { values: Float64Array.from(values), nPoints };
+    container.value = {
+      values: Float64Array.from(values),
+      realised: Float64Array.from(realised),
+      nPoints,
+    };
     container.dispatchEvent(new CustomEvent("input", { bubbles: true }));
   }
 
@@ -1234,9 +1303,13 @@ viewof customCurve = {
 
   container.appendChild(toolbar);
   container.appendChild(canvas);
-  container.value = { values: Float64Array.from(values), nPoints };
 
   redraw();
+  container.value = {
+    values: Float64Array.from(values),
+    realised: Float64Array.from(realised),
+    nPoints,
+  };
   return container;
 }
 ```
@@ -1244,29 +1317,12 @@ viewof customCurve = {
 ```{ojs}
 //| echo: false
 customScenario = {
-  const { values: base, nPoints } = customCurve;
+  const { values: base, realised, nPoints } = customCurve;
   const T = derived.T;
   const P = derived.P;
   const lam = derived.lambda;
   const N = derived.N;
   const dt = T / (nPoints - 1);
-  const sigmaN = Math.sqrt(curveVar);
-
-  // Realised path = drawn curve * accumulated log-normal noise.
-  // Noise is zero-drift (−½σ² dt correction) so the mean is the drawn curve.
-  const realised = new Float64Array(nPoints);
-  if (sigmaN === 0) {
-    for (let k = 0; k < nPoints; k++) realised[k] = base[k];
-  } else {
-    const rng = makeRng(seed);
-    let logNoise = 0;
-    realised[0] = base[0];
-    for (let k = 1; k < nPoints; k++) {
-      const z = rng.normal();
-      logNoise += sigmaN * Math.sqrt(dt) * z - 0.5 * sigmaN * sigmaN * dt;
-      realised[k] = base[k] * Math.exp(logNoise);
-    }
-  }
 
   let IT = 0;
   for (let k = 0; k < nPoints; k++) {
@@ -1304,60 +1360,10 @@ customScenario = {
 }
 ```
 
-```{ojs}
-//| echo: false
-customPathRecords = {
-  const { base, realised, nPoints } = customScenario;
-  const rows = [];
-  const noisy = curveVar > 0;
-  const anchorMs = buildDate.getTime();
-  const DAY_MS = 86400000;
-  for (let k = 0; k < nPoints; k++) {
-    const daysAgo = ((nPoints - 1 - k) / (nPoints - 1)) * Tdays;
-    const date = new Date(anchorMs - daysAgo * DAY_MS);
-    rows.push({ date, S: base[k], kind: "drawn (base)" });
-    if (noisy) rows.push({ date, S: realised[k], kind: "realised (+ noise)" });
-  }
-  return rows;
-}
-```
-
-```{ojs}
-//| echo: false
-Plot.plot({
-  width: 820,
-  height: 200,
-  marginLeft: 58,
-  marginBottom: 32,
-  grid: true,
-  x: {
-    label: "date",
-    domain: [
-      new Date(buildDate.getTime() - Tdays * 86400000),
-      buildDate,
-    ],
-    ticks: xTicksAnchoredRight(Tdays).map(
-      d => new Date(buildDate.getTime() - (Tdays - d) * 86400000),
-    ),
-    tickFormat: (d) => formatTickDate(d, Tdays),
-  },
-  y: { label: "S_t (USD / kVCM)", zero: true, tickFormat: "~g" },
-  color: {
-    legend: true,
-    domain: ["drawn (base)", "realised (+ noise)"],
-    range: ["#c94", "#4c78a8"],
-  },
-  marks: [
-    Plot.ruleY([0]),
-    Plot.line(customPathRecords, { x: "date", y: "S", stroke: "kind", strokeOpacity: d => d.kind === "drawn (base)" ? 1 : 0.7 }),
-  ],
-})
-```
-
 _Orange: the curve you drew. Blue (when $\sigma^2_{\mathrm{noise}} > 0$):
-the realised noisy path actually fed into the integrals. Change the PRNG
-seed (either slider — they're synchronised) to cycle through different
-noise realisations._
+the realised noisy path actually fed into the integrals, overlaid on the
+same canvas. Change the PRNG seed (either slider — they're synchronised)
+to cycle through different noise realisations._
 
 ```{ojs}
 //| echo: false
