@@ -7,6 +7,7 @@
   "scripts": {
     "simulate": "tsx src/cli.ts",
     "sweep": "tsx src/cli.ts --sweep",
+    "fetch:prices": "tsx src/fetch-historical-price.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
