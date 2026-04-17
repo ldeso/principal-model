@@ -27,10 +27,9 @@ format:
     align-items: start;
     margin-left: calc(-320px - 1.5rem);
   }
-  .pc-section > * { grid-column: 3; min-width: 0; }
+  .pc-section > .pc-main { grid-column: 3; min-width: 0; }
   .pc-section > .pc-controls {
     grid-column: 1;
-    grid-row: 1 / -1;
     position: sticky; top: 0.75rem;
     align-self: start;
     max-height: calc(100vh - 1.5rem);
@@ -181,6 +180,8 @@ html`<div class="pc-readout">
 ```
 
 :::
+
+::: {.pc-main}
 
 Drift $\mu$ and variance $\sigma^2$ are annualised. The retirement rate
 $\lambda$ is specified per calendar day; internally we use a year as the
@@ -609,6 +610,8 @@ highlighted. Green dashed rule: time at which the pre-purchased inventory
 is exhausted — to the right of this line, retirements are sourced at
 spot._
 
+:::
+
 ::::
 
 ## Custom price curve scenario
@@ -731,6 +734,8 @@ viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG s
 ```
 
 :::
+
+::: {.pc-main}
 
 ```{ojs}
 //| echo: false
@@ -1113,6 +1118,8 @@ _The **drawn** column is the deterministic P&L implied by the trajectory
 you sketched; the **MC mean** column is $\mathbb{E}[\Pi]$ from the Monte
 Carlo above; the **diff** shows how this specific scenario compares to
 the average across random GBM futures._
+
+:::
 
 ::::
 
