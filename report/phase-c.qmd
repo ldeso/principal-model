@@ -16,20 +16,20 @@ format:
   .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
   .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
 
-  /* Section layout: controls in a left rail that's sticky across the whole
-     section; body content aligns with Quarto's body column. The .pc-section
-     uses .column-screen-inset-left, whose right edge coincides with the
-     body column's right edge, so placing the content column at the grid's
-     right edge with the body column's width reproduces the body column
-     exactly. The sticky sidebar sits in the left whitespace. */
+  /* Section layout: body content stays at Quarto's native body-column
+     width; the controls panel is pulled into the left gutter via a
+     negative margin on the grid container. Avoiding a .column-* escape
+     sidesteps Quarto's TOC-grid interactions (which were making the
+     text column too wide and introducing an extra vertical gap). */
   .pc-section {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px 1.5rem minmax(0, 850px);
+    grid-template-columns: 320px 1.5rem minmax(0, 1fr);
     align-items: start;
+    margin-left: calc(-320px - 1.5rem);
   }
-  .pc-section > * { grid-column: 4; min-width: 0; }
+  .pc-section > * { grid-column: 3; min-width: 0; }
   .pc-section > .pc-controls {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1 / -1;
     position: sticky; top: 0.75rem;
     align-self: start;
@@ -50,9 +50,9 @@ format:
     white-space: normal !important;
     line-height: 1.2;
   }
-  /* Narrow screens: drop the grid, unstick the controls. */
+  /* Narrow screens: drop the grid, unstick the controls, reset margin. */
   @media (max-width: 1100px) {
-    .pc-section { display: block; }
+    .pc-section { display: block; margin-left: 0; }
     .pc-section > .pc-controls { position: static; max-height: none; }
   }
 
@@ -90,7 +90,7 @@ k / (N \cdot P),\; \text{basis} = \alpha \cdot N \cdot P \cdot S_0)$
 parametrisation is a special case of the new one.
 :::
 
-:::: {.pc-section .column-screen-inset-left}
+:::: {.pc-section}
 
 ::: {.pc-controls}
 ### Price process
@@ -660,7 +660,7 @@ historicalPrices = {
 }
 ```
 
-:::: {.pc-section .column-screen-inset-left}
+:::: {.pc-section}
 
 ::: {.pc-controls}
 All sliders below mirror the ones in the previous section — moving either
