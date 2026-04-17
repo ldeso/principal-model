@@ -27,13 +27,13 @@ tail-risk metric menu for the fee model and the three principal variants
 :::
 
 ::: {.g-col-12 .g-col-md-6}
-### [Phase B — Simulator](report.qmd)
+### [Phase B — Simulator](phase-b.qmd)
 
 TypeScript Monte Carlo reproduction of the Phase A closed forms, with
 VaR / CVaR tail estimates and an Observable-powered notebook for exploring
 $(\alpha, \mu, \sigma, f, Q, T)$.
 
-[Open the simulator →](report.qmd)
+[Open the simulator →](phase-b.qmd)
 :::
 
 ::: {.g-col-12 .g-col-md-6}

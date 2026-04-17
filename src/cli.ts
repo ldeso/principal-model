@@ -1,5 +1,5 @@
 // CLI entrypoint: runs the simulator, prints the §4 / §5 tables, and
-// writes JSON artifacts consumed by report/report.qmd.
+// writes JSON artifacts consumed by report/phase-b.qmd.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

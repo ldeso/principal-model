@@ -69,7 +69,7 @@ Artifacts are written to `report/data/`:
 # Phase B — pre-computed JSON, requires a simulate+sweep pass first.
 npm run simulate -- --seed 42
 npm run sweep    -- --seed 42
-quarto preview report/report.qmd
+quarto preview report/phase-b.qmd
 
 # Phase C — live in-browser Monte Carlo, no JSON pre-pass needed.
 quarto preview report/phase-c.qmd
@@ -92,7 +92,7 @@ test/                        vitest unit + cross-check suite (39 tests)
 report/
   index.qmd                  landing page linking Phases A / B / C
   phase-a.qmd                includes research-note.md (Phase A)
-  report.qmd                 Phase B — Quarto + Observable notebook
+  phase-b.qmd                Phase B — Quarto + Observable notebook
   phase-c.qmd                Phase C — live in-browser Monte Carlo + custom curve
   data/                      emitted JSON artifacts
 ```

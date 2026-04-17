@@ -213,9 +213,9 @@ html`<div class="metric-grid">
   <div class="card"><div class="label">T (horizon, yr)</div><div class="value">${run.params.T}</div></div>
   <div class="card"><div class="label">λ (tonnes/yr)</div><div class="value">${run.params.lambda.toLocaleString()}</div></div>
   <div class="card"><div class="label">f (fee rate)</div><div class="value">${run.params.f}</div></div>
-  <div class="card"><div class="label">Q (USD/tonne)</div><div class="value">${run.params.Q}</div></div>
+  <div class="card"><div class="label">Q (USD/tonne)</div><div class="value">${"$" + run.params.Q}</div></div>
   <div class="card"><div class="label">α (hedge ratio)</div><div class="value">${run.params.alpha}</div></div>
-  <div class="card"><div class="label">Q* (break-even)</div><div class="value">${run.closed.QStar.toFixed(4)}</div></div>
+  <div class="card"><div class="label">Q* (break-even)</div><div class="value">${"$" + run.closed.QStar.toFixed(4)}</div></div>
 </div>`
 ```
 
@@ -312,16 +312,16 @@ Inputs.table(run.rows, {
     sharpe: "Sharpe"
   },
   format: {
-    closedFormMean: x => x.toFixed(2),
-    mcMean: x => x.toFixed(2),
-    mcCi95: x => "±" + x.toFixed(2),
-    closedFormSd: x => x.toFixed(2),
-    mcSd: x => x.toFixed(2),
+    closedFormMean: x => "$" + x.toFixed(2),
+    mcMean: x => "$" + x.toFixed(2),
+    mcCi95: x => "±$" + x.toFixed(2),
+    closedFormSd: x => "$" + x.toFixed(2),
+    mcSd: x => "$" + x.toFixed(2),
     zScore: x => x.toFixed(2),
-    var95: x => x.toFixed(2),
-    var99: x => x.toFixed(2),
-    cvar95: x => x.toFixed(2),
-    cvar99: x => x.toFixed(2),
+    var95: x => "$" + x.toFixed(2),
+    var99: x => "$" + x.toFixed(2),
+    cvar95: x => "$" + x.toFixed(2),
+    cvar99: x => "$" + x.toFixed(2),
     probLoss: x => x.toFixed(3),
     sharpe: x => x === null ? "—" : x.toFixed(3)
   }
@@ -385,7 +385,7 @@ Plot.plot({
   marginRight: 30,
   marginBottom: 50,
   grid: true,
-  x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: "~s" },
+  x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
   y: { label: "empirical density", labelAnchor: "center" },
   fy: { label: "model" },
   color: { legend: true, domain: ["fee","principal_3b","principal_3c"], label: "model" },
@@ -529,7 +529,7 @@ Plot.plot({
   marginBottom: 50,
   grid: true,
   x: { label: "normalised time  t / T", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "V_t  =  N·P·(1−t/T)·S_t    (USD)", labelAnchor: "center", tickFormat: "~s" },
+  y: { label: "V_t  =  N·P·(1−t/T)·S_t    (USD)", labelAnchor: "center", tickFormat: "$~s" },
   marks: [
     Plot.ruleY([0]),
     Plot.line(pathRecords, { x: "t", y: "V", z: "id", stroke: "#888", strokeOpacity: 0.3 }),
@@ -582,7 +582,7 @@ Plot.plot({
   marginLeft: 70,
   marginBottom: 50,
   grid: true,
-  x: { label: "max_t [N·P·(1−t/T)·(S_0−S_t)]₊   (USD shortfall)", labelAnchor: "center", labelOffset: 36, tickFormat: "~s" },
+  x: { label: "max_t [N·P·(1−t/T)·(S_0−S_t)]₊   (USD shortfall)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
   y: { label: "number of paths", labelAnchor: "center" },
   marks: [
     Plot.rectY(run.sampleTraces.navDrawdown, Plot.binX({y:"count"}, {x: d => d, fill:"#e45", fillOpacity: 0.8})),
@@ -656,7 +656,7 @@ Plot.plot({
   marginBottom: 55,
   grid: true,
   x: { label: "volatility σ   (annualised)", labelAnchor: "center", labelOffset: 36, type: "linear" },
-  y: { label: "CVaR95 of Π (principal 3c)   (USD)", labelAnchor: "center", zero: true, tickFormat: "~s" },
+  y: { label: "CVaR95 of Π (principal 3c)   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
   marks: [
     Plot.ruleY([0]),
     Plot.line(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, stroke: "#c53", strokeWidth: 2 }),
@@ -709,7 +709,7 @@ Plot.plot({
   grid: true,
   caption: "Hedge ratio α vs tail risk. Fixed μ (selected above), σ = second grid value. At α = 1 the book is deterministic so CVaR95 collapses to the sign of the matched P&L.",
   x: { label: "hedge ratio α   (0 = back-to-back, 1 = fully matched)", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "CVaR95 of Π (principal 3c)   (USD)", labelAnchor: "center", zero: true, tickFormat: "~s" },
+  y: { label: "CVaR95 of Π (principal 3c)   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
   marks: [
     Plot.ruleY([0]),
     Plot.line(byAlpha, { x: "alpha", y: d => d.partial.cvar95, stroke: "#35a", strokeWidth: 2 }),

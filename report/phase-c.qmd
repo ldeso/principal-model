@@ -157,7 +157,7 @@ format:
 
 ## Starting Phase C
 
-[Phase B](report.qmd) cross-checked the closed-form §1–§5 quantities (see
+[Phase B](phase-b.qmd) cross-checked the closed-form §1–§5 quantities (see
 the [Phase A note](phase-a.qmd)) against Monte Carlo and exposed a
 **pre-baked** sweep over $(\alpha, \mu, \sigma)$ through the Observable
 notebook. Phase C extends the modelling menu — jump diffusion, regime
@@ -167,12 +167,12 @@ simulator live on parameters of our choosing**, not just a pre-computed grid.
 
 This page is that scaffolding. Every slider below triggers a fresh Monte
 Carlo in the browser (no server round-trip, no artifact regeneration). The
-baseline price process is the same GBM used in [Phase B](report.qmd);
+baseline price process is the same GBM used in [Phase B](phase-b.qmd);
 subsequent Phase C iterations will swap in the richer dynamics behind the
 same UI.
 
 ::: {.callout-note appearance="simple"}
-## What changes vs. [Phase B](report.qmd)
+## What changes vs. [Phase B](phase-b.qmd)
 
 The pre-purchase hedge is now specified by the **raw inventory state** —
 a number of kVCM tokens and their USD cost basis — instead of the ratio

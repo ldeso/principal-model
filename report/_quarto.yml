@@ -13,7 +13,7 @@ website:
         text: Home
       - href: phase-a.qmd
         text: Phase A — Note
-      - href: report.qmd
+      - href: phase-b.qmd
         text: Phase B — Simulator
       - href: phase-c.qmd
         text: Phase C — Interactive
