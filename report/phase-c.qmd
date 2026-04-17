@@ -669,6 +669,73 @@ historicalPrices = {
 }
 ```
 
+::: {.pc-layout}
+
+::: {.pc-controls-pane}
+## Curve controls
+
+All sliders below mirror the ones in the previous section — moving either
+copy updates both, so the drawn-curve scenario and the Monte Carlo above
+stay on the same parameter set.
+
+### Price process
+
+```{ojs}
+//| echo: false
+viewof curvePi0 = Inputs.bind(Inputs.range([0, 500], { step: 1, label: "π₀ (USD / tonne)" }), viewof pi0)
+```
+
+```{ojs}
+//| echo: false
+viewof curveS0 = Inputs.bind(Inputs.range([0.005, 1], { step: 0.005, label: "S₀ (USD / kVCM)" }), viewof S0)
+```
+
+```{ojs}
+//| echo: false
+viewof curveMu = Inputs.bind(Inputs.range([-0.5, 0.5], { step: 0.005, label: "drift μ (annualised)" }), viewof mu)
+```
+
+```{ojs}
+//| echo: false
+viewof curveSigma2 = Inputs.bind(Inputs.range([0, 2.5], { step: 0.005, label: "variance σ² (annualised)" }), viewof sigma2)
+```
+
+### Demand & inventory
+
+```{ojs}
+//| echo: false
+viewof curveLambdaDay = Inputs.bind(Inputs.range([0, 50], { step: 0.1, label: "retirements (tonnes / day)" }), viewof lambdaDay)
+```
+
+```{ojs}
+//| echo: false
+viewof curveKPre = Inputs.bind(Inputs.range([0, 2000000], { step: 1000, label: "initial inventory (kVCM)" }), viewof kPre)
+```
+
+```{ojs}
+//| echo: false
+viewof curveCBasis = Inputs.bind(Inputs.range([0, 1000000], { step: 100, label: "inventory basis (USD, total)" }), viewof cBasis)
+```
+
+### Contract
+
+```{ojs}
+//| echo: false
+viewof curveTdays = Inputs.bind(Inputs.range([30, 1095], { step: 5, label: "horizon T (days)" }), viewof Tdays)
+```
+
+```{ojs}
+//| echo: false
+viewof curveQ = Inputs.bind(Inputs.range([0, 1000], { step: 0.5, label: "fixed quote Q (USD / tonne)" }), viewof Q)
+```
+
+```{ojs}
+//| echo: false
+viewof curveFee = Inputs.bind(Inputs.range([0, 1], { step: 0.01, label: "fee rate f" }), viewof fee)
+```
+
+### Curve settings
+
 ```{ojs}
 //| echo: false
 viewof curveYMax = Inputs.range([0.01, 3], { step: 0.005, value: 0.2, label: "canvas y-max (USD / kVCM)" })
@@ -683,6 +750,10 @@ viewof curveVar = Inputs.range([0, 2.5], { step: 0.005, value: 0, label: "noise 
 //| echo: false
 viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG seed" }), viewof seed)
 ```
+
+:::
+
+::: {.pc-content-pane}
 
 ```{ojs}
 //| echo: false
@@ -1065,6 +1136,10 @@ _The **drawn** column is the deterministic P&L implied by the trajectory
 you sketched; the **MC mean** column is $\mathbb{E}[\Pi]$ from the Monte
 Carlo above; the **diff** shows how this specific scenario compares to
 the average across random GBM futures._
+
+:::
+
+:::
 
 ## Notes
 
