@@ -690,16 +690,6 @@ viewof curvePi0 = Inputs.bind(Inputs.range([0, 500], { step: 1, label: "π₀ (U
 viewof curveS0 = Inputs.bind(Inputs.range([0.005, 1], { step: 0.005, label: "S₀ (USD / kVCM)" }), viewof S0)
 ```
 
-```{ojs}
-//| echo: false
-viewof curveMu = Inputs.bind(Inputs.range([-0.5, 0.5], { step: 0.005, label: "drift μ (annualised)" }), viewof mu)
-```
-
-```{ojs}
-//| echo: false
-viewof curveSigma2 = Inputs.bind(Inputs.range([0, 2.5], { step: 0.005, label: "variance σ² (annualised)" }), viewof sigma2)
-```
-
 ### Demand & inventory
 
 ```{ojs}
