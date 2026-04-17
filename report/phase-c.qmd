@@ -1,0 +1,559 @@
+---
+title: "Phase C — Interactive simulator"
+subtitle: "Live Monte Carlo on parameters of your choosing"
+format:
+  html:
+    page-layout: full
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    embed-resources: false
+---
+
+```{=html}
+<style>
+  .phase-c-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+  .phase-c-controls .group { display: flex; flex-direction: column; gap: 0.35rem; }
+  .phase-c-controls .group h4 { margin: 0 0 0.25rem; font-size: 0.95rem; color: #333; }
+  .phase-c-derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+  .phase-c-derived .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.75rem; background: #fff; }
+  .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
+  .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
+  .callout-note-lite { border-left: 3px solid #4c78a8; background: #f3f7fb; padding: 0.6rem 0.9rem; margin: 0.8rem 0; font-size: 0.95rem; }
+</style>
+```
+
+## Starting Phase C
+
+Phase B cross-checked the closed-form §1–§5 quantities against Monte Carlo
+and exposed a **pre-baked** sweep over $(\alpha, \mu, \sigma)$ through the
+Observable notebook. Phase C extends the modelling menu — jump diffusion,
+regime switching, Poisson retirements, historical calibration, dynamic
+hedging — and the first piece of scaffolding it needs is **a way to run the
+simulator live on parameters of our choosing**, not just a pre-computed grid.
+
+This page is that scaffolding. Every slider below triggers a fresh Monte
+Carlo in the browser (no server round-trip, no artifact regeneration). The
+baseline price process is the same GBM used in Phase B; subsequent Phase C
+iterations will swap in the richer dynamics behind the same UI.
+
+::: {.callout-note-lite}
+**What changes vs. Phase B.** The pre-purchase hedge is now specified by
+the **raw inventory state** — a number of kVCM tokens and their USD cost
+basis — instead of the ratio $\alpha$. This removes the Phase B assumption
+that the tokens were bought today at $S_0$: you can seed the simulation
+with an inventory that was acquired earlier at a different price. The
+Phase B $(\alpha = k / (N \cdot P),\; \text{basis} = \alpha \cdot N \cdot P \cdot S_0)$ parametrisation
+is a special case of the new one.
+:::
+
+## Controls
+
+Drift $\mu$ and variance $\sigma^2$ are annualised. The retirement rate
+$\lambda$ is specified per calendar day; internally we use a year as the
+time unit, so $\lambda_{\mathrm{yr}} = 365 \cdot \lambda_{\mathrm{day}}$.
+
+```{ojs}
+//| echo: false
+viewof pi0 = Inputs.range([1, 200], { step: 0.5, value: 40, label: "starting carbon price π₀ (USD / tonne)" })
+```
+
+```{ojs}
+//| echo: false
+viewof S0 = Inputs.range([0.1, 50], { step: 0.05, value: 10, label: "starting kVCM price S₀ (USD / kVCM)" })
+```
+
+```{ojs}
+//| echo: false
+viewof mu = Inputs.range([-0.5, 0.5], { step: 0.005, value: 0.05, label: "drift μ (annualised)" })
+```
+
+```{ojs}
+//| echo: false
+viewof sigma2 = Inputs.range([0, 2.5], { step: 0.005, value: 0.25, label: "variance σ² (annualised)" })
+```
+
+```{ojs}
+//| echo: false
+viewof lambdaDay = Inputs.range([0, 5000], { step: 10, value: 250, label: "retirements per day (tonnes / day)" })
+```
+
+```{ojs}
+//| echo: false
+viewof kPre = Inputs.range([0, 500000], { step: 100, value: 0, label: "initial kVCM inventory (tokens)" })
+```
+
+```{ojs}
+//| echo: false
+viewof cBasis = Inputs.range([0, 2000000], { step: 100, value: 0, label: "initial inventory cost basis (USD, total)" })
+```
+
+Secondary controls — horizon, customer quote, fee, and Monte Carlo size.
+Defaults are set so that $Q$ tracks the Phase B fee-equivalent quote at
+$t = 0$; override to study off-market pricing.
+
+```{ojs}
+//| echo: false
+viewof Tdays = Inputs.range([30, 1095], { step: 5, value: 365, label: "horizon T (days)" })
+```
+
+```{ojs}
+//| echo: false
+viewof Q = Inputs.range([0, 500], { step: 0.5, value: 42, label: "fixed quote Q (USD / tonne)" })
+```
+
+```{ojs}
+//| echo: false
+viewof fee = Inputs.range([0, 0.25], { step: 0.005, value: 0.05, label: "fee rate f (dimensionless)" })
+```
+
+```{ojs}
+//| echo: false
+viewof nPaths = Inputs.select([2000, 5000, 10000, 20000, 40000], { value: 5000, label: "Monte Carlo paths" })
+```
+
+```{ojs}
+//| echo: false
+viewof nSteps = Inputs.select([50, 100, 200, 365], { value: 100, label: "time steps / path" })
+```
+
+```{ojs}
+//| echo: false
+viewof seed = Inputs.range([1, 9999], { step: 1, value: 42, label: "PRNG seed" })
+```
+
+## Derived quantities
+
+```{ojs}
+//| echo: false
+derived = {
+  const sigma = Math.sqrt(sigma2);
+  const P = pi0 / S0;
+  const T = Tdays / 365;
+  const lambda = lambdaDay * 365;
+  const N = lambda * T;
+  const tokensNeeded = N * P;
+  const coverageDays = (lambda > 0 && P > 0) ? kPre / (lambda * P) * 365 : Infinity;
+  const coverageFrac = tokensNeeded > 0 ? Math.min(1, kPre / tokensNeeded) : 0;
+  const impliedCost = kPre > 0 ? cBasis / kPre : 0;
+  const QStarRatio = expm1OverX(mu * T);
+  const QStar = (1 + fee) * P * S0 * QStarRatio;
+  return { sigma, P, T, lambda, N, tokensNeeded, coverageDays, coverageFrac, impliedCost, QStar };
+}
+```
+
+```{ojs}
+//| echo: false
+html`<div class="phase-c-derived">
+  <div class="card"><div class="label">σ (volatility)</div><div class="value">${derived.sigma.toFixed(4)}</div></div>
+  <div class="card"><div class="label">P = π₀ / S₀ (kVCM / tonne)</div><div class="value">${derived.P.toFixed(4)}</div></div>
+  <div class="card"><div class="label">T (years)</div><div class="value">${derived.T.toFixed(3)}</div></div>
+  <div class="card"><div class="label">N = λ·T (tonnes over horizon)</div><div class="value">${derived.N.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">tokens needed N·P</div><div class="value">${derived.tokensNeeded.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">coverage from inventory</div><div class="value">${(derived.coverageFrac * 100).toFixed(1)}%</div></div>
+  <div class="card"><div class="label">inventory runs out at (days)</div><div class="value">${isFinite(derived.coverageDays) ? Math.min(derived.coverageDays, Tdays).toFixed(1) : "∞"}</div></div>
+  <div class="card"><div class="label">implied basis per token</div><div class="value">${kPre > 0 ? "$" + derived.impliedCost.toFixed(3) : "—"}</div></div>
+  <div class="card"><div class="label">break-even Q* (USD / tonne)</div><div class="value">${derived.QStar.toFixed(3)}</div></div>
+</div>`
+```
+
+::: {.callout-note-lite}
+**Interpreting "coverage".** If the pre-purchased inventory covers 100% of
+the horizon's token demand, the book is fully matched (§3a-style). Below
+100%, the operator runs out of inventory part-way through the horizon and
+has to buy the remainder back-to-back at spot — that is where the left-tail
+risk appears. Above 100% (over-hedged) the excess tokens are marked-to-
+market at $S_T$ at the horizon.
+:::
+
+## Core simulator
+
+All cells below are pure JavaScript running in the browser — no server, no
+pre-computed JSON. The simulator is a direct port of `src/rng.ts`,
+`src/gbm.ts`, `src/moments.ts`, and `src/risk.ts`. Keeping it inline lets
+readers audit every calculation in one place.
+
+```{ojs}
+//| echo: false
+function makeRng(seedVal) {
+  let state = seedVal >>> 0;
+  let cached = null;
+  const uniform = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const u = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return u === 0 ? 1 / 4294967296 : u;
+  };
+  const normal = () => {
+    if (cached !== null) {
+      const z = cached;
+      cached = null;
+      return z;
+    }
+    const u1 = uniform();
+    const u2 = uniform();
+    const r = Math.sqrt(-2 * Math.log(u1));
+    const th = 2 * Math.PI * u2;
+    cached = r * Math.sin(th);
+    return r * Math.cos(th);
+  };
+  return { uniform, normal };
+}
+```
+
+```{ojs}
+//| echo: false
+function expm1OverX(x) {
+  if (x === 0) return 1;
+  if (Math.abs(x) < 1e-8) return 1 + x / 2 + (x * x) / 6;
+  return Math.expm1(x) / x;
+}
+```
+
+```{ojs}
+//| echo: false
+function quantileSorted(sorted, q) {
+  const n = sorted.length;
+  if (n === 0) return NaN;
+  if (n === 1) return sorted[0];
+  const pos = q * (n - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  const frac = pos - lo;
+  return sorted[lo] * (1 - frac) + sorted[hi] * frac;
+}
+```
+
+```{ojs}
+//| echo: false
+function tailMean(sortedAscending, q) {
+  const n = sortedAscending.length;
+  const k = Math.max(1, Math.ceil((1 - q) * n));
+  let s = 0;
+  for (let i = 0; i < k; i++) s += sortedAscending[i];
+  return s / k;
+}
+```
+
+```{ojs}
+//| echo: false
+function simulate(inputs) {
+  const { S0, mu, sigma, P, lambda, T, Q, fee, kPre, cBasis, nPaths, nSteps, seed } = inputs;
+  const rng = makeRng(seed);
+  const dt = T / nSteps;
+  const drift = (mu - 0.5 * sigma * sigma) * dt;
+  const diffusion = sigma * Math.sqrt(dt);
+  const N = lambda * T;
+  // Fraction of horizon over which inventory lasts, clamped to [0, 1].
+  // Retirements are a constant flow λ, so `kPre` tokens cover
+  // τ = kPre / (λ P) years of demand.
+  const tauFrac = (lambda > 0 && P > 0)
+    ? Math.min(1, kPre / (lambda * P * T))
+    : 1;
+  const tokensUsedInternal = Math.min(kPre, lambda * T * P);
+  const tokensLeftover = Math.max(0, kPre - lambda * T * P);
+  // When inventory covers the whole horizon, the tail integral range [τT, T]
+  // has zero length; park tailStartStep beyond the loop so no node ever
+  // contributes. (Math.ceil(1 · nSteps) = nSteps would otherwise add
+  // 0.5·S_T·dt from the single collapsed endpoint.)
+  // Snap tauFrac onto the integration grid and treat "only the endpoint
+  // falls in [τT, T]" as an empty range — otherwise the trapezoid rule
+  // would contribute 0.5·S_T·dt for a zero-length interval.
+  const tailStartRaw = Math.ceil(tauFrac * nSteps);
+  const tailStartStep = tailStartRaw >= nSteps ? nSteps + 1 : tailStartRaw;
+
+  const feeSamples = new Float64Array(nPaths);
+  const principalSamples = new Float64Array(nPaths);
+  const b2bSamples = new Float64Array(nPaths);
+  const ITSamples = new Float64Array(nPaths);
+  const terminalS = new Float64Array(nPaths);
+  const keepPaths = Math.min(20, nPaths);
+  const sampledPaths = [];
+
+  for (let i = 0; i < nPaths; i++) {
+    // Trapezoid accumulators: full-horizon I_T and uncovered-tail integral
+    // ∫_{τ T}^{T} S_t dt. We stitch the tail integral out of the same
+    // trajectory so it uses the same realisations as I_T.
+    let S = S0;
+    let IT = 0;
+    let tailInt = 0;
+    const path = (i < keepPaths) ? new Float64Array(nSteps + 1) : null;
+    if (path) path[0] = S;
+
+    // Trapezoid rule: weight endpoints by 1/2.
+    IT += 0.5 * S;
+    if (tailStartStep === 0) tailInt += 0.5 * S;
+
+    for (let k = 1; k <= nSteps; k++) {
+      const z = rng.normal();
+      S = S * Math.exp(drift + diffusion * z);
+      if (path) path[k] = S;
+      const w = (k === nSteps) ? 0.5 : 1;
+      IT += w * S;
+      if (k >= tailStartStep) {
+        const wt = (k === tailStartStep || k === nSteps) ? 0.5 : 1;
+        tailInt += wt * S;
+      }
+    }
+    IT *= dt;
+    tailInt *= dt;
+    terminalS[i] = S;
+    ITSamples[i] = IT;
+
+    // Fee book: R_fee = f · P · λ · I_T.
+    feeSamples[i] = fee * P * lambda * IT;
+
+    // Back-to-back principal book (no pre-purchase): Π = Q·N − P·λ·I_T.
+    b2bSamples[i] = Q * N - P * lambda * IT;
+
+    // Custom principal with initial inventory:
+    //   Π = Q·N − C_basis − P·λ·∫_{τT}^{T} S_t dt + leftover · S_T.
+    // The cost basis is a sunk cost at t=0; uncovered retirements after
+    // inventory exhaustion are bought at spot; excess tokens mark-to-market
+    // at horizon.
+    principalSamples[i] =
+      Q * N - cBasis - P * lambda * tailInt + tokensLeftover * S;
+
+    if (path) sampledPaths.push(path);
+  }
+
+  return {
+    feeSamples,
+    principalSamples,
+    b2bSamples,
+    ITSamples,
+    terminalS,
+    sampledPaths,
+    tauFrac,
+    tokensUsedInternal,
+    tokensLeftover,
+    N,
+  };
+}
+```
+
+```{ojs}
+//| echo: false
+function summarise(samples) {
+  const n = samples.length;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += samples[i];
+  const mean = sum / n;
+  let sse = 0;
+  for (let i = 0; i < n; i++) {
+    const d = samples[i] - mean;
+    sse += d * d;
+  }
+  const variance = n > 1 ? sse / (n - 1) : 0;
+  const sd = Math.sqrt(variance);
+  const stderr = sd / Math.sqrt(n);
+  const sorted = Float64Array.from(samples); sorted.sort();
+  const var95 = -quantileSorted(sorted, 0.05);
+  const var99 = -quantileSorted(sorted, 0.01);
+  const cvar95 = -tailMean(sorted, 0.95);
+  const cvar99 = -tailMean(sorted, 0.99);
+  let losses = 0;
+  for (let i = 0; i < n; i++) if (samples[i] < 0) losses++;
+  const probLoss = losses / n;
+  const sharpe = sd > 0 ? mean / sd : null;
+  return { mean, sd, stderr, ci95: 1.96 * stderr, var95, var99, cvar95, cvar99, probLoss, sharpe };
+}
+```
+
+## Monte Carlo run
+
+```{ojs}
+//| echo: false
+run = {
+  const inputs = {
+    S0, mu, sigma: derived.sigma, P: derived.P,
+    lambda: derived.lambda, T: derived.T,
+    Q, fee, kPre, cBasis,
+    nPaths, nSteps, seed,
+  };
+  const t0 = performance.now();
+  const raw = simulate(inputs);
+  const elapsedMs = performance.now() - t0;
+  return {
+    inputs,
+    ...raw,
+    fee: summarise(raw.feeSamples),
+    principal: summarise(raw.principalSamples),
+    b2b: summarise(raw.b2bSamples),
+    elapsedMs,
+  };
+}
+```
+
+```{ojs}
+//| echo: false
+html`<div class="phase-c-derived">
+  <div class="card"><div class="label">paths simulated</div><div class="value">${nPaths.toLocaleString()}</div></div>
+  <div class="card"><div class="label">wall time</div><div class="value">${run.elapsedMs.toFixed(1)} ms</div></div>
+  <div class="card"><div class="label">coverage this run</div><div class="value">${(run.tauFrac * 100).toFixed(1)}%</div></div>
+  <div class="card"><div class="label">leftover tokens at T</div><div class="value">${run.tokensLeftover.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+</div>`
+```
+
+### Summary statistics
+
+Three books are simulated on each draw:
+
+- **Fee** — $R_{\mathrm{fee}} = f \cdot P \cdot \lambda \cdot I_T$, revenue only.
+- **Principal (back-to-back)** — $\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$. No pre-purchase, for reference.
+- **Principal (custom inventory)** — $\Pi_{\mathrm{cust}} = Q \cdot N - C_{\mathrm{basis}} - P \cdot \lambda \int_{\tau T}^{T} S_t\,dt + k_{\mathrm{left}} \cdot S_T$, the active slider model.
+
+```{ojs}
+//| echo: false
+summaryRows = [
+  { book: "fee", ...run.fee },
+  { book: "principal (custom)", ...run.principal },
+  { book: "principal (back-to-back)", ...run.b2b },
+]
+```
+
+```{ojs}
+//| echo: false
+Inputs.table(summaryRows, {
+  columns: ["book","mean","sd","ci95","var95","var99","cvar95","cvar99","probLoss","sharpe"],
+  header: {
+    book: "book",
+    mean: "E[Π] (mc)",
+    sd: "SD",
+    ci95: "±CI95",
+    var95: "VaR95",
+    var99: "VaR99",
+    cvar95: "CVaR95",
+    cvar99: "CVaR99",
+    probLoss: "P[Π<0]",
+    sharpe: "Sharpe",
+  },
+  format: {
+    mean: x => x.toFixed(2),
+    sd: x => x.toFixed(2),
+    ci95: x => "±" + x.toFixed(2),
+    var95: x => x.toFixed(2),
+    var99: x => x.toFixed(2),
+    cvar95: x => x.toFixed(2),
+    cvar99: x => x.toFixed(2),
+    probLoss: x => x.toFixed(3),
+    sharpe: x => x === null ? "—" : x.toFixed(3),
+  }
+})
+```
+
+### P&L distributions
+
+```{ojs}
+//| echo: false
+pnlRecords = {
+  const rows = [];
+  const push = (label, arr) => {
+    for (let i = 0; i < arr.length; i++) rows.push({ book: label, pnl: arr[i] });
+  };
+  // Subsample for plotting responsiveness.
+  const stride = Math.max(1, Math.floor(run.feeSamples.length / 2500));
+  for (let i = 0; i < run.feeSamples.length; i += stride) {
+    rows.push({ book: "fee", pnl: run.feeSamples[i] });
+    rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
+    rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
+  }
+  return rows;
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 900,
+  height: 440,
+  marginLeft: 80,
+  marginRight: 30,
+  marginBottom: 50,
+  grid: true,
+  x: { label: "terminal P&L (USD)", tickFormat: "~s" },
+  y: { label: "empirical density" },
+  fy: { label: "book" },
+  color: { legend: true, domain: ["fee","principal (custom)","principal (back-to-back)"] },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
+    Plot.rectY(pnlRecords, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "book", fy: "book", thresholds: 50 })),
+    Plot.ruleX([
+      { book: "fee", x: run.fee.mean },
+      { book: "principal (custom)", x: run.principal.mean },
+      { book: "principal (back-to-back)", x: run.b2b.mean },
+    ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
+  ]
+})
+```
+
+_Solid black: MC-estimated $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$. The
+custom-principal panel collapses toward a spike as coverage approaches
+100% — that's the §3a matched book limit._
+
+### Sample price paths and inventory decay
+
+```{ojs}
+//| echo: false
+pathRecords = {
+  const rows = [];
+  const paths = run.sampledPaths;
+  const nS = run.inputs.nSteps;
+  for (let idx = 0; idx < paths.length; idx++) {
+    const path = paths[idx];
+    for (let k = 0; k <= nS; k++) {
+      rows.push({
+        tDays: (k / nS) * Tdays,
+        S: path[k],
+        id: idx,
+      });
+    }
+  }
+  return rows;
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 900,
+  height: 340,
+  marginLeft: 70,
+  marginBottom: 50,
+  grid: true,
+  x: { label: "t (days)", domain: [0, Tdays] },
+  y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: "~s" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(pathRecords, { x: "tDays", y: "S", z: "id", stroke: "#888", strokeOpacity: 0.35 }),
+    Plot.line(pathRecords.filter(r => r.id === 0), { x: "tDays", y: "S", stroke: "#c94", strokeWidth: 2 }),
+    Plot.ruleX([run.tauFrac * Tdays], { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+  ]
+})
+```
+
+_Grey: sampled GBM trajectories of the kVCM spot. Orange: first path
+highlighted. Green dashed rule: time at which the pre-purchased inventory
+is exhausted — to the right of this line, retirements are sourced at
+spot._
+
+## Notes
+
+- **Performance.** Each slider change re-runs the simulator. At 5,000
+  paths × 100 steps the wall time reported above should be well under a
+  second on a typical laptop. Increase `Monte Carlo paths` for tighter
+  tails; decrease for responsiveness while exploring.
+- **Reproducibility.** The PRNG is the same seeded Mulberry32 as Phase B,
+  so a given `(seed, inputs)` pair is deterministic across reloads.
+- **What is still Phase B under the hood.** GBM dynamics and deterministic
+  retirement flow. Phase C iterations will replace these with
+  jump-diffusion, regime switching, and Poisson demand while keeping the
+  same UI and book definitions.
+- **What is new beyond Phase B.** The principal book is parametrised by
+  the raw inventory state (tokens + cost basis), not by a ratio $\alpha$.
+  This allows seeding with inventory bought previously at a price different
+  from $S_0$ — a prerequisite for the calibration work later in Phase C.
