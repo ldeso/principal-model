@@ -17,12 +17,14 @@ format:
   .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
 
   /* Section layout: controls in a left rail that's sticky across the whole
-     section; body content keeps Quarto's default column width. The .pc-section
-     grid escapes to screen width via .column-screen-inset, with the sidebar
-     sitting in left whitespace rather than stealing room from the text. */
+     section; body content stays centred on the page. The .pc-section grid
+     escapes to screen width via .column-screen-inset; a phantom column
+     mirrors the sidebar on the right so the content column is symmetric
+     about the page centre, rather than being pushed rightward by the
+     sidebar's footprint. */
   .pc-section {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px 1.5rem minmax(0, 850px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 320px 1.5rem minmax(0, 850px) 1.5rem 320px minmax(0, 1fr);
     align-items: start;
   }
   .pc-section > * { grid-column: 4; min-width: 0; }
