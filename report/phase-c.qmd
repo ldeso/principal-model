@@ -634,6 +634,21 @@ identical to the MC ones; only the price path differs.
 
 ```{ojs}
 //| echo: false
+historicalPrices = {
+  // Fetched at build time by `npm run fetch:prices` (Alchemy Prices API).
+  // Missing or empty file ⇒ the "Historical" preset below is inert.
+  try {
+    const r = await fetch("data/kvcm-historical.json");
+    if (!r.ok) return { data: [] };
+    return await r.json();
+  } catch (e) {
+    return { data: [] };
+  }
+}
+```
+
+```{ojs}
+//| echo: false
 viewof curveYMax = Inputs.range([0.01, 3], { step: 0.005, value: 0.2, label: "canvas y-max (USD / kVCM)" })
 ```
 
@@ -654,6 +669,9 @@ viewof customCurve = {
   const yMax = curveYMax;
   const S0Val = S0;
   const TDaysVal = Tdays;
+  const history = (historicalPrices && Array.isArray(historicalPrices.data))
+    ? historicalPrices.data
+    : [];
 
   const values = new Float64Array(nPoints).fill(S0Val);
 
@@ -840,6 +858,29 @@ viewof customCurve = {
     redraw();
     emit();
   });
+  const historicalBtn = document.createElement("button");
+  historicalBtn.type = "button";
+  historicalBtn.textContent = history.length > 0
+    ? `Historical (${history.length}d, ${history[0].timestamp.slice(0, 10)}→${history[history.length - 1].timestamp.slice(0, 10)})`
+    : "Historical (unavailable)";
+  historicalBtn.disabled = history.length < 2;
+  historicalBtn.addEventListener("click", () => {
+    // Map the daily historical series onto the nPoints grid by linear
+    // interpolation in index space. The drawn curve therefore spans the
+    // same number of fetched days end-to-end, independent of Tdays — the
+    // sliders treat it as a T-day trajectory regardless.
+    const m = history.length;
+    for (let i = 0; i < nPoints; i++) {
+      const t = (i / (nPoints - 1)) * (m - 1);
+      const lo = Math.floor(t);
+      const hi = Math.min(m - 1, lo + 1);
+      const frac = t - lo;
+      values[i] = history[lo].value * (1 - frac) + history[hi].value * frac;
+    }
+    redraw();
+    emit();
+  });
+  toolbar.appendChild(historicalBtn);
   toolbar.appendChild(hint);
 
   container.appendChild(toolbar);
