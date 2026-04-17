@@ -389,6 +389,24 @@ function tailMean(sortedAscending, q) {
 
 ```{ojs}
 //| echo: false
+// Pick calendar-ish tick positions (in days) so the x-axis steps in
+// whole weeks / months / years depending on the horizon, rather than
+// rescaling to a fixed number of evenly-spaced ticks. The same helper
+// drives the drawable canvas and the two Plot charts below so all three
+// agree on where the gridlines land.
+xTicksForHorizon = function (tdays) {
+  let step;
+  if (tdays <= 60) step = 7;
+  else if (tdays <= 730) step = 30;
+  else step = 365;
+  const ticks = [];
+  for (let d = 0; d <= tdays; d += step) ticks.push(d);
+  return ticks;
+}
+```
+
+```{ojs}
+//| echo: false
 function simulate(inputs) {
   const { S0, mu, sigma, P, lambda, T, Q, fee, kPre, cBasis, nPaths, nSteps, seed } = inputs;
   const rng = makeRng(seed);
@@ -674,7 +692,7 @@ Plot.plot({
   marginLeft: 70,
   marginBottom: 50,
   grid: true,
-  x: { label: "t (days)", domain: [0, Tdays] },
+  x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
   y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: "~s" },
   marks: [
     Plot.ruleY([0]),
@@ -833,7 +851,16 @@ viewof customCurve = {
     ? historicalPrices.data
     : [];
 
-  const values = new Float64Array(nPoints).fill(S0Val);
+  // Persist the drawn curve across cell re-runs. Observable re-evaluates
+  // this cell whenever any referenced input (Tdays, S0, curveYMax, ...)
+  // changes, which would otherwise blow away the user's drawing. Stashing
+  // on window survives those re-runs; nPoints is fixed so the shape match
+  // check is effectively a presence check.
+  const stateKey = "__pcCustomCurveValues";
+  const prior = window[stateKey];
+  const values = (prior && prior.length === nPoints)
+    ? Float64Array.from(prior)
+    : new Float64Array(nPoints).fill(S0Val);
 
   const container = document.createElement("div");
   container.className = "pc-curve-box";
@@ -857,6 +884,7 @@ viewof customCurve = {
   const yToPrice = (y) =>
     Math.max(0, Math.min(yMax, yMax - ((y - margin.top) / plotH) * yMax));
 
+  const xTicks = xTicksForHorizon(TDaysVal);
   function redraw() {
     ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = "#e5e5e5";
@@ -867,8 +895,9 @@ viewof customCurve = {
       ctx.moveTo(margin.left, y);
       ctx.lineTo(margin.left + plotW, y);
     }
-    for (let g = 1; g < 5; g++) {
-      const x = margin.left + (g * plotW) / 5;
+    for (const d of xTicks) {
+      if (d <= 0 || d >= TDaysVal) continue;
+      const x = margin.left + (d / TDaysVal) * plotW;
       ctx.moveTo(x, margin.top);
       ctx.lineTo(x, margin.top + plotH);
     }
@@ -888,10 +917,9 @@ viewof customCurve = {
     }
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    for (let g = 0; g <= 5; g++) {
-      const tDay = (TDaysVal * g) / 5;
-      const x = margin.left + (g * plotW) / 5;
-      ctx.fillText(tDay.toFixed(0), x, margin.top + plotH + 6);
+    for (const d of xTicks) {
+      const x = margin.left + (d / TDaysVal) * plotW;
+      ctx.fillText(d.toFixed(0), x, margin.top + plotH + 6);
     }
 
     ctx.font = "12px sans-serif";
@@ -930,6 +958,7 @@ viewof customCurve = {
   }
 
   function emit() {
+    window[stateKey] = Float64Array.from(values);
     container.value = { values: Float64Array.from(values), nPoints };
     container.dispatchEvent(new CustomEvent("input", { bubbles: true }));
   }
@@ -1025,17 +1054,19 @@ viewof customCurve = {
     : "Historical (unavailable)";
   historicalBtn.disabled = history.length < 2;
   historicalBtn.addEventListener("click", () => {
-    // Map the daily historical series onto the nPoints grid by linear
-    // interpolation in index space. The drawn curve therefore spans the
-    // same number of fetched days end-to-end, independent of Tdays — the
-    // sliders treat it as a T-day trajectory regardless.
-    const m = history.length;
+    // Fit the historical series to the current horizon: take the most
+    // recent Tdays days (or the whole fetched range if it's shorter) and
+    // interpolate them onto the nPoints grid. The drawn curve then spans
+    // the same [0, T] window the sliders see, instead of stretching the
+    // entire fetched range regardless of T.
+    const days = Math.min(history.length, Math.max(2, Math.round(TDaysVal) + 1));
+    const start = history.length - days;
     for (let i = 0; i < nPoints; i++) {
-      const t = (i / (nPoints - 1)) * (m - 1);
+      const t = (i / (nPoints - 1)) * (days - 1);
       const lo = Math.floor(t);
-      const hi = Math.min(m - 1, lo + 1);
+      const hi = Math.min(days - 1, lo + 1);
       const frac = t - lo;
-      values[i] = history[lo].value * (1 - frac) + history[hi].value * frac;
+      values[i] = history[start + lo].value * (1 - frac) + history[start + hi].value * frac;
     }
     redraw();
     emit();
@@ -1046,6 +1077,7 @@ viewof customCurve = {
   container.appendChild(toolbar);
   container.appendChild(canvas);
   container.value = { values: Float64Array.from(values), nPoints };
+  window[stateKey] = Float64Array.from(values);
 
   redraw();
   return container;
@@ -1138,7 +1170,7 @@ Plot.plot({
   marginLeft: 58,
   marginBottom: 32,
   grid: true,
-  x: { label: "t (days)", domain: [0, Tdays] },
+  x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
   y: { label: "S_t (USD / kVCM)", zero: true, tickFormat: "~g" },
   color: {
     legend: true,
