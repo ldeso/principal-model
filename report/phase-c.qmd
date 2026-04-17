@@ -25,7 +25,15 @@ format:
   /* Two-column grid: inputs pinned on the left, charts on the right.
      Falls back to a single column on narrow screens. */
   @media (min-width: 1100px) {
-    .pc-layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+    /* Quarto's cosmo theme keeps a ~1400px cap on the main container even
+       under page-layout:full, which leaves the charts pane cramped next to
+       the 320px sticky sidebar. Let the page span the viewport. */
+    main#quarto-document-content,
+    div#quarto-content > main.content,
+    .quarto-container.page-full {
+      max-width: none;
+    }
+    .pc-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
     .pc-controls-pane {
       position: sticky; top: 0.75rem;
       max-height: calc(100vh - 1.5rem);
