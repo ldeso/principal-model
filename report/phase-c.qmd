@@ -1198,6 +1198,7 @@ viewof customCurve = {
     redraw();
     emit();
   });
+  const tdaysView = viewof Tdays;
   const historicalBtn = document.createElement("button");
   historicalBtn.type = "button";
   historicalBtn.textContent = history.length >= 2 ? "Historical" : "Historical (unavailable)";
@@ -1205,14 +1206,29 @@ viewof customCurve = {
   historicalBtn.addEventListener("click", () => {
     // Right-align the daily historical series: the most recent sample
     // lands on today (rightmost point) and earlier samples fill back
-    // in toward the left. If the fetched range doesn't reach all the
-    // way back to Tdays days ago, leave the older leftmost points at
-    // S₀ rather than stretching history to fill the gap.
+    // in toward the left. Write the full series into the persistent
+    // master first so resizing the horizon below can read it back.
     const dayCount = history.length;
+    for (let daysAgo = 0; daysAgo < dayCount && daysAgo <= MAX_TDAYS; daysAgo++) {
+      const histIdx = dayCount - 1 - daysAgo;
+      master[daysAgo] = history[histIdx].value;
+    }
+
+    // Snap horizon T to the span of available history so the drawn
+    // curve shows every historical sample, no more and no less. The
+    // range slider clamps at 30..1095.
+    const targetTdays = Math.max(30, Math.min(1095, dayCount - 1));
+    if (Number(tdaysView.value) !== targetTdays) {
+      tdaysView.value = targetTdays;
+      tdaysView.dispatchEvent(new CustomEvent("input", { bubbles: true }));
+      // The Tdays change invalidates this cell; the re-run reads master
+      // and rebuilds the canvas against the new horizon.
+      return;
+    }
+
     for (let i = 0; i < nPoints; i++) {
       const daysAgo = nPoints - 1 - i;
-      const histIdx = dayCount - 1 - daysAgo;
-      values[i] = histIdx >= 0 ? history[histIdx].value : S0Val;
+      values[i] = master[daysAgo];
     }
     redraw();
     emit();
