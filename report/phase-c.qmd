@@ -599,6 +599,334 @@ spot._
 
 :::
 
+## Custom price curve scenario
+
+The Monte Carlo above averages over a GBM's random futures. Sometimes you
+want the opposite: fix **one** specific price trajectory and see what the
+books do under it. Draw (or click-and-drag) a curve below — a crash, a
+spike, a choppy flat — and the three book P&Ls are recomputed
+deterministically from that trajectory in real time, using the same
+parameters as the sliders in the left pane.
+
+::: {.callout-note-lite}
+**How the curve is used.** The drawn values $\tilde S_0, \tilde S_1,
+\ldots, \tilde S_n$ replace the GBM sample path. Integrals are computed
+by the trapezoid rule on the same grid ($I_T = \int_0^T \tilde S_t\,dt$,
+tail integral over $[\tau T, T]$), and $\tilde S_T$ is read off the last
+point. All book formulas are identical to the MC ones; only the price
+path differs.
+:::
+
+```{=html}
+<style>
+  .pc-curve-box { border: 1px solid #ddd; border-radius: 8px; background: #fafafa; padding: 0.75rem 1rem 1rem; margin: 0.75rem 0; }
+  .pc-curve-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.6rem; align-items: center; }
+  .pc-curve-toolbar button { padding: 0.3rem 0.7rem; border: 1px solid #bbb; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+  .pc-curve-toolbar button:hover { background: #eef; }
+  .pc-curve-toolbar .hint { font-size: 0.82rem; color: #666; margin-left: auto; }
+  .pc-curve-canvas { display: block; max-width: 100%; height: auto; touch-action: none; cursor: crosshair; background: #fff; border: 1px solid #ccc; border-radius: 6px; }
+</style>
+```
+
+```{ojs}
+//| echo: false
+viewof curveYMax = Inputs.range([0.01, 3], { step: 0.005, value: 0.2, label: "canvas y-max (USD / kVCM)" })
+```
+
+```{ojs}
+//| echo: false
+viewof customCurve = {
+  const nPoints = 201;
+  const width = 820;
+  const height = 320;
+  const margin = { top: 10, right: 12, bottom: 32, left: 58 };
+  const plotW = width - margin.left - margin.right;
+  const plotH = height - margin.top - margin.bottom;
+  const yMax = curveYMax;
+  const S0Val = S0;
+  const TDaysVal = Tdays;
+
+  const values = new Float64Array(nPoints).fill(S0Val);
+
+  const container = document.createElement("div");
+  container.className = "pc-curve-box";
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "pc-curve-toolbar";
+  const hint = document.createElement("span");
+  hint.className = "hint";
+  hint.textContent = "Click and drag on the canvas to draw a price path.";
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "pc-curve-canvas";
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  const indexToX = (i) => margin.left + (i / (nPoints - 1)) * plotW;
+  const priceToY = (p) => margin.top + (1 - p / yMax) * plotH;
+  const xToIndex = (x) =>
+    Math.max(0, Math.min(nPoints - 1, Math.round(((x - margin.left) / plotW) * (nPoints - 1))));
+  const yToPrice = (y) =>
+    Math.max(0, Math.min(yMax, yMax - ((y - margin.top) / plotH) * yMax));
+
+  function redraw() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.strokeStyle = "#e5e5e5";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let g = 1; g < 5; g++) {
+      const y = margin.top + (g * plotH) / 5;
+      ctx.moveTo(margin.left, y);
+      ctx.lineTo(margin.left + plotW, y);
+    }
+    for (let g = 1; g < 5; g++) {
+      const x = margin.left + (g * plotW) / 5;
+      ctx.moveTo(x, margin.top);
+      ctx.lineTo(x, margin.top + plotH);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = "#333";
+    ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+
+    ctx.fillStyle = "#333";
+    ctx.font = "11px ui-monospace, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (let g = 0; g <= 5; g++) {
+      const priceVal = yMax * (1 - g / 5);
+      const y = margin.top + (g * plotH) / 5;
+      ctx.fillText(priceVal.toFixed(3), margin.left - 6, y);
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (let g = 0; g <= 5; g++) {
+      const tDay = (TDaysVal * g) / 5;
+      const x = margin.left + (g * plotW) / 5;
+      ctx.fillText(tDay.toFixed(0), x, margin.top + plotH + 6);
+    }
+
+    ctx.font = "12px sans-serif";
+    ctx.save();
+    ctx.translate(14, margin.top + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText("S_t (USD / kVCM)", 0, 0);
+    ctx.restore();
+    ctx.textAlign = "center";
+    ctx.fillText("t (days)", margin.left + plotW / 2, height - 2);
+
+    if (S0Val > 0 && S0Val <= yMax) {
+      ctx.strokeStyle = "#2a7";
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, priceToY(S0Val));
+      ctx.lineTo(margin.left + plotW, priceToY(S0Val));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#2a7";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.font = "11px ui-monospace, monospace";
+      ctx.fillText("S₀", margin.left + 4, priceToY(S0Val) - 2);
+    }
+
+    ctx.strokeStyle = "#c94";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(indexToX(0), priceToY(values[0]));
+    for (let i = 1; i < nPoints; i++) ctx.lineTo(indexToX(i), priceToY(values[i]));
+    ctx.stroke();
+  }
+
+  function emit() {
+    container.value = { values: Float64Array.from(values), nPoints };
+    container.dispatchEvent(new CustomEvent("input", { bubbles: true }));
+  }
+
+  let lastIdx = null;
+  let drawing = false;
+
+  function apply(ev) {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((ev.clientX - rect.left) * canvas.width) / rect.width;
+    const y = ((ev.clientY - rect.top) * canvas.height) / rect.height;
+    const idx = xToIndex(x);
+    const price = yToPrice(y);
+    if (lastIdx === null || lastIdx === idx) {
+      values[idx] = price;
+    } else {
+      const lo = Math.min(idx, lastIdx);
+      const hi = Math.max(idx, lastIdx);
+      const loP = lastIdx <= idx ? values[lastIdx] : price;
+      const hiP = lastIdx <= idx ? price : values[lastIdx];
+      for (let k = lo; k <= hi; k++) {
+        const frac = (k - lo) / (hi - lo);
+        values[k] = loP * (1 - frac) + hiP * frac;
+      }
+    }
+    lastIdx = idx;
+  }
+
+  canvas.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    drawing = true;
+    lastIdx = null;
+    canvas.setPointerCapture?.(ev.pointerId);
+    apply(ev);
+    redraw();
+    emit();
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    if (!drawing) return;
+    ev.preventDefault();
+    apply(ev);
+    redraw();
+    emit();
+  });
+  const endStroke = (ev) => {
+    drawing = false;
+    lastIdx = null;
+    if (canvas.hasPointerCapture?.(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+  };
+  canvas.addEventListener("pointerup", endStroke);
+  canvas.addEventListener("pointercancel", endStroke);
+
+  function setPreset(fn) {
+    for (let i = 0; i < nPoints; i++) values[i] = fn(i / (nPoints - 1));
+    redraw();
+    emit();
+  }
+  function addButton(label, fn) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    toolbar.appendChild(b);
+  }
+  addButton("Flat @ S₀", () => setPreset(() => S0Val));
+  addButton("Linear +50%", () => setPreset((u) => S0Val * (1 + 0.5 * u)));
+  addButton("Linear −50%", () => setPreset((u) => S0Val * (1 - 0.5 * u)));
+  addButton("Crash @ ½T", () =>
+    setPreset((u) => (u < 0.5 ? S0Val : S0Val * Math.max(0.05, 1 - 1.6 * (u - 0.5))))
+  );
+  addButton("Spike @ ⅓T", () => {
+    const peak = S0Val * 2.5;
+    setPreset((u) => {
+      const d = u - 1 / 3;
+      return S0Val + (peak - S0Val) * Math.exp(-80 * d * d);
+    });
+  });
+  addButton("Random walk", () => {
+    let s = S0Val;
+    const vals = [];
+    for (let i = 0; i < nPoints; i++) {
+      s = Math.max(0, s * (1 + 0.02 * (Math.random() - 0.5)));
+      vals.push(s);
+    }
+    for (let i = 0; i < nPoints; i++) values[i] = vals[i];
+    redraw();
+    emit();
+  });
+  toolbar.appendChild(hint);
+
+  container.appendChild(toolbar);
+  container.appendChild(canvas);
+  container.value = { values: Float64Array.from(values), nPoints };
+
+  redraw();
+  return container;
+}
+```
+
+```{ojs}
+//| echo: false
+customScenario = {
+  const { values, nPoints } = customCurve;
+  const T = derived.T;
+  const P = derived.P;
+  const lam = derived.lambda;
+  const N = derived.N;
+  const dt = T / (nPoints - 1);
+
+  let IT = 0;
+  for (let k = 0; k < nPoints; k++) {
+    const w = (k === 0 || k === nPoints - 1) ? 0.5 : 1;
+    IT += w * values[k];
+  }
+  IT *= dt;
+
+  const tauFrac = (lam > 0 && P > 0)
+    ? Math.min(1, kPre / (lam * P * T))
+    : 1;
+  const tailStartRaw = Math.ceil(tauFrac * (nPoints - 1));
+  const tailStartIdx = tailStartRaw >= nPoints - 1 ? nPoints : tailStartRaw;
+  let tailInt = 0;
+  for (let k = tailStartIdx; k < nPoints; k++) {
+    const w = (k === tailStartIdx || k === nPoints - 1) ? 0.5 : 1;
+    tailInt += w * values[k];
+  }
+  tailInt *= dt;
+
+  const ST = values[nPoints - 1];
+  const tokensLeftover = Math.max(0, kPre - lam * T * P);
+  const feeRev = fee * P * lam * IT;
+  const b2b = Q * N - P * lam * IT;
+  const cust = Q * N - cBasis - P * lam * tailInt + tokensLeftover * ST;
+
+  const maxS = values.reduce((a, b) => Math.max(a, b), 0);
+  const minS = values.reduce((a, b) => Math.min(a, b), Infinity);
+  const meanS = IT / T;
+
+  return { IT, tailInt, ST, tauFrac, tokensLeftover, feeRev, b2b, cust, maxS, minS, meanS };
+}
+```
+
+```{ojs}
+//| echo: false
+html`<div class="phase-c-derived">
+  <div class="card"><div class="label">min / max drawn S</div><div class="value">${customScenario.minS.toFixed(4)} / ${customScenario.maxS.toFixed(4)}</div></div>
+  <div class="card"><div class="label">mean drawn S (I_T / T)</div><div class="value">${customScenario.meanS.toFixed(4)}</div></div>
+  <div class="card"><div class="label">terminal S_T</div><div class="value">${customScenario.ST.toFixed(4)}</div></div>
+  <div class="card"><div class="label">tail integral ∫_{τT}^{T} S_t dt</div><div class="value">${customScenario.tailInt.toFixed(4)}</div></div>
+</div>`
+```
+
+```{ojs}
+//| echo: false
+customRows = [
+  { book: "fee",                      pnl: customScenario.feeRev, mcMean: run.fee.mean,       diff: customScenario.feeRev - run.fee.mean },
+  { book: "principal (custom)",       pnl: customScenario.cust,   mcMean: run.principal.mean, diff: customScenario.cust   - run.principal.mean },
+  { book: "principal (back-to-back)", pnl: customScenario.b2b,    mcMean: run.b2b.mean,       diff: customScenario.b2b    - run.b2b.mean },
+]
+```
+
+```{ojs}
+//| echo: false
+Inputs.table(customRows, {
+  columns: ["book", "pnl", "mcMean", "diff"],
+  header: {
+    book: "book",
+    pnl: "P&L on drawn curve",
+    mcMean: "E[Π] (MC)",
+    diff: "drawn − MC mean",
+  },
+  format: {
+    pnl: x => x.toFixed(2),
+    mcMean: x => x.toFixed(2),
+    diff: x => (x >= 0 ? "+" : "") + x.toFixed(2),
+  },
+})
+```
+
+_The **drawn** column is the deterministic P&L implied by the trajectory
+you sketched; the **MC mean** column is $\mathbb{E}[\Pi]$ from the Monte
+Carlo above; the **diff** shows how this specific scenario compares to
+the average across random GBM futures._
+
 ## Notes
 
 - **Performance.** Each slider change re-runs the simulator. At 5,000
