@@ -3,7 +3,6 @@ title: "Phase C — Interactive simulator"
 subtitle: "Live Monte Carlo on parameters of your choosing"
 format:
   html:
-    page-layout: full
     toc: true
     toc-depth: 2
     theme: cosmo
@@ -23,16 +22,10 @@ format:
 
   /* --- Sticky controls layout ---------------------------------------- */
   /* Two-column grid: inputs pinned on the left, charts on the right.
-     Falls back to a single column on narrow screens. */
+     Falls back to a single column on narrow screens. The grid itself
+     escapes the central body column via Quarto's `.column-screen-inset`,
+     so the sidebar sits outside the prose column on the left. */
   @media (min-width: 1100px) {
-    /* Quarto's cosmo theme keeps a ~1400px cap on the main container even
-       under page-layout:full, which leaves the charts pane cramped next to
-       the 320px sticky sidebar. Let the page span the viewport. */
-    main#quarto-document-content,
-    div#quarto-content > main.content,
-    .quarto-container.page-full {
-      max-width: none;
-    }
     .pc-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
     .pc-controls-pane {
       position: sticky; top: 0.75rem;
@@ -106,7 +99,7 @@ different price. The Phase B $(\alpha = k / (N \cdot P),\; \text{basis} = \alpha
 is a special case of the new one.
 :::
 
-::: {.pc-layout}
+::: {.pc-layout .column-screen-inset}
 
 ::: {.pc-controls-pane}
 ## Controls
@@ -679,7 +672,7 @@ historicalPrices = {
 }
 ```
 
-::: {.pc-layout}
+::: {.pc-layout .column-screen-inset}
 
 ::: {.pc-controls-pane}
 ## Curve controls
