@@ -339,7 +339,21 @@ viewof cBasis = Inputs.range([0, 1000000], { step: 100, value: 21000, label: "in
 
 ```{ojs}
 //| echo: false
-viewof Tdays = Inputs.range([30, 1095], { step: 5, value: 365, label: "horizon T (days)" })
+// Default horizon is the length of the historical series (so the
+// default "Historical" view spans exactly what's available). Step = 1
+// avoids a range-input snap that would otherwise grow nPoints by one
+// past the length of the historical data array and leave a
+// non-historical fill at the leftmost point.
+viewof Tdays = {
+  const hist = (historicalPrices && Array.isArray(historicalPrices.data))
+    ? historicalPrices.data
+    : [];
+  const fallback = 365;
+  const dflt = hist.length >= 2
+    ? Math.max(30, Math.min(1095, hist.length - 1))
+    : fallback;
+  return Inputs.range([30, 1095], { step: 1, value: dflt, label: "horizon T (days)" });
+}
 ```
 
 ```{ojs}
@@ -372,10 +386,16 @@ viewof seed = Inputs.range([1, 9999], { step: 1, value: 42, label: "PRNG seed" }
 ```{ojs}
 //| echo: false
 conclusionsResetButton = {
+  const hist = (historicalPrices && Array.isArray(historicalPrices.data))
+    ? historicalPrices.data
+    : [];
+  const defaultTdays = hist.length >= 2
+    ? Math.max(30, Math.min(1095, hist.length - 1))
+    : 365;
   const defaults = {
     pi0: 125, P: 1790,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
-    Tdays: 365, Q: 180, fee: 0.4,
+    Tdays: defaultTdays, Q: 180, fee: 0.4,
     curveYMax: 0.2, curveVar: 0, seed: 42,
   };
   const views = {
@@ -659,6 +679,22 @@ viewof customCurve = {
     master = new Float64Array(MAX_TDAYS + 1);
     master.fill(NaN);
     window[masterKey] = master;
+  }
+
+  // First-load seeding: if historical data is available and the user
+  // hasn't drawn anything yet, pre-populate the master array with the
+  // historical series so the canvas opens on the "Historical" view by
+  // default. Detected via a one-shot flag on window so re-runs of this
+  // cell (from slider changes) don't stomp user edits.
+  const seededKey = "__conclusionsCustomCurveSeeded";
+  if (!window[seededKey]) {
+    window[seededKey] = true;
+    if (history.length >= 2) {
+      const fillCount = Math.min(history.length, MAX_TDAYS + 1);
+      for (let daysAgo = 0; daysAgo < fillCount; daysAgo++) {
+        master[daysAgo] = history[history.length - 1 - daysAgo].value;
+      }
+    }
   }
 
   const values = new Float64Array(nPoints);
