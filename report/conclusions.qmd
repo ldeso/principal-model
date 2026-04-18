@@ -339,11 +339,9 @@ viewof cBasis = Inputs.range([0, 1000000], { step: 100, value: 21000, label: "in
 
 ```{ojs}
 //| echo: false
-// Default horizon is the length of the historical series (so the
-// default "Historical" view spans exactly what's available). Step = 1
-// avoids a range-input snap that would otherwise grow nPoints by one
-// past the length of the historical data array and leave a
-// non-historical fill at the leftmost point.
+// Step = 1 (not 5): a coarser step causes a range-input snap when the
+// value is set to `history.length - 1`, inflating nPoints past the
+// available history and leaving a non-historical fill at the left edge.
 viewof Tdays = {
   const hist = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
@@ -681,11 +679,9 @@ viewof customCurve = {
     window[masterKey] = master;
   }
 
-  // First-load seeding: if historical data is available and the user
-  // hasn't drawn anything yet, pre-populate the master array with the
-  // historical series so the canvas opens on the "Historical" view by
-  // default. Detected via a one-shot flag on window so re-runs of this
-  // cell (from slider changes) don't stomp user edits.
+  // Seed the canvas with the historical series on first page load. The
+  // one-shot window flag is required: without it, every slider-driven
+  // re-run of this cell would overwrite user edits.
   const seededKey = "__conclusionsCustomCurveSeeded";
   if (!window[seededKey]) {
     window[seededKey] = true;
