@@ -342,9 +342,11 @@ Quick reading guide for the Phase-C-specific symbols:
 ### Price process
 
 Sets the four numbers that define the GBM model of the token price.
-$\pi_0$ and $S_0$ together pin down today's price *and* the protocol
-constant $P = \pi_0 / S_0$; $\mu$ and $\sigma^2$ are the annualised
-expected return and variance of the log-price.
+$\pi_0$ is the carbon price expressed in **USD per tonne** and $P$ is
+the same price expressed in **kVCM per tonne** (the protocol constant
+— how many tokens are burned to retire one tonne); together they imply
+today's spot $S_0 = \pi_0 / P$. $\mu$ and $\sigma^2$ are the
+annualised expected return and variance of the log-price.
 
 ```{ojs}
 //| echo: false
@@ -353,7 +355,7 @@ viewof pi0 = Inputs.range([0, 500], { step: 1, value: 125, label: "π₀ (USD / 
 
 ```{ojs}
 //| echo: false
-viewof S0 = Inputs.range([0.005, 1], { step: 0.005, value: 0.07, label: "S₀ (USD / kVCM)" })
+viewof P = Inputs.range([100, 25000], { step: 10, value: 1790, label: "P (kVCM / tonne)" })
 ```
 
 ```{ojs}
@@ -436,7 +438,8 @@ viewof seed = Inputs.range([1, 9999], { step: 1, value: 42, label: "PRNG seed" }
 ```{ojs}
 //| echo: false
 html`<div class="pc-readout">
-  <div class="k">P = π₀ / S₀</div><div class="v">${derived.P.toFixed(3)}</div>
+  <div class="k">π₀ (USD/t)</div><div class="v">${"$" + pi0.toFixed(2)}</div>
+  <div class="k">S₀ = π₀ / P</div><div class="v">${"$" + derived.S0.toFixed(4)}</div>
   <div class="k">σ</div><div class="v">${derived.sigma.toFixed(3)}</div>
   <div class="k">T (yr)</div><div class="v">${derived.T.toFixed(2)}</div>
   <div class="k">N (tonnes)</div><div class="v">${derived.N.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
@@ -449,13 +452,13 @@ html`<div class="pc-readout">
 //| echo: false
 mcResetButton = {
   const defaults = {
-    pi0: 125, S0: 0.07, mu: 0.05, sigma2: 0.25,
+    pi0: 125, P: 1790, mu: 0.05, sigma2: 0.25,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
     nPaths: 5000, nSteps: 100, seed: 42,
   };
   const views = {
-    pi0: viewof pi0, S0: viewof S0, mu: viewof mu, sigma2: viewof sigma2,
+    pi0: viewof pi0, P: viewof P, mu: viewof mu, sigma2: viewof sigma2,
     lambdaDay: viewof lambdaDay, kPre: viewof kPre, cBasis: viewof cBasis,
     Tdays: viewof Tdays, Q: viewof Q, fee: viewof fee,
     nPaths: viewof nPaths, nSteps: viewof nSteps, seed: viewof seed,
@@ -499,11 +502,13 @@ plots below when you move the slider.
   tonne. Moving this rescales the whole simulation but does not
   change any P&L shape — it re-prices both the fee book's revenue
   and the principal book's quote equally.
-- **$S_0$ (USD per kVCM).** Today's token price. Entering $\pi_0$
-  and $S_0$ separately lets the model back out the **protocol
-  constant** $P = \pi_0 / S_0$: the number of tokens the protocol
-  needs per tonne of CO₂ retired. $P$ is a constant of the protocol
-  and does not move during the simulation.
+- **$P$ (kVCM per tonne).** The **protocol constant** — the number
+  of tokens the protocol needs per tonne of CO₂ retired. Together
+  with $\pi_0$ it implies today's token spot $S_0 = \pi_0 / P$
+  (printed in the live readout below). $P$ is a constant of the
+  protocol and does not move during the simulation; moving the
+  slider changes how much of the per-tonne USD price is denominated
+  in tokens versus dollars.
 - **$\mu$ (annualised drift).** The expected growth rate of the
   token price under GBM. Positive $\mu$ pushes the principal book
   into the red on average (it is structurally short the token);
@@ -608,7 +613,7 @@ before looking at the MC output.
 //| echo: false
 derived = {
   const sigma = Math.sqrt(sigma2);
-  const P = pi0 / S0;
+  const S0 = P > 0 ? pi0 / P : 0;
   const T = Tdays / 365;
   const lambda = lambdaDay * 365;
   const N = lambda * T;
@@ -618,7 +623,7 @@ derived = {
   const impliedCost = kPre > 0 ? cBasis / kPre : 0;
   const QStarRatio = expm1OverX(mu * T);
   const QStar = (1 + fee) * P * S0 * QStarRatio;
-  return { sigma, P, T, lambda, N, tokensNeeded, coverageDays, coverageFrac, impliedCost, QStar };
+  return { sigma, S0, T, lambda, N, tokensNeeded, coverageDays, coverageFrac, impliedCost, QStar };
 }
 ```
 
@@ -626,7 +631,7 @@ derived = {
 //| echo: false
 html`<div class="phase-c-derived">
   <div class="card"><div class="label">σ (volatility)</div><div class="value">${derived.sigma.toFixed(4)}</div></div>
-  <div class="card"><div class="label">P = π₀ / S₀ (kVCM / tonne)</div><div class="value">${derived.P.toFixed(4)}</div></div>
+  <div class="card"><div class="label">S₀ = π₀ / P (USD / kVCM)</div><div class="value">${"$" + derived.S0.toFixed(4)}</div></div>
   <div class="card"><div class="label">T (years)</div><div class="value">${derived.T.toFixed(3)}</div></div>
   <div class="card"><div class="label">N = λ·T (tonnes over horizon)</div><div class="value">${derived.N.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">tokens needed N·P</div><div class="value">${derived.tokensNeeded.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
@@ -642,9 +647,10 @@ html`<div class="phase-c-derived">
 - **$\sigma$.** Simply $\sqrt{\sigma^2}$. Displayed because the sim
   internally uses $\sigma$ (the SD), not $\sigma^2$ (the variance), and
   it is the number that appears in every moment formula.
-- **$P = \pi_0 / S_0$.** The protocol constant. This is set implicitly
-  by the pair $(\pi_0, S_0)$ rather than as a first-class slider, so
-  the user can keep the dollar price per tonne fixed and independently
+- **$S_0 = \pi_0 / P$.** Today's token spot price in USD / kVCM,
+  derived from the carbon price $\pi_0$ (USD / tonne) and the protocol
+  constant $P$ (kVCM / tonne). Both are first-class sliders, so the
+  user can keep the dollar price per tonne fixed and independently
   vary where it lives in token space.
 - **$T$ (years).** The horizon in the internal time unit. Multiply any
   per-year quantity by this to translate to the horizon total.
@@ -993,7 +999,7 @@ to re-histogram and re-plot, not on the simulator itself.
 //| echo: false
 run = {
   const inputs = {
-    S0, mu, sigma: derived.sigma, P: derived.P,
+    S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
     Q, fee, kPre, cBasis,
     nPaths, nSteps, seed,
@@ -1419,7 +1425,7 @@ viewof curvePi0 = Inputs.bind(Inputs.range([0, 500], { step: 1, label: "π₀ (U
 
 ```{ojs}
 //| echo: false
-viewof curveS0 = Inputs.bind(Inputs.range([0.005, 1], { step: 0.005, label: "S₀ (USD / kVCM)" }), viewof S0)
+viewof curveP = Inputs.bind(Inputs.range([100, 25000], { step: 10, label: "P (kVCM / tonne)" }), viewof P)
 ```
 
 ### Demand & inventory
@@ -1477,13 +1483,13 @@ viewof curveSeed = Inputs.bind(Inputs.range([1, 9999], { step: 1, label: "PRNG s
 //| echo: false
 curveResetButton = {
   const defaults = {
-    curvePi0: 125, curveS0: 0.07,
+    curvePi0: 125, curveP: 1790,
     curveLambdaDay: 1, curveKPre: 300000, curveCBasis: 21000,
     curveTdays: 365, curveQ: 180, curveFee: 0.4,
     curveYMax: 0.2, curveVar: 0, curveSeed: 42,
   };
   const views = {
-    curvePi0: viewof curvePi0, curveS0: viewof curveS0,
+    curvePi0: viewof curvePi0, curveP: viewof curveP,
     curveLambdaDay: viewof curveLambdaDay, curveKPre: viewof curveKPre, curveCBasis: viewof curveCBasis,
     curveTdays: viewof curveTdays, curveQ: viewof curveQ, curveFee: viewof curveFee,
     curveYMax: viewof curveYMax, curveVar: viewof curveVar, curveSeed: viewof curveSeed,
@@ -1524,7 +1530,7 @@ viewof customCurve = {
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const yMax = curveYMax;
-  const S0Val = S0;
+  const S0Val = derived.S0;
   const history = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
     : [];
@@ -1535,8 +1541,8 @@ viewof customCurve = {
   // Persist the drawn curve indexed by days-ago (0 = build-time anchor)
   // so shrinking and regrowing the horizon restores the previously
   // drawn samples at the leftmost part of the curve. NaN marks "never
-  // drawn" so S₀ slider changes still refresh the initial fill for
-  // days that haven't been touched.
+  // drawn" so π₀/P slider changes still refresh the initial fill (via
+  // the derived S₀) for days that haven't been touched.
   const MAX_TDAYS = 1095;
   const masterKey = "__pcCustomCurveByDaysAgo";
   let master = window[masterKey];
@@ -1863,7 +1869,6 @@ viewof customCurve = {
 customScenario = {
   const { values: base, realised, nPoints } = customCurve;
   const T = derived.T;
-  const P = derived.P;
   const lam = derived.lambda;
   const N = derived.N;
   const dt = T / (nPoints - 1);
