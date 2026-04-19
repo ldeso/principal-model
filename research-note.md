@@ -162,8 +162,8 @@ For each model, the Phase B simulator should report:
 | Metric | How |
 | --- | --- |
 | $\mathbb{E}[\Pi]$, $\mathrm{Var}[\Pi]$, $\mathrm{SD}[\Pi]$ | Closed form from §2–3 |
-| $\mathrm{VaR}_{95},\ \mathrm{VaR}_{99}$ | Monte Carlo empirical quantile of $-\Pi$ |
-| $\mathrm{CVaR}_{95},\ \mathrm{CVaR}_{99}$ | Monte Carlo tail mean of $-\Pi$ |
+| $\mathrm{VaR}\_{95}, \mathrm{VaR}\_{99}$ | Monte Carlo empirical quantile of $-\Pi$ |
+| $\mathrm{CVaR}\_{95}, \mathrm{CVaR}\_{99}$ | Monte Carlo tail mean of $-\Pi$ |
 | $\mathbb{P}[\Pi < 0]$ | Monte Carlo |
 | Sharpe-like $= \mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ | Closed form |
 | Max NAV drawdown (principal 3a only) | Monte Carlo on $V_t$ path |
