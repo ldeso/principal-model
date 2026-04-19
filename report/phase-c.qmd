@@ -5,7 +5,6 @@ format:
   html:
     toc: true
     toc-depth: 2
-    toc-location: left
     theme: cosmo
     embed-resources: false
     css: lib/phase-styles.css
@@ -414,11 +413,11 @@ run = {
 
 ```{ojs}
 //| echo: false
-// Sibling run of the §3e switching book. α is implicit in the Phase C custom
-// book via (k, C_basis), not as a Params field; drive the switching book with
-// α=0 (pure b2b-plus-switch) and β=0 (no syndication) for a clean reading. The
-// barrier composes with β / θ in the core module but Phase C surfaces the
-// simpler story first — users who want composition should look at Phase B.
+// Sibling run of the §3e switching book. α is implicit in the custom book via
+// (k, C_basis), not as a Params field; drive the switching book with α=0
+// (pure b2b-plus-switch) and β=0 (no syndication) for a clean reading. The
+// barrier composes with β / θ in the core module but this page surfaces the
+// simpler story first — users who want composition should look at Validation.
 switchRun = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,

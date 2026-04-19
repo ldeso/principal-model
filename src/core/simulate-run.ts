@@ -1,8 +1,8 @@
-// Phase C custom-principal Monte Carlo runner. Shares the Merton path core
-// with src/core/gbm.ts; adds the fee / b2b / custom-principal accumulators
-// that used to be hand-ported inline in report/lib/ojs-helpers.js. Both the
-// OJS cells and the CLI can call this so the browser and the offline report
-// run the same code.
+// Custom-principal Monte Carlo runner. Shares the Merton path core with
+// src/core/gbm.ts; adds the fee / b2b / custom-principal accumulators that
+// used to be hand-ported inline in report/lib/ojs-helpers.js. Both the OJS
+// cells and the CLI can call this so the browser and the offline report run
+// the same code.
 
 import { samplePath } from "./gbm.js";
 import { mulberry32 } from "./rng.js";
@@ -127,8 +127,8 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     if (i < keep) sampledPaths.push(S);
   }
 
-  // §3d quota-share on the residual stochastic leg. Phase B uses a
-  // closed-form premium because Π_α is linear in I_T; Phase C's custom
+  // §3d quota-share on the residual stochastic leg. The Validation page
+  // uses a closed-form premium because Π_α is linear in I_T; the custom
   // inventory has no clean closed-form counterpart (the matched slice mixes
   // τ_cov with a sunk basis), so we price the cession from this run's own
   // MC sample moments. With nPaths ≥ 5000 the estimator is tight enough for

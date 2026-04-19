@@ -22,7 +22,7 @@ const base: SimulateRunInputs = {
   seed: 2026,
 };
 
-describe("simulateRun — Phase C custom-principal book", () => {
+describe("simulateRun — custom-principal book", () => {
   it("kPre = 0 collapses principal onto b2b − cBasis", () => {
     // No pre-purchased inventory ⇒ tauFrac = 0 ⇒ tailInt = I_T ⇒
     // principal = Q·N − C_basis − P·λ·I_T = b2b − C_basis.
