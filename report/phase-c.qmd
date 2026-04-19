@@ -351,12 +351,12 @@ annualised expected return and variance of the log-price.
 
 ```{ojs}
 //| echo: false
-viewof pi0 = Inputs.range([0, 500], { step: 1, value: 104, label: "π₀ (USD / tonne)" })
+viewof pi0 = Inputs.range([0, 500], { step: 1, value: 125, label: "π₀ (USD / tonne)" })
 ```
 
 ```{ojs}
 //| echo: false
-viewof P = Inputs.range([100, 25000], { step: 10, value: 1790, label: "P (kVCM / tonne)" })
+viewof P = Inputs.range([100, 25000], { step: 10, value: 2160, label: "P (kVCM / tonne)" })
 ```
 
 ```{ojs}
@@ -464,7 +464,7 @@ viewof seed = Inputs.range([1, 9999], { step: 1, value: 42, label: "PRNG seed" }
 //| echo: false
 mcResetButton = {
   const defaults = {
-    pi0: 104, P: 1790, mu: -0.1, sigma2: 0.06,
+    pi0: 125, P: 2160, mu: -0.1, sigma2: 0.06,
     lambdaJ: 20, muJ: -0.05, sigmaJ: 0.35,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
