@@ -7,92 +7,15 @@ format:
     toc-depth: 2
     theme: cosmo
     embed-resources: false
+    css: lib/phase-styles.css
+    include-in-header:
+      - text: |
+          <script src="lib/phase-layout.js" defer></script>
 ---
 
 ```{=html}
 <style>
-  .phase-c-derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
-  .phase-c-derived .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.75rem; background: #fff; }
-  .phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
-  .phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
-
-  /* Sticky sidebar + main-body layout, identical to phase-c.qmd. The
-     left gutter's width is measured at runtime (see the <script> below)
-     because Quarto's page grid places the body column off-centre. */
-  .pc-section {
-    --pc-gap: 1.5rem;
-    --pc-left-gutter: 0px;
-    --pc-sidebar-w: clamp(0px, calc(var(--pc-left-gutter) - 1rem), 420px);
-    display: grid;
-    grid-template-columns: var(--pc-sidebar-w) var(--pc-gap) minmax(0, 1fr);
-    align-items: start;
-    margin-left: calc(-1 * (var(--pc-sidebar-w) + var(--pc-gap)));
-  }
-  .pc-section > .pc-main { grid-column: 3; min-width: 0; }
-  .pc-section > .pc-controls {
-    grid-column: 1;
-    position: sticky; top: 0.75rem;
-    align-self: start;
-    max-height: calc(100vh - 1.5rem);
-    overflow-y: auto;
-  }
-  .pc-controls {
-    padding: 0.75rem 1rem 1rem;
-    border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
-    font-size: 0.85rem;
-  }
-  .pc-controls h3 { font-size: 0.9rem; margin: 0.9rem 0 0.4rem; color: #333; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2rem; }
-  .pc-controls p { font-size: 0.82rem; color: #555; margin: 0.25rem 0 0.6rem; }
-  .pc-controls form[class*="oi-"] {
-    align-items: center;
-  }
-  .pc-controls form[class*="oi-"] > label {
-    width: 11rem !important;
-    min-width: 11rem !important;
-    max-width: 11rem !important;
-    white-space: normal !important;
-    line-height: 1.2;
-    flex-shrink: 0;
-  }
-  .pc-controls form[class*="oi-"] input[type="number"],
-  .pc-controls form[class*="oi-"] select {
-    min-width: 5.5rem;
-  }
-  .pc-controls form[class*="oi-"] input[type="range"] {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  @media (max-width: 1100px) {
-    .pc-section { display: block; margin-left: 0; }
-    .pc-section > .pc-controls { position: static; max-height: none; }
-    .pc-controls form[class*="oi-"] > label {
-      width: auto !important;
-      min-width: 90px !important;
-      max-width: 160px !important;
-    }
-  }
-  .pc-section.pc-narrow { display: block; margin-left: 0; }
-  .pc-section.pc-narrow > .pc-controls { position: static; max-height: none; }
-  .pc-section.pc-narrow .pc-controls form[class*="oi-"] > label {
-    width: auto !important;
-    min-width: 90px !important;
-    max-width: 160px !important;
-  }
-
-  .pc-reset { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e0e0e0; }
-  .pc-reset button {
-    width: 100%;
-    padding: 0.4rem 0.7rem;
-    border: 1px solid #888;
-    background: #fff;
-    color: #111;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-  .pc-reset button:hover { background: #eef; border-color: #555; }
-
+  /* Drawable custom-curve widget — conclusions.qmd only. */
   .pc-curve-box { border: 1px solid #ddd; border-radius: 8px; background: #fafafa; padding: 0.75rem 1rem 1rem; margin: 0.75rem 0; }
   .pc-curve-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.6rem; align-items: center; }
   .pc-curve-toolbar button { padding: 0.3rem 0.7rem; border: 1px solid #888; background: #fff; color: #111; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
@@ -100,33 +23,6 @@ format:
   .pc-curve-toolbar .hint { font-size: 0.82rem; color: #666; margin-left: auto; }
   .pc-curve-canvas { display: block; max-width: 100%; height: auto; touch-action: none; cursor: crosshair; background: #fff; border: 1px solid #ccc; border-radius: 6px; }
 </style>
-<script>
-  (function () {
-    var MIN_GUTTER = 320;
-    function update() {
-      document.querySelectorAll('.pc-section').forEach(function (sec) {
-        var parent = sec.parentElement;
-        if (!parent) return;
-        var left = parent.getBoundingClientRect().left;
-        if (left < MIN_GUTTER) {
-          sec.classList.add('pc-narrow');
-          sec.style.setProperty('--pc-left-gutter', '0px');
-        } else {
-          sec.classList.remove('pc-narrow');
-          sec.style.setProperty('--pc-left-gutter', left + 'px');
-        }
-      });
-    }
-    var schedule = function () { requestAnimationFrame(update); };
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', schedule);
-    } else {
-      schedule();
-    }
-    window.addEventListener('load', schedule);
-    window.addEventListener('resize', schedule);
-  })();
-</script>
 ```
 
 [Phase B](phase-b.qmd) cross-checked the closed-form math against Monte

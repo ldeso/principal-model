@@ -67,14 +67,20 @@ export function tailMean(sortedAscending, q) {
   return s / k;
 }
 
+// Calendar-ish tick step in days — whole weeks up to 60 days, whole months
+// up to 2 years, then whole years. Shared by the two tick functions and by
+// formatTickDate so the three always agree.
+export function tickStep(tdays) {
+  if (tdays <= 60) return 7;
+  if (tdays <= 730) return 30;
+  return 365;
+}
+
 // Pick calendar-ish tick positions (in days) so the x-axis steps in
 // whole weeks / months / years depending on the horizon, rather than
 // rescaling to a fixed number of evenly-spaced ticks.
 export function xTicksForHorizon(tdays) {
-  let step;
-  if (tdays <= 60) step = 7;
-  else if (tdays <= 730) step = 30;
-  else step = 365;
+  const step = tickStep(tdays);
   const ticks = [];
   for (let d = 0; d <= tdays; d += step) ticks.push(d);
   return ticks;
@@ -83,10 +89,7 @@ export function xTicksForHorizon(tdays) {
 // Same step logic as xTicksForHorizon but anchored on the right edge
 // (day = tdays) rather than zero.
 export function xTicksAnchoredRight(tdays) {
-  let step;
-  if (tdays <= 60) step = 7;
-  else if (tdays <= 730) step = 30;
-  else step = 365;
+  const step = tickStep(tdays);
   const ticks = [];
   for (let d = tdays; d >= 0; d -= step) ticks.push(d);
   return ticks.reverse();
@@ -94,10 +97,11 @@ export function xTicksAnchoredRight(tdays) {
 
 // Render a date at a resolution appropriate for the horizon it sits on.
 export function formatTickDate(date, tdays) {
-  if (tdays <= 60) {
+  const step = tickStep(tdays);
+  if (step === 7) {
     return date.toLocaleString("en-US", { month: "short", day: "numeric" });
   }
-  if (tdays <= 730) {
+  if (step === 30) {
     return date.toLocaleString("en-US", { month: "short", year: "2-digit" });
   }
   return date.toLocaleString("en-US", { year: "numeric" });

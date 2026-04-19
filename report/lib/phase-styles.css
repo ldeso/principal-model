@@ -1,0 +1,101 @@
+.phase-c-derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.phase-c-derived .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.75rem; background: #fff; }
+.phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
+.phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
+
+/* Section layout: body content stays at Quarto's native body-column
+   width; the controls panel is pulled into the left gutter via a
+   negative margin on the grid container. Avoiding a .column-* escape
+   sidesteps Quarto's TOC-grid interactions (which were making the
+   text column too wide and introducing an extra vertical gap).
+
+   The left gutter's actual width can't be computed from 100vw alone:
+   Quarto's page grid places the body column off-centre (TOC sits on
+   the right), and the body column is narrower than a round viewport
+   fraction. So --pc-left-gutter is measured at runtime from the body
+   column's bounding rect (see phase-layout.js). Default 0 keeps the
+   sidebar collapsed until the measurement lands, so nothing bleeds
+   off-screen on first paint. */
+.pc-section {
+  --pc-gap: 1.5rem;
+  --pc-left-gutter: 0px;
+  --pc-sidebar-w: clamp(0px, calc(var(--pc-left-gutter) - 1rem), 420px);
+  display: grid;
+  grid-template-columns: var(--pc-sidebar-w) var(--pc-gap) minmax(0, 1fr);
+  align-items: start;
+  margin-left: calc(-1 * (var(--pc-sidebar-w) + var(--pc-gap)));
+}
+.pc-section > .pc-main { grid-column: 3; min-width: 0; }
+.pc-section > .pc-controls {
+  grid-column: 1;
+  position: sticky; top: 0.75rem;
+  align-self: start;
+  max-height: calc(100vh - 1.5rem);
+  overflow-y: auto;
+}
+.pc-controls {
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
+  font-size: 0.85rem;
+}
+.pc-controls h3 { font-size: 0.9rem; margin: 0.9rem 0 0.4rem; color: #333; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2rem; }
+.pc-controls p { font-size: 0.82rem; color: #555; margin: 0.25rem 0 0.6rem; }
+/* Align every slider row on a shared label column so the ranges and
+   number boxes line up vertically. A fixed label width (wrapping when
+   needed) is what makes the subsequent track + value columns start at
+   the same x across rows. */
+.pc-controls form[class*="oi-"] {
+  align-items: center;
+}
+.pc-controls form[class*="oi-"] > label {
+  width: 11rem !important;
+  min-width: 11rem !important;
+  max-width: 11rem !important;
+  white-space: normal !important;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+/* Give the numeric readout / select enough room that long values
+   (e.g. 2,000,000 for inventory) don't get clipped with an ellipsis. */
+.pc-controls form[class*="oi-"] input[type="number"],
+.pc-controls form[class*="oi-"] select {
+  min-width: 5.5rem;
+}
+.pc-controls form[class*="oi-"] input[type="range"] {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+/* When JS has measured a gutter too small for a usable sidebar, or on
+   narrow viewports, drop the grid, unstick the controls, reset margin,
+   and release the fixed label column so labels can shrink with the
+   now-stacked layout. .pc-narrow is toggled by phase-layout.js. */
+@media (max-width: 1100px) {
+  .pc-section { display: block; margin-left: 0; }
+  .pc-section > .pc-controls { position: static; max-height: none; }
+  .pc-controls form[class*="oi-"] > label {
+    width: auto !important;
+    min-width: 90px !important;
+    max-width: 160px !important;
+  }
+}
+.pc-section.pc-narrow { display: block; margin-left: 0; }
+.pc-section.pc-narrow > .pc-controls { position: static; max-height: none; }
+.pc-section.pc-narrow .pc-controls form[class*="oi-"] > label {
+  width: auto !important;
+  min-width: 90px !important;
+  max-width: 160px !important;
+}
+
+.pc-reset { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e0e0e0; }
+.pc-reset button {
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #888;
+  background: #fff;
+  color: #111;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.pc-reset button:hover { background: #eef; border-color: #555; }
