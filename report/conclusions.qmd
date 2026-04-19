@@ -159,13 +159,16 @@ simulator runs agree on.
   $\tau$ far more than about the unrealised gain / loss on the
   existing inventory.
 - **Over- and under-hedging produce differently-shaped loss tails.**
-  Under-hedge ($k < N \cdot P$): the residual exposure is a path
-  integral $J_\tau$ — an averaging of many prices, so the tail is
-  milder (log-normal-*integrated*). Over-hedge ($k > N \cdot P$): the
-  residual exposure is a single terminal price $S_T$, whose
-  distribution is raw log-normal and has a heavier tail at the same
-  dollar exposure. Crossing $k = N \cdot P$ changes the *kind* of
-  risk, not just the amount.
+  Under-hedge ($k < N \cdot P$): residual exposure is $-P\lambda J_\tau$,
+  so losses come from **high** prices. $J_\tau$ is an averaged
+  log-normal with an unbounded upper tail, giving an unbounded but
+  softened loss tail. Over-hedge ($k > N \cdot P$): residual exposure
+  is $+k_\mathrm{left} \cdot S_T$, so losses come from **low** prices.
+  Because $S_T \geq 0$, the loss tail is *bounded*; the heavy raw
+  log-normal tail lands on the **gain** side, not the loss side.
+  Crossing $k = N \cdot P$ therefore switches the loss tail from
+  unbounded-but-averaged to bounded — changing the *kind* of risk, not
+  just the amount.
 - **$Q = Q^*$ equalises means, not distributions.** At the break-even
   quote $Q^* = (1 + f) \cdot P \cdot S_0 \cdot (e^{\mu T} - 1)/(\mu T)$
   the fee book and the back-to-back principal book have matching

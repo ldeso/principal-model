@@ -1377,8 +1377,10 @@ spot._
   §3a matched-book limit — SD on the custom row approaches zero and
   the histogram narrows to a single bin.
 - **Crossing $k = N \cdot P$ changes the *kind* of risk.** Under-hedge
-  exposure is an integral (milder tails); over-hedge exposure is a
-  terminal price (heavier tails at the same dollar amount).
+  loss comes from high prices via the averaged integral $J_\tau$
+  (unbounded but softened loss tail). Over-hedge loss comes from low
+  prices via $S_T$, which is bounded below by $0$ — so the loss tail
+  is *bounded* and the heavy log-normal tail lands on the gain side.
 
 For cross-phase business take-aways, scope caveats, implementation
 notes, and a drawable price-curve stress-test tool, see the

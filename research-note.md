@@ -204,7 +204,7 @@ $$
 
 As $\mu \to 0$, $Q^* \to (1 + f) \cdot P \cdot S_0$ — the fee-based time-zero quote. For $\mu > 0$ the principal model must quote *above* that to compensate for expected kVCM appreciation; for $\mu < 0$ it quotes below.
 
-**Asymmetry observation.** Even at $Q = Q^*$, the two books have radically different risk profiles: the fee book has bounded positive-only revenue, while the back-to-back principal book has the same variance but a *left-skewed* loss tail. Matching means does not match distributions.
+**Asymmetry observation.** Even at $Q = Q^*$, the two books have radically different risk profiles: the fee book's revenue is bounded below by $0$ (never negative), while the back-to-back principal book has the same variance but a *left-skewed* loss tail. Matching means does not match distributions.
 
 ## 6. Compensated Merton jump-diffusion
 
