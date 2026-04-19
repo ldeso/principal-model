@@ -3,13 +3,9 @@ title: "Validation"
 subtitle: "Closed-form vs. Monte Carlo cross-check, plus the tail metrics the closed form cannot give"
 format:
   html:
-    page-layout: full
     toc: true
     toc-depth: 2
     toc-location: left
-    theme: cosmo
-    embed-resources: false
-    css: lib/phase-styles.css
 ---
 
 ```{=html}
@@ -24,7 +20,9 @@ format:
 </style>
 ```
 
+::: {.side-panel-right .side-panel-stack}
 {{< include _glossary.qmd >}}
+:::
 
 This page cross-checks the closed-form moments from the
 [Model](phase-a.qmd) against Monte Carlo and adds the tail metrics

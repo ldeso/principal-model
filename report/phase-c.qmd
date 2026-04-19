@@ -1,18 +1,9 @@
 ---
 title: "Simulator"
 subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
-format:
-  html:
-    toc: false
-    theme: cosmo
-    embed-resources: false
-    css: lib/phase-styles.css
-    include-in-header:
-      - text: |
-          <script src="lib/phase-layout.js" defer></script>
 ---
 
-::: {.right-sidebars}
+::: {.side-panel-right .side-panel-stack}
 {{< include _glossary.qmd >}}
 {{< include _notation.qmd >}}
 :::
@@ -24,9 +15,7 @@ is specified by the **raw inventory state** $(k, C_{\mathrm{basis}})$
 — kVCM tokens on hand plus their sunk USD cost — so inventory acquired
 earlier at a different price can be studied directly.
 
-:::: {.pc-section}
-
-::: {.pc-controls}
+::: {.side-panel-left .side-panel .pc-controls}
 ### Price process
 
 ```{ojs}
@@ -198,8 +187,6 @@ mcResetButton = {
 ```
 
 :::
-
-::: {.pc-main}
 
 ## Derived quantities
 
@@ -587,6 +574,3 @@ _Grey: sampled GBM trajectories of the kVCM spot. Orange: first path
 highlighted. Green dashed rule: inventory-exhaustion time; right of
 it, retirements are sourced at spot._
 
-:::
-
-::::

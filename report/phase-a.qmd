@@ -7,9 +7,10 @@ format:
     toc: true
     toc-depth: 3
     toc-location: left
-    css: lib/phase-styles.css
 ---
 
+::: {.side-panel-right .side-panel-stack}
 {{< include _glossary.qmd >}}
+:::
 
 {{< include ../research-note.md >}}

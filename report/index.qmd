@@ -1,16 +1,6 @@
 ---
 title: "Klima Protocol — Fee vs. Principal"
 subtitle: "Revenue and risk for a carbon-retirement intermediary"
-format:
-  html:
-    toc: true
-    toc-depth: 2
-    theme: cosmo
-    embed-resources: false
-    css: lib/phase-styles.css
-    include-in-header:
-      - text: |
-          <script src="lib/phase-layout.js" defer></script>
 ---
 
 ```{=html}
@@ -25,7 +15,9 @@ format:
 </style>
 ```
 
+::: {.side-panel-right .side-panel-stack}
 {{< include _glossary.qmd >}}
+:::
 
 A carbon-retirement intermediary buys carbon tokens (kVCM) on the open
 market and burns them to retire carbon credits on behalf of clients.
@@ -156,12 +148,12 @@ buildDate = {
 }
 ```
 
-:::: {.pc-section}
+::: {.side-panel-left .side-panel .pc-controls}
+### Inputs
 
-::: {.pc-controls}
 The sliders set inventory, contract, and horizon. The comparison Monte
-Carlo on the right runs at fixed defaults ($\mu = 0.05$, $\sigma^2 =
-0.25$, no jumps); to vary those, use the [Simulator](phase-c.qmd).
+Carlo runs at fixed defaults ($\mu = 0.05$, $\sigma^2 = 0.25$, no
+jumps); to vary those, use the [Simulator](phase-c.qmd).
 
 ### Price process
 
@@ -277,8 +269,6 @@ findingsResetButton = {
 ```
 
 :::
-
-::: {.pc-main}
 
 ```{ojs}
 //| echo: false
@@ -794,10 +784,6 @@ specific scenario compares to the average across random GBM futures._
 - **Diff ≈ 0.** The curve is "typical": a plausible GBM future, not
   a stress scenario. At $\tau = 1$ the custom book is deterministic
   and path-independent, so expect zero sensitivity to the curve.
-
-:::
-
-::::
 
 ## Scope
 

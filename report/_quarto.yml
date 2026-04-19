@@ -23,4 +23,6 @@ website:
 format:
   html:
     theme: cosmo
-    toc: true
+    css: lib/phase-styles.css
+    embed-resources: false
+    toc: false

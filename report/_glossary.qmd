@@ -1,5 +1,5 @@
 ```{=html}
-<aside class="glossary-sidebar">
+<aside class="side-panel glossary-sidebar">
 <details open>
 <summary>Glossary</summary>
 <dl>

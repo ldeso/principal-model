@@ -1,160 +1,41 @@
-.phase-c-derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
-.phase-c-derived .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.75rem; background: #fff; }
-.phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
-.phase-c-derived .card .value { font-family: ui-monospace, monospace; font-size: 1.1rem; }
+/* Report-wide layout.
+   One card style for every floating panel (simulator inputs, glossary,
+   notation, Quarto TOC), plus CSS-only responsive fixed positioning on
+   each viewport side. No runtime JS. */
 
-/* Section layout: body content stays at Quarto's native body-column
-   width; the controls panel is pulled into the left gutter via a
-   negative margin on the grid container. Avoiding a .column-* escape
-   sidesteps Quarto's TOC-grid interactions (which were making the
-   text column too wide and introducing an extra vertical gap).
-
-   The left gutter's actual width can't be computed from 100vw alone:
-   Quarto's page grid places the body column off-centre (TOC sits on
-   the right), and the body column is narrower than a round viewport
-   fraction. So --pc-left-gutter is measured at runtime from the body
-   column's bounding rect (see phase-layout.js). Default 0 keeps the
-   sidebar collapsed until the measurement lands, so nothing bleeds
-   off-screen on first paint. */
-.pc-section {
-  --pc-gap: 1.5rem;
-  --pc-left-gutter: 0px;
-  --pc-sidebar-w: clamp(0px, calc(var(--pc-left-gutter) - 1rem), 420px);
-  display: grid;
-  grid-template-columns: var(--pc-sidebar-w) var(--pc-gap) minmax(0, 1fr);
-  align-items: start;
-  margin-left: calc(-1 * (var(--pc-sidebar-w) + var(--pc-gap)));
-}
-.pc-section > .pc-main { grid-column: 3; min-width: 0; }
-.pc-section > .pc-controls {
-  grid-column: 1;
-  position: sticky; top: 0.75rem;
-  align-self: start;
-  max-height: calc(100vh - 1.5rem);
-  overflow-y: auto;
-}
-.pc-controls {
-  padding: 0.75rem 1rem 1rem;
-  border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
-  font-size: 0.85rem;
-}
-.pc-controls h3 { font-size: 0.9rem; margin: 0.9rem 0 0.4rem; color: #333; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2rem; }
-.pc-controls p { font-size: 0.82rem; color: #555; margin: 0.25rem 0 0.6rem; }
-/* Align every slider row on a shared label column so the ranges and
-   number boxes line up vertically. A fixed label width (wrapping when
-   needed) is what makes the subsequent track + value columns start at
-   the same x across rows. */
-.pc-controls form[class*="oi-"] {
-  align-items: center;
-}
-.pc-controls form[class*="oi-"] > label {
-  width: 11rem !important;
-  min-width: 11rem !important;
-  max-width: 11rem !important;
-  white-space: normal !important;
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-/* Give the numeric readout / select enough room that long values
-   (e.g. 2,000,000 for inventory) don't get clipped with an ellipsis. */
-.pc-controls form[class*="oi-"] input[type="number"],
-.pc-controls form[class*="oi-"] select {
-  min-width: 5.5rem;
-}
-.pc-controls form[class*="oi-"] input[type="range"] {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-/* When JS has measured a gutter too small for a usable sidebar, or on
-   narrow viewports, drop the grid, unstick the controls, reset margin,
-   and release the fixed label column so labels can shrink with the
-   now-stacked layout. .pc-narrow is toggled by phase-layout.js. */
-@media (max-width: 1100px) {
-  .pc-section { display: block; margin-left: 0; }
-  .pc-section > .pc-controls { position: static; max-height: none; }
-  .pc-controls form[class*="oi-"] > label {
-    width: auto !important;
-    min-width: 90px !important;
-    max-width: 160px !important;
-  }
-}
-.pc-section.pc-narrow { display: block; margin-left: 0; }
-.pc-section.pc-narrow > .pc-controls { position: static; max-height: none; }
-.pc-section.pc-narrow .pc-controls form[class*="oi-"] > label {
-  width: auto !important;
-  min-width: 90px !important;
-  max-width: 160px !important;
+:root {
+  --side-w: 260px;
+  --side-offset: 0.75rem;
+  --side-top: 5rem;
+  --side-gap: 0.6rem;
 }
 
-.pc-reset { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e0e0e0; }
-.pc-reset button {
-  width: 100%;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid #888;
-  background: #fff;
-  color: #111;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-.pc-reset button:hover { background: #eef; border-color: #555; }
+/* --- Shared card chrome -------------------------------------------------- */
 
-/* Reference sidebars: the floating, collapsible cards pinned to the top-
-   right below the Quarto navbar (see _glossary.qmd and _notation.qmd).
-   The glossary ships on every page; the notation panel is simulator-only
-   and, when present, is stacked below the glossary inside a shared
-   .right-sidebars container so the two share the fixed right column
-   without overlap.
-
-   `.glossary-sidebar` without a .right-sidebars parent keeps its own
-   fixed-position rules (other pages). Inside the container, both panels
-   become regular flex children of the container so they stack. */
-.right-sidebars {
-  position: fixed;
-  top: 5rem;
-  right: 0.75rem;
-  width: min(300px, calc(100vw - 1.5rem));
-  z-index: 900;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: calc(100vh - 6rem);
-  overflow: hidden;
-}
-.right-sidebars .glossary-sidebar,
-.right-sidebars .notation-sidebar {
-  position: static;
-  width: auto;
-  min-height: 0;
-}
-.right-sidebars .glossary-sidebar details,
-.right-sidebars .notation-sidebar details {
-  max-height: 45vh;
-}
-
-.glossary-sidebar,
-.notation-sidebar {
-  position: fixed;
-  top: 5rem;
-  right: 0.75rem;
-  width: min(280px, calc(100vw - 1.5rem));
-  z-index: 900;
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-.glossary-sidebar details,
-.notation-sidebar details {
+.side-panel,
+nav#TOC {
   background: #fafafa;
   border: 1px solid #ccc;
   border-radius: 6px;
-  padding: 0.4rem 0.75rem 0.6rem;
+  padding: 0.6rem 0.85rem 0.75rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  max-height: calc(100vh - 6rem);
-  overflow-y: auto;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #222;
 }
-.glossary-sidebar summary,
-.notation-sidebar summary {
+
+.side-panel > h3 {
+  font-size: 0.8rem;
+  margin: 0.85rem 0 0.35rem;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.2rem;
+}
+.side-panel > h3:first-child { margin-top: 0.1rem; }
+
+.side-panel details > summary {
   cursor: pointer;
   font-weight: 600;
   color: #333;
@@ -164,41 +45,31 @@
   padding: 0.15rem 0;
   list-style: none;
 }
-.glossary-sidebar summary::-webkit-details-marker,
-.notation-sidebar summary::-webkit-details-marker { display: none; }
-.glossary-sidebar summary::before,
-.notation-sidebar summary::before {
+.side-panel details > summary::-webkit-details-marker { display: none; }
+.side-panel details > summary::before {
   content: "▸";
   display: inline-block;
   margin-right: 0.35rem;
   transition: transform 0.12s ease-out;
 }
-.glossary-sidebar details[open] > summary::before,
-.notation-sidebar details[open] > summary::before { transform: rotate(90deg); }
-.glossary-sidebar dl,
-.notation-sidebar dl { margin: 0.4rem 0 0; }
-.glossary-sidebar dt,
-.notation-sidebar dt {
+.side-panel details[open] > summary::before { transform: rotate(90deg); }
+
+.side-panel dl { margin: 0.4rem 0 0; }
+.side-panel dt {
   font-family: ui-monospace, monospace;
   font-size: 0.78rem;
   color: #1a3a6b;
   margin-top: 0.55rem;
 }
-.glossary-sidebar dt:first-child,
-.notation-sidebar dt:first-child { margin-top: 0; }
-.glossary-sidebar dd,
-.notation-sidebar dd {
-  margin: 0.15rem 0 0;
-  color: #333;
-}
-.glossary-sidebar code,
-.notation-sidebar code {
+.side-panel dt:first-child { margin-top: 0; }
+.side-panel dd { margin: 0.15rem 0 0; color: #333; }
+.side-panel code {
   background: rgba(0, 0, 0, 0.04);
   padding: 0 0.18rem;
   border-radius: 3px;
   font-size: 0.78rem;
 }
-.notation-sidebar h4 {
+.side-panel h4 {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -207,32 +78,138 @@
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 0.15rem;
 }
-.notation-sidebar h4:first-of-type { margin-top: 0.4rem; }
-.notation-sidebar p {
-  margin: 0.35rem 0;
-  color: #333;
-}
-.notation-sidebar ul {
-  margin: 0.3rem 0 0.5rem 0;
-  padding-left: 1.1rem;
-}
-.notation-sidebar li { margin: 0.15rem 0; }
+.side-panel h4:first-of-type { margin-top: 0.4rem; }
+.side-panel p { margin: 0.35rem 0; color: #333; }
+.side-panel ul { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
+.side-panel li { margin: 0.15rem 0; }
 
-/* On narrow viewports, unfix the sidebars and render them inline at the
-   page location where the includes landed (top of the body). Hide the
-   shadow so they blend with surrounding content. */
-@media (max-width: 1200px) {
-  .right-sidebars,
-  .glossary-sidebar,
-  .notation-sidebar {
-    position: static;
-    width: auto;
-    max-height: none;
-    overflow: visible;
+/* Quarto TOC heading (rendered as <h2 id="toc-title">) matched to the
+   side-panel summary weight. */
+nav#TOC > #toc-title,
+nav#TOC > .toc-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #333;
+  margin: 0 0 0.35rem;
+}
+nav#TOC > ul { font-size: 0.82rem; }
+
+/* --- Floating behaviour -------------------------------------------------- */
+
+/* Quarto auto-decorates every top-level block inside main.content with
+   .page-columns .page-full, and its body-scoped rules
+   (e.g. body.fullcontent:not(.floating):not(.docked) .page-columns) land
+   at specificity 0,4,1 — higher than any realistic class-based selector
+   we can add here. !important is the cleanest way to reclaim control of
+   display / grid / position for our own wrappers. */
+.side-panel-left,
+.side-panel-right {
+  display: block !important;
+  grid-column: body-content-start / body-content-end !important;
+  grid-template-columns: none !important;
+  overflow: visible;
+}
+.side-panel-left > *,
+.side-panel-right > * {
+  grid-column: auto !important;
+}
+
+/* Wide viewports: pin each side-panel column to the edge of the window.
+   :has() shrinks Quarto's page-columns grid so the centred body column
+   slides inward and does not run under a pinned panel. */
+@media (min-width: 1400px) {
+  .side-panel-left,
+  .side-panel-right {
+    position: fixed !important;
+    top: var(--side-top);
+    width: var(--side-w);
+    max-height: calc(100vh - var(--side-top) - 1rem);
+    overflow-y: auto;
+    z-index: 500;
+  }
+  .side-panel-left  { left:  var(--side-offset); }
+  .side-panel-right { right: var(--side-offset); }
+
+  /* Stack wrapper: multiple cards share one pinned column. */
+  .side-panel-stack {
+    display: flex !important;
+    flex-direction: column;
+    gap: var(--side-gap);
+  }
+
+  body:has(.side-panel-left) #quarto-content {
+    padding-left: calc(var(--side-w) + 1.25rem);
+  }
+  body:has(.side-panel-right) #quarto-content {
+    padding-right: calc(var(--side-w) + 1.25rem);
+  }
+}
+
+/* Narrow viewports: drop the fix and let panels render inline above the
+   main content. Cards stack as normal block flow. */
+@media (max-width: 1399px) {
+  .side-panel-left,
+  .side-panel-right {
     margin: 0 0 1rem;
   }
-  .glossary-sidebar details,
-  .notation-sidebar details { box-shadow: none; max-height: none; }
-  .right-sidebars .glossary-sidebar details,
-  .right-sidebars .notation-sidebar details { max-height: none; }
+  .side-panel-stack > .side-panel + .side-panel { margin-top: 0.6rem; }
+}
+
+/* --- Simulator / Findings input panel (slider rows) --------------------- */
+
+.pc-controls form[class*="oi-"] { align-items: center; }
+.pc-controls form[class*="oi-"] > label {
+  width: 8rem !important;
+  min-width: 8rem !important;
+  max-width: 8rem !important;
+  white-space: normal !important;
+  line-height: 1.2;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.pc-controls form[class*="oi-"] input[type="number"],
+.pc-controls form[class*="oi-"] select { min-width: 4rem; }
+.pc-controls form[class*="oi-"] input[type="range"] {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pc-reset {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e0e0e0;
+}
+.pc-reset button {
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #888;
+  background: #fff;
+  color: #111;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.pc-reset button:hover { background: #eef; border-color: #555; }
+
+/* --- Summary-card grid (derived-quantity readouts) ---------------------- */
+
+.phase-c-derived {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.phase-c-derived .card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  background: #fff;
+}
+.phase-c-derived .card .label { font-size: 0.8rem; color: #555; }
+.phase-c-derived .card .value {
+  font-family: ui-monospace, monospace;
+  font-size: 1.1rem;
 }

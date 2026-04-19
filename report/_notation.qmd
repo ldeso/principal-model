@@ -1,5 +1,5 @@
 ```{=html}
-<aside class="notation-sidebar">
+<aside class="side-panel notation-sidebar">
 <details>
 <summary>Notation &amp; inputs</summary>
 
@@ -83,10 +83,6 @@ book to the fee book the first time S<sub>t</sub> crosses H = h·S<sub>0</sub>.
 h = ∞ disables the switch (§3d baseline); h = 1 starts in fee mode.
 f<sub>post</sub> defaults to f but can be raised independently to compensate
 for lost upside once the barrier breaches.</p>
-
-<p><strong>Monte Carlo.</strong> Number of paths, steps per path, and the
-PRNG seed — statistical controls (more paths = tighter estimates), not
-business controls.</p>
 
 </details>
 </aside>
