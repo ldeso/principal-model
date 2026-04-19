@@ -3,8 +3,7 @@ title: "Simulator"
 subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
 format:
   html:
-    toc: true
-    toc-depth: 2
+    toc: false
     theme: cosmo
     embed-resources: false
     css: lib/phase-styles.css
@@ -13,7 +12,10 @@ format:
           <script src="lib/phase-layout.js" defer></script>
 ---
 
+::: {.right-sidebars}
 {{< include _glossary.qmd >}}
+{{< include _notation.qmd >}}
+:::
 
 Every slider on this page kicks off a fresh Monte Carlo in your
 browser. The price model is GBM with an optional compensated Merton
@@ -22,29 +24,10 @@ is specified by the **raw inventory state** $(k, C_{\mathrm{basis}})$
 — kVCM tokens on hand plus their sunk USD cost — so inventory acquired
 earlier at a different price can be studied directly.
 
-### Extended notation
-
-[The model](phase-a.qmd#setup-and-notation) §1 covers the shared
-symbols. Simulator-specific additions:
-
-| Symbol | Meaning | Units |
-| --- | --- | --- |
-| $k$ | pre-purchased inventory | kVCM |
-| $C_{\mathrm{basis}}$ | sunk cost of that inventory | USD |
-| $\tau := \min(1,\; k / (N \cdot P))$ | fraction of horizon the inventory covers | dimensionless |
-| $k_{\mathrm{left}} := \max(0,\; k - N \cdot P)$ | leftover tokens at horizon (over-hedge) | kVCM |
-| $J_\tau := \int_{\tau T}^{T} S_t\,dt$ | tail integral over the uncovered window | (USD/kVCM)·year |
-| $\Pi_{\mathrm{cust}} = Q \cdot N - C_{\mathrm{basis}} - P \cdot \lambda \cdot J_\tau + k_{\mathrm{left}} \cdot S_T$ | custom-inventory principal P&L | USD |
-
 :::: {.pc-section}
 
 ::: {.pc-controls}
 ### Price process
-
-$\pi_0$ is the carbon price in USD/tonne; $P$ is the same price in
-kVCM/tonne (the protocol constant). Together they imply today's spot
-$S_0 = \pi_0 / P$. $\mu$ and $\sigma^2$ are the annualised
-log-price drift and variance.
 
 ```{ojs}
 //| echo: false
@@ -68,13 +51,6 @@ viewof sigma2 = Inputs.range([0, 3], { step: 0.005, value: 0.06, label: "varianc
 
 ### Jumps (Merton)
 
-Optional discrete shocks on top of the GBM. $\lambda_J$ is the expected
-jumps per year; each arrival multiplies the log-price by $N(\mu_J,
-\sigma_J^2)$. The drift is **compensated** ($\mu$ absorbs $-\lambda_J
-\kappa$ with $\kappa = e^{\mu_J + \sigma_J^2/2} - 1$) so
-$\mathbb{E}[S_t] = S_0 e^{\mu t}$ stays put — jumps widen the
-distribution without relocating it. $\lambda_J = 0$ recovers pure GBM.
-
 ```{ojs}
 //| echo: false
 viewof lambdaJ = Inputs.range([0, 50], { step: 0.1, value: 20, label: "jump intensity λ_J (/yr)" })
@@ -91,41 +67,6 @@ viewof sigmaJ = Inputs.range([0, 1], { step: 0.01, value: 0.35, label: "log-jump
 ```
 
 ### Demand & inventory
-
-Retirement flow $\lambda$ (tonnes per calendar day) plus the raw
-inventory state $(k, C_{\mathrm{basis}})$. The derived card **coverage
-$\tau = \min(1, k / (N \cdot P))$** — fraction of the horizon the
-inventory lasts — controls the custom book. Three regimes, each with
-a different *kind* of tail:
-
-- **Under-hedged ($\tau < 1$).** Inventory runs out at $\tau T$;
-  randomness lives in the tail integral $J_\tau$. Loss tail is
-  *unbounded* (high prices) but *softened* by the averaging of an
-  integrated log-normal.
-- **Matched ($\tau = 1$, $k = N \cdot P$).** Custom P&L is $Q \cdot N
-  - C_{\mathrm{basis}}$ — deterministic (reproduces §3a).
-- **Over-hedged ($\tau = 1$, $k > N \cdot P$).** Leftover
-  $k_{\mathrm{left}} = k - N \cdot P$ tokens mark to spot at $S_T$.
-  Loss tail is *bounded* (prices can't go below zero); the heavy
-  log-normal mass now sits on the gain side.
-
-Raising $C_{\mathrm{basis}}$ translates the distribution leftward by
-the same amount without touching SD, VaR, or CVaR — basis is a sunk
-cost.
-
-::: {.callout-note appearance="simple"}
-## Custom inventory vs. the model's $\alpha$
-
-The Validation page's §3c uses a single hedge ratio $\alpha$ and
-assumes inventory was bought today at $S_0$. This page replaces that
-with $(k, C_{\mathrm{basis}})$, recovering the $\alpha$-case at $k =
-\alpha \cdot N \cdot P$, $C_{\mathrm{basis}} = \alpha \cdot N \cdot P
-\cdot S_0$. Syndication ($\beta$) likewise applies to the residual
-stochastic part of the custom book — the uncovered tail integral
-$J_\tau$ and, when over-hedged, $k_{\mathrm{left}} \cdot S_T$ — and
-is priced from this run's MC moments rather than from a closed-form
-shortcut (no clean closed form exists in the over-hedged regime).
-:::
 
 ```{ojs}
 //| echo: false
@@ -144,11 +85,6 @@ viewof cBasis = Inputs.range([0, 1000000], { step: 100, value: 21000, label: "in
 
 ### Contract
 
-Horizon (in calendar days, converted internally to years), the fixed
-USD quote $Q$ of the principal book, and the fee rate $f$ of the fee
-book. Doubling $f$ doubles both the fee book's mean and its SD,
-leaving Sharpe invariant; $f$ does not touch the principal books.
-
 ```{ojs}
 //| echo: false
 viewof Tdays = Inputs.range([30, 1095], { step: 5, value: 365, label: "horizon T (days)" })
@@ -166,15 +102,6 @@ viewof fee = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fee rate f" 
 
 ### Syndication (§3d)
 
-Quota-share cession of the custom book's stochastic residual.
-$\beta$ is the fraction ceded; $\theta$ the counterparty's risk-load
-($0$ = actuarially fair premium). Premium mode selects the risk
-measure $\theta$ multiplies — `sharpe`: $\theta \cdot \mathrm{SD}$;
-`cvar`: $\theta \cdot \mathrm{SD} \cdot
-\phi(\Phi^{-1}(0.95))/0.05 \approx \theta \cdot \mathrm{SD} \cdot
-2.063$. Retained variance collapses as $(1-\beta)^2$ on top of the
-$(1-\tau)^2$ collapse already bought by coverage.
-
 ```{ojs}
 //| echo: false
 viewof beta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "cession β" })
@@ -190,13 +117,7 @@ viewof theta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "counterparty
 viewof premiumMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
 ```
 
-### §3e Switching
-
-Flip from the fixed-quote principal book to the fee book the first
-time $S_t$ crosses $H = h \cdot S_0$. $h = \infty$ disables the switch
-(§3d baseline); $h = 1$ starts in fee mode. $f_{\mathrm{post}}$ defaults
-to $f$ but can be independently raised to compensate for lost upside
-once the barrier is breached.
+### Switching (§3e)
 
 ```{ojs}
 //| echo: false
@@ -221,10 +142,6 @@ feePost = feePostLocked ? null : feePostSlider
 ```
 
 ### Monte Carlo
-
-Number of paths, steps per path, and the PRNG seed. These are
-statistical controls (more paths = tighter estimates), not business
-controls.
 
 ```{ojs}
 //| echo: false

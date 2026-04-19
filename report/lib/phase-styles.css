@@ -100,12 +100,41 @@
 }
 .pc-reset button:hover { background: #eef; border-color: #555; }
 
-/* Glossary sidebar: a floating, collapsible reference card included on
-   every page (see _glossary.qmd). Fixed to the top-right below the
-   Quarto navbar so the reader can check a symbol without scrolling.
-   Collapses to a "Glossary" pill when closed; falls back to an inline
-   block on narrow viewports. */
-.glossary-sidebar {
+/* Reference sidebars: the floating, collapsible cards pinned to the top-
+   right below the Quarto navbar (see _glossary.qmd and _notation.qmd).
+   The glossary ships on every page; the notation panel is simulator-only
+   and, when present, is stacked below the glossary inside a shared
+   .right-sidebars container so the two share the fixed right column
+   without overlap.
+
+   `.glossary-sidebar` without a .right-sidebars parent keeps its own
+   fixed-position rules (other pages). Inside the container, both panels
+   become regular flex children of the container so they stack. */
+.right-sidebars {
+  position: fixed;
+  top: 5rem;
+  right: 0.75rem;
+  width: min(300px, calc(100vw - 1.5rem));
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: calc(100vh - 6rem);
+  overflow: hidden;
+}
+.right-sidebars .glossary-sidebar,
+.right-sidebars .notation-sidebar {
+  position: static;
+  width: auto;
+  min-height: 0;
+}
+.right-sidebars .glossary-sidebar details,
+.right-sidebars .notation-sidebar details {
+  max-height: 45vh;
+}
+
+.glossary-sidebar,
+.notation-sidebar {
   position: fixed;
   top: 5rem;
   right: 0.75rem;
@@ -114,7 +143,8 @@
   font-size: 0.82rem;
   line-height: 1.35;
 }
-.glossary-sidebar details {
+.glossary-sidebar details,
+.notation-sidebar details {
   background: #fafafa;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -123,7 +153,8 @@
   max-height: calc(100vh - 6rem);
   overflow-y: auto;
 }
-.glossary-sidebar summary {
+.glossary-sidebar summary,
+.notation-sidebar summary {
   cursor: pointer;
   font-weight: 600;
   color: #333;
@@ -133,41 +164,75 @@
   padding: 0.15rem 0;
   list-style: none;
 }
-.glossary-sidebar summary::-webkit-details-marker { display: none; }
-.glossary-sidebar summary::before {
+.glossary-sidebar summary::-webkit-details-marker,
+.notation-sidebar summary::-webkit-details-marker { display: none; }
+.glossary-sidebar summary::before,
+.notation-sidebar summary::before {
   content: "▸";
   display: inline-block;
   margin-right: 0.35rem;
   transition: transform 0.12s ease-out;
 }
-.glossary-sidebar details[open] > summary::before { transform: rotate(90deg); }
-.glossary-sidebar dl { margin: 0.4rem 0 0; }
-.glossary-sidebar dt {
+.glossary-sidebar details[open] > summary::before,
+.notation-sidebar details[open] > summary::before { transform: rotate(90deg); }
+.glossary-sidebar dl,
+.notation-sidebar dl { margin: 0.4rem 0 0; }
+.glossary-sidebar dt,
+.notation-sidebar dt {
   font-family: ui-monospace, monospace;
   font-size: 0.78rem;
   color: #1a3a6b;
   margin-top: 0.55rem;
 }
-.glossary-sidebar dt:first-child { margin-top: 0; }
-.glossary-sidebar dd {
+.glossary-sidebar dt:first-child,
+.notation-sidebar dt:first-child { margin-top: 0; }
+.glossary-sidebar dd,
+.notation-sidebar dd {
   margin: 0.15rem 0 0;
   color: #333;
 }
-.glossary-sidebar code {
+.glossary-sidebar code,
+.notation-sidebar code {
   background: rgba(0, 0, 0, 0.04);
   padding: 0 0.18rem;
   border-radius: 3px;
   font-size: 0.78rem;
 }
+.notation-sidebar h4 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #333;
+  margin: 0.9rem 0 0.3rem;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.15rem;
+}
+.notation-sidebar h4:first-of-type { margin-top: 0.4rem; }
+.notation-sidebar p {
+  margin: 0.35rem 0;
+  color: #333;
+}
+.notation-sidebar ul {
+  margin: 0.3rem 0 0.5rem 0;
+  padding-left: 1.1rem;
+}
+.notation-sidebar li { margin: 0.15rem 0; }
 
-/* On narrow viewports, unfix the sidebar and render it inline at the
-   page location where the include landed (top of the body). Hide the
-   shadow so it blends with surrounding content. */
+/* On narrow viewports, unfix the sidebars and render them inline at the
+   page location where the includes landed (top of the body). Hide the
+   shadow so they blend with surrounding content. */
 @media (max-width: 1200px) {
-  .glossary-sidebar {
+  .right-sidebars,
+  .glossary-sidebar,
+  .notation-sidebar {
     position: static;
     width: auto;
+    max-height: none;
+    overflow: visible;
     margin: 0 0 1rem;
   }
-  .glossary-sidebar details { box-shadow: none; max-height: none; }
+  .glossary-sidebar details,
+  .notation-sidebar details { box-shadow: none; max-height: none; }
+  .right-sidebars .glossary-sidebar details,
+  .right-sidebars .notation-sidebar details { max-height: none; }
 }
