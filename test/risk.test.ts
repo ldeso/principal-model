@@ -4,6 +4,7 @@ import {
   shortfallVsSchedule,
   probLoss,
   quantile,
+  summarise,
   summarize,
   valueAtRisk,
 } from "../src/core/risk.js";
@@ -96,5 +97,50 @@ describe("summarize", () => {
     expect(s.variance).toBeCloseTo(2.5, 12);
     expect(s.sd).toBeCloseTo(Math.sqrt(2.5), 12);
     expect(s.stderr).toBeCloseTo(Math.sqrt(2.5 / 5), 12);
+  });
+});
+
+describe("summarise", () => {
+  // Symmetric non-trivial sample: P&L in [-2, 2] stepped in 0.01, plus a
+  // pair to force n odd for the interpolation case.
+  const xs = new Float64Array(401);
+  for (let i = 0; i < xs.length; i++) xs[i] = -2 + i * 0.01;
+
+  it("agrees with summarize on mean / sd / stderr / ci95", () => {
+    const s = summarise(xs);
+    const base = summarize(xs);
+    expect(s.mean).toBeCloseTo(base.mean, 12);
+    expect(s.sd).toBeCloseTo(base.sd, 12);
+    expect(s.stderr).toBeCloseTo(base.stderr, 12);
+    expect(s.ci95).toBeCloseTo(base.ci95, 12);
+  });
+
+  it("routes VaR/CVaR through the dedicated primitives", () => {
+    const s = summarise(xs);
+    expect(s.var95).toBeCloseTo(valueAtRisk(xs, 0.95), 12);
+    expect(s.var99).toBeCloseTo(valueAtRisk(xs, 0.99), 12);
+    expect(s.cvar95).toBeCloseTo(conditionalVaR(xs, 0.95), 12);
+    expect(s.cvar99).toBeCloseTo(conditionalVaR(xs, 0.99), 12);
+  });
+
+  it("matches probLoss and computes sharpe = mean/sd when sd > 0", () => {
+    const s = summarise(xs);
+    expect(s.probLoss).toBe(probLoss(xs));
+    expect(s.sharpe).not.toBeNull();
+    expect(s.sharpe as number).toBeCloseTo(s.mean / s.sd, 12);
+  });
+
+  it("returns sharpe = null for a constant sample (sd = 0)", () => {
+    const s = summarise([3, 3, 3, 3]);
+    expect(s.sd).toBe(0);
+    expect(s.sharpe).toBeNull();
+    expect(s.probLoss).toBe(0);
+  });
+
+  it("does not throw on n = 1 (variance defined as 0)", () => {
+    const s = summarise([1.5]);
+    expect(s.mean).toBe(1.5);
+    expect(s.sd).toBe(0);
+    expect(s.sharpe).toBeNull();
   });
 });
