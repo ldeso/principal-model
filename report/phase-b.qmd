@@ -312,18 +312,18 @@ Inputs.table(run.rows, {
     sharpe: "Sharpe"
   },
   format: {
-    closedFormMean: x => "$" + x.toFixed(2),
-    mcMean: x => "$" + x.toFixed(2),
+    closedFormMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    mcMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     mcCi95: x => "±$" + x.toFixed(2),
     closedFormSd: x => "$" + x.toFixed(2),
     mcSd: x => "$" + x.toFixed(2),
-    zScore: x => x.toFixed(2),
-    var95: x => "$" + x.toFixed(2),
-    var99: x => "$" + x.toFixed(2),
-    cvar95: x => "$" + x.toFixed(2),
-    cvar99: x => "$" + x.toFixed(2),
+    zScore: x => (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
+    var95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    var99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    cvar95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    cvar99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     probLoss: x => x.toFixed(3),
-    sharpe: x => x === null ? "—" : x.toFixed(3)
+    sharpe: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
   }
 })
 ```
@@ -369,12 +369,12 @@ Inputs.table(run.jumpCheck.rows, {
     zVsGbmClosed: "z vs gbm-cf"
   },
   format: {
-    gbmClosedMean: x => "$" + x.toFixed(2),
-    mertonMcMean: x => "$" + x.toFixed(2),
+    gbmClosedMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    mertonMcMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     mertonMcCi95: x => "±$" + x.toFixed(2),
     gbmClosedSd: x => "$" + x.toFixed(2),
     mertonMcSd: x => "$" + x.toFixed(2),
-    zVsGbmClosed: x => x.toFixed(2),
+    zVsGbmClosed: x => (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
   }
 })
 ```
@@ -392,7 +392,7 @@ Spot-check on the same run:
 html`<div class="metric-grid">
   <div class="card"><div class="label">E[S_T] gbm closed</div><div class="value">${run.jumpCheck.terminalSCheck.gbmClosed.toFixed(4)}</div></div>
   <div class="card"><div class="label">E[S_T] merton mc</div><div class="value">${run.jumpCheck.terminalSCheck.mertonMcMean.toFixed(4)}</div></div>
-  <div class="card"><div class="label">z vs gbm closed</div><div class="value">${run.jumpCheck.terminalSCheck.zVsGbmClosed.toFixed(2)}</div></div>
+  <div class="card"><div class="label">z vs gbm closed</div><div class="value">${(run.jumpCheck.terminalSCheck.zVsGbmClosed >= 0 ? "" : "−") + Math.abs(run.jumpCheck.terminalSCheck.zVsGbmClosed).toFixed(2)}</div></div>
 </div>`
 ```
 
