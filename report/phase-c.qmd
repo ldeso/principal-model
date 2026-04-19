@@ -351,7 +351,7 @@ annualised expected return and variance of the log-price.
 
 ```{ojs}
 //| echo: false
-viewof pi0 = Inputs.range([0, 500], { step: 1, value: 125, label: "π₀ (USD / tonne)" })
+viewof pi0 = Inputs.range([0, 500], { step: 1, value: 104, label: "π₀ (USD / tonne)" })
 ```
 
 ```{ojs}
@@ -361,12 +361,12 @@ viewof P = Inputs.range([100, 25000], { step: 10, value: 1790, label: "P (kVCM /
 
 ```{ojs}
 //| echo: false
-viewof mu = Inputs.range([-0.5, 0.5], { step: 0.005, value: 0.05, label: "drift μ (annualised)" })
+viewof mu = Inputs.range([-1, 1], { step: 0.005, value: -0.1, label: "drift μ (annualised)" })
 ```
 
 ```{ojs}
 //| echo: false
-viewof sigma2 = Inputs.range([0, 2.5], { step: 0.005, value: 0.25, label: "variance σ² (annualised)" })
+viewof sigma2 = Inputs.range([0, 3], { step: 0.005, value: 0.06, label: "variance σ² (annualised)" })
 ```
 
 ### Jumps (Merton)
@@ -382,17 +382,17 @@ to pure GBM.
 
 ```{ojs}
 //| echo: false
-viewof lambdaJ = Inputs.range([0, 20], { step: 0.1, value: 0, label: "jump intensity λ_J (/yr)" })
+viewof lambdaJ = Inputs.range([0, 50], { step: 0.1, value: 20, label: "jump intensity λ_J (/yr)" })
 ```
 
 ```{ojs}
 //| echo: false
-viewof muJ = Inputs.range([-1, 1], { step: 0.01, value: 0, label: "mean log-jump μ_J" })
+viewof muJ = Inputs.range([-0.5, 0.5], { step: 0.01, value: -0.05, label: "mean log-jump μ_J" })
 ```
 
 ```{ojs}
 //| echo: false
-viewof sigmaJ = Inputs.range([0, 1], { step: 0.01, value: 0, label: "log-jump SD σ_J" })
+viewof sigmaJ = Inputs.range([0, 1], { step: 0.01, value: 0.35, label: "log-jump SD σ_J" })
 ```
 
 ### Demand & inventory
@@ -464,8 +464,8 @@ viewof seed = Inputs.range([1, 9999], { step: 1, value: 42, label: "PRNG seed" }
 //| echo: false
 mcResetButton = {
   const defaults = {
-    pi0: 125, P: 1790, mu: 0.05, sigma2: 0.25,
-    lambdaJ: 0, muJ: 0, sigmaJ: 0,
+    pi0: 104, P: 1790, mu: -0.1, sigma2: 0.06,
+    lambdaJ: 20, muJ: -0.05, sigmaJ: 0.35,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
     nPaths: 5000, nSteps: 100, seed: 42,

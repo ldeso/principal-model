@@ -4,10 +4,15 @@ import { defaultParams, withOverrides } from "../src/params.ts";
 import { summarize } from "../src/risk.ts";
 
 describe("closed-form ↔ Monte Carlo cross-check", () => {
+  // gbmMoments is pure-GBM; zero the Merton slice so closed-form variance
+  // matches MC variance. The jump-aware paths are exercised in jump-gbm.test.
   const p = withOverrides(defaultParams, {
     nPaths: 50_000,
     nSteps: 200,
     seed: 2026,
+    lambdaJ: 0,
+    muJ: 0,
+    sigmaJ: 0,
   });
   const cf = closedForm(p);
   const mc = simulate(p);
