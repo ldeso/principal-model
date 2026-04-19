@@ -143,7 +143,7 @@ $$
 \end{aligned}
 $$
 
-Mean and variance interpolate linearly in $\alpha$:
+The mean interpolates linearly in $\alpha$; the variance scales as $(1-\alpha)^2$:
 
 $$
 \mathbb{E}[\Pi_\alpha] = (1 - \alpha) \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}] + \alpha \cdot \Pi_{\mathrm{matched}},

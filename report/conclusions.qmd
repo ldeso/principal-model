@@ -149,10 +149,9 @@ simulator runs agree on.
 - **Pre-buying inventory is the natural principal hedge.** Moving the
   pre-purchase from nothing toward full coverage shrinks every risk
   metric — variance collapses as $(1 - \tau)^2$ in Phase C's coverage
-  parametrisation (equivalently $(1 - \alpha)^2$ in Phase A §3c). Even
-  a modest coverage buys a disproportionate reduction in tail risk,
-  because the variance scales with the *square* of the uncovered
-  fraction.
+  parametrisation (equivalently $(1 - \alpha)^2$ in Phase A §3c), so
+  SD and CVaR collapse linearly in $(1 - \tau)$. Tail risk reduction
+  is therefore roughly proportional to coverage.
 - **Cost basis is a location parameter, not a risk parameter.** Raising
   $C_{\mathrm{basis}}$ shifts the principal book's distribution left
   along the P&L axis by the difference; it leaves the shape, SD, VaR,

@@ -288,9 +288,10 @@ per-tonne).
 - Row `principal_3b`: the unhedged principal book. This is the row
   where the loss tail is real — compare its $\mathrm{CVaR}_{99}$ against the others
   to see how much a bad price path costs.
-- Row `principal_3c`: the partially-hedged book. Expect its SD and
-  CVaR to be smaller than `3b`'s by roughly $(1-\alpha)^2$ — the variance
-  formula from Phase A §3c.
+- Row `principal_3c`: the partially-hedged book. By the variance
+  formula from Phase A §3c, expect its variance to be smaller than
+  `3b`'s by $(1-\alpha)^2$, hence its SD and CVaR smaller by
+  $(1-\alpha)$.
 
 ```{ojs}
 //| echo: false
@@ -747,12 +748,14 @@ the grid (a middle-of-the-road volatility so the shape is easy to
 read), then sweeps $\alpha$ from 0 (fully back-to-back, no pre-buying) to 1
 (fully matched, entire year's supply bought today).
 
-Phase A §3c showed that $\mathrm{Var}[\Pi_\alpha] = (1-\alpha)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}]$. Since CVaR
-scales roughly with standard deviation in a broad family of
-distributions, the $\mathrm{CVaR}_{95}$ curve should collapse **quadratically**
-toward zero as $\alpha \to 1$. Visually: expect a smooth convex curve that
-bends down steeply, not a straight line. That's the signature of the
-$(1-\alpha)^2$ factor.
+Phase A §3c showed that $\mathrm{Var}[\Pi_\alpha] = (1-\alpha)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}]$,
+so $\mathrm{SD}[\Pi_\alpha] = (1-\alpha) \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}]$.
+Since CVaR scales roughly with standard deviation in a broad family
+of distributions, the $\mathrm{CVaR}_{95}$ curve should collapse
+**linearly** toward zero as $\alpha \to 1$. Visually: expect a
+roughly straight line trending down to zero. The $(1-\alpha)^2$
+variance factor becomes a $(1-\alpha)^1$ factor on the SD / CVaR
+scale.
 
 At $\alpha = 1$ the book is fully pre-hedged and terminal P&L is
 deterministic; at that point the $\mathrm{CVaR}_{95}$ drops to the sign of the one
