@@ -76,6 +76,26 @@ the closed-form cross-checks, and a live simulator.
    principal book trades mean preservation for a left-skewed loss
    tail. This is the programme's headline asymmetry.
 
+6. **A switching strategy (§3e) *truncates* the loss tail rather than
+   rescaling it.** §3c ($\alpha$, pre-purchase) and §3d ($\beta$,
+   syndication) multiply the left tail by constants; they shrink it
+   but cannot cap it. If the operator quotes $Q$ up front but keeps
+   the option to flip to fee-based pricing the first time $S_t$
+   crosses an upper barrier $H = h \cdot S_0$ (stopping time $\tau$),
+   every path where the barrier fires has its post-barrier exposure
+   replaced by the non-negative §2 fee book on $[\tau, T]$. At $h =
+   1.25$ under the default calibration, the §3e tail is ~80× smaller
+   than §3b's — CVaR₉₅ collapses from ≈ \$3,900 to ≈ \$49 — while
+   $\mathbb{E}[\Pi]$ actually *rises* (fee revenue replaces the
+   tail-heavy b2b payoff on switched paths). $h \to \infty$ recovers
+   §3d; $h \le 1$ recovers the pure fee book. The three levers
+   $(\alpha, \beta, h)$ compose multiplicatively and consume distinct
+   resources — capital, counterparty credit, market timing — giving
+   the operator a three-dimensional Pareto surface. This is the
+   programme's answer to the headline asymmetry of finding 5: the
+   intermediary can preserve principal-book expected revenue **and**
+   bound the loss tail by holding the switch option open.
+
 ---
 
 ## Stress-test a specific scenario

@@ -27,6 +27,8 @@ const FLAG_TO_PARAM: Record<string, NumericParamKey> = {
   lambdaJ: "lambdaJ",
   muJ: "muJ",
   sigmaJ: "sigmaJ",
+  h: "barrierRatio",
+  fPost: "feePost",
 };
 
 interface CliArgs {
@@ -135,6 +137,36 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
+  if (report.switching) {
+    const sw = report.switching;
+    const fmtMaybe = (x: number | null, d = 3) =>
+      x === null || !isFinite(x) ? "—" : fmt(x, d);
+    console.log(
+      `\n§3e — Switching  h=${params.barrierRatio}  H=${fmt(sw.barrierLevel, 4)}` +
+        `  f_post=${fmt(sw.feePost, 4)}` +
+        (params.feePost === null ? " (locked to f)" : ""),
+    );
+    console.log(
+      `  P[τ<T]  mc=${fmt(sw.probSwitch.mc, 4)}` +
+        `  cf=${fmtMaybe(sw.probSwitch.closedForm, 4)}` +
+        `  z=${fmtMaybe(sw.probSwitch.zScore, 2)}`,
+    );
+    console.log(
+      `  E[τ∧T]  mc=${fmt(sw.expectedTau.mc, 4)}` +
+        `  cf=${fmtMaybe(sw.expectedTau.closedForm, 4)}` +
+        `  z=${fmtMaybe(sw.expectedTau.zScore, 2)}`,
+    );
+    console.log(
+      `  E[(T−τ)/T]=${fmt(sw.meanFracInFeeMode, 4)}` +
+        `  CVaR95|no-switch=${fmtMaybe(sw.cvar95GivenNoSwitch)}` +
+        `  CVaR95|switched=${fmtMaybe(sw.cvar95GivenSwitch)}`,
+    );
+    console.log(
+      `  π_fair=${fmt(sw.premiumFair)}  π_loaded=${fmt(sw.premiumLoaded)}` +
+        `  (MC-derived; no closed form for Π_sw)`,
+    );
+  }
+
   console.log(`\n§5 — Break-even quote  Q* = ${fmt(report.closed.QStar, 4)}`);
   console.log(
     `     E[R_fee] = ${fmt(report.closed.fee.mean)}` +
@@ -202,6 +234,34 @@ function extractRowMetrics(
     probLoss: r.probLoss,
     sharpe: r.sharpe,
   };
+}
+
+// §3e barrier sweep: the operator-decision chart (CVaR₉₅ and E[Π] vs h) is
+// derived from these cells. Infinity = "switch disabled", which anchors the
+// curve to the §3d retained book. Kept separate from SWEEP_ALPHAS/MUS/SIGMAS
+// so we don't blow up the (α, μ, σ) grid into a 4-dim product.
+const SWEEP_BARRIERS = [1.0, 1.1, 1.25, 1.5, 2.0, Infinity];
+
+function runSwitchingSweep(baseParams: Params): unknown {
+  const p0 = withOverrides(baseParams, { nPaths: 20_000, nSteps: 100 });
+  const cells: unknown[] = [];
+  for (const h of SWEEP_BARRIERS) {
+    const p = withOverrides(p0, { barrierRatio: h });
+    const r = buildReport(p, { keepPaths: 0, traceSize: 0, histBins: 0 });
+    const switchingRow =
+      r.rows.find((x) => x.name === "principal_3e") ?? null;
+    cells.push({
+      h,
+      switching: r.switching ?? null,
+      row: switchingRow
+        ? extractRowMetrics(r.rows, "principal_3e")
+        : extractRowMetrics(r.rows, "principal_3d"),
+      retained: extractRowMetrics(r.rows, "principal_3d"),
+      b2b: extractRowMetrics(r.rows, "principal_3b"),
+      fee: extractRowMetrics(r.rows, "fee"),
+    });
+  }
+  return { grid: { barriers: SWEEP_BARRIERS }, base: p0, cells };
 }
 
 const QSTAR_MUS = [-0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];
@@ -305,6 +365,12 @@ function main(): void {
     const sweepPath = resolve(DATA_DIR, "sweep.json");
     writeFileSync(sweepPath, JSON.stringify(sweep, null, 2));
     console.log(`wrote ${sweepPath}`);
+
+    console.log(`\nRunning §3e switching barrier sweep…`);
+    const switchingSweep = runSwitchingSweep(params);
+    const switchingSweepPath = resolve(DATA_DIR, "switching-sweep.json");
+    writeFileSync(switchingSweepPath, JSON.stringify(switchingSweep, null, 2));
+    console.log(`wrote ${switchingSweepPath}`);
   }
 
   const qSurface = {

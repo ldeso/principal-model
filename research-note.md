@@ -204,6 +204,58 @@ The CVaR mode is a **Gaussian-approximate** surrogate — $I_T$ is not log-norma
 
 **Tranching is out of scope.** A first-loss / senior split would price the ceded leg as $\max(L - K, 0)$ — non-linear in $I_T$, breaking the Dufresne-moment backbone. It belongs in a separate MC-only note and is not part of this extension.
 
+### 3e. Switching strategy ($h$ barrier, $f_{\mathrm{post}}$ markup)
+
+§3c and §3d both **rescale** the loss tail by a constant factor — they shrink but do not bound it. §3e is the first primitive that **truncates** it. The intuition: the principal book's left tail is driven entirely by paths where $S_t$ rises materially above $S_0$ (cost $P \cdot S_t$ overruns the locked quote $Q$). If the intermediary can detect such a rise in real time and, from that point on, switch retirement pricing from the fixed quote $Q$ to the live fee-book markup $f_{\mathrm{post}} \cdot P \cdot S_t$, then every path where the barrier fires has its post-barrier loss capped by the non-negative §2 fee revenue. The left tail becomes bounded above by the fee book on $[\tau, T]$.
+
+**Stopping time and integrals.** Fix a dimensionless barrier ratio $h \ge 1$ and let $H := h \cdot S_0$. Define the first-passage time
+
+$$
+\tau := \inf\{\,t \in [0, T] : S_t \ge H\,\} \;\wedge\; T,
+$$
+
+with the convention $\tau = T$ when the barrier is never reached. Split the shared kernel:
+
+$$
+I_\tau := \int_0^\tau S_t\,dt, \qquad J_\tau := \int_\tau^T S_t\,dt, \qquad I_\tau + J_\tau = I_T.
+$$
+
+Under the switching rule the stochastic leg of the book is
+
+$$
+\Pi_{\mathrm{sw}}^{(1-\alpha)} = Q \cdot \lambda \cdot \tau \;-\; P \cdot \lambda \cdot I_\tau \;+\; f_{\mathrm{post}} \cdot P \cdot \lambda \cdot J_\tau,
+$$
+
+i.e. back-to-back revenue-less-cost up to $\tau$, fee revenue on the remaining horizon. $h \to \infty$ gives $\tau = T$, $I_\tau = I_T$, $J_\tau = 0$ and recovers $\Pi_{\mathrm{b2b}}$; $h \le 1$ forces $\tau = 0$ and $\Pi_{\mathrm{sw}}^{(1-\alpha)} = f_{\mathrm{post}} \cdot P \cdot \lambda \cdot I_T$ — the §2 fee book at rate $f_{\mathrm{post}}$. The post-switch rate defaults to $f$ but is exposed as an independent lever so the note can explore a richer markup activated by the barrier.
+
+**Composition with $\alpha$ and $\beta$.** The switching rule touches only the stochastic leg; the matched slice runs to $T$ untouched and syndication applies to the switched leg unchanged:
+
+$$
+\Pi_{3e} = \alpha \cdot N \cdot (Q - P \cdot S_0) + (1 - \alpha)(1 - \beta) \cdot \Pi_{\mathrm{sw}}^{(1-\alpha)} + \pi_{\mathrm{sw}}(\alpha, \beta, \theta).
+$$
+
+Three orthogonal levers: $\alpha$ consumes capital, $\beta$ consumes counterparty credit, $h$ consumes nothing but imposes a market-timing decision. The levers commute under this scope convention — e.g. $\mathbb{E}[\Pi_{3e}]$ decomposes linearly into an $\alpha$-matched term plus a syndicated-switched term — so the joint $(\alpha, \beta, h)$ surface Pareto-extends the $(\alpha, \beta)$ surface of §3d.
+
+**No closed-form density.** Because $\tau$ is a stopping time, not a path-average, the P&L density is not of the Dufresne-integral family. $\Pi_{3e}$ depends on $(\tau, I_\tau, J_\tau)$ jointly, and those three quantities share a non-trivial copula (large $I_\tau$ tends to precede barrier crossings; $J_\tau$ lives on a random horizon $T - \tau$ starting at level $H$). Moments are MC-authoritative. The premium $\pi_{\mathrm{sw}}$ is in turn computed from MC moments of the stochastic leg, exactly as in §3c/§3d's custom-inventory extension — see `src/core/simulate-switching.ts`.
+
+**Partial closed-form anchors (pure GBM).** Under $\lambda_J = 0$ the Brownian-motion-with-drift hitting-time distribution (Harrison 1985; Borodin-Salminen Table 3.0.1) gives
+
+$$
+\mathbb{P}[\tau \le T] \;=\; \Phi\!\left(\tfrac{-\log h + \nu T}{\sigma \sqrt{T}}\right) + h^{2\nu/\sigma^2} \cdot \Phi\!\left(\tfrac{-\log h - \nu T}{\sigma \sqrt{T}}\right), \qquad \nu := \mu - \tfrac12 \sigma^2,
+$$
+
+and $\mathbb{E}[\tau \wedge T] = \int_0^T \bigl(1 - \mathbb{P}[\tau \le t]\bigr)\,dt$ as a tractable quadrature. These two scalars are used as **test oracles** for the switching simulator under pure GBM. Under Merton jumps the distribution of $\tau$ inflates — jumps can punch through the barrier in one step — so the anchors become upper bounds for the true $\mathbb{E}[\tau \wedge T]$ and lower bounds for $\mathbb{P}[\tau \le T]$; MC is authoritative.
+
+**Tail decomposition.** Partitioning paths by whether the barrier fired,
+
+$$
+\mathrm{CVaR}_{95}[\Pi_{3e}] \;\le\; \mathbb{P}[\tau = T] \cdot \mathrm{CVaR}_{95}^{\{\tau = T\}}[\Pi_{3b}] \;+\; \mathbb{P}[\tau < T] \cdot \mathrm{CVaR}_{95}^{\{\tau < T\}}[\text{post-switch fee}],
+$$
+
+where the second term is non-negative a.s. because the fee book is bounded below by $0$. Equality is not exact — CVaR is not linear in arbitrary partitions — but the inequality makes the claim "barrier truncates the loss tail" precise: the unswitched residual is bounded by a vanilla §3b CVaR on its own measure; the switched residual is bounded by a non-negative §2 object. As $h \downarrow 1$ the first term's weight shrinks and the bound tightens. Phase B reports `CVaR95|no-switch` and `CVaR95|switched` separately for this reason.
+
+**Operator decision surface.** Fix $(\mu, \sigma, f, f_{\mathrm{post}})$; sweep $h$. Both $\mathbb{E}[\Pi_{3e}]$ and $\mathrm{CVaR}_{95}[\Pi_{3e}]$ are monotone functions of $h$ in opposite directions: tighter barrier lifts the mean (fee revenue replaces negative-skewed b2b exposure) and tightens the tail (less residual unswitched risk). The curves' knee against the §3d reference is the operator's decision point. Optimal-$h$ is a control-problem formulation (scope §7), but the eyeball-the-knee presentation is deliberate — the fee-vs-principal research programme has consistently emphasised that "matching means does not match distributions" and §3e adds "choosing a tail cap is a business decision, not a pricing optimum".
+
 ## 4. Risk quantification
 
 For each model, the Phase B simulator should report:
@@ -235,14 +287,14 @@ This is the handle for Phase C hedging: the natural static hedge for the princip
 
 ## 5. Direct comparison
 
-| | Fee-based | Principal 3a (matched) | Principal 3b (back-to-back) | Principal 3d (syndicated) |
-| --- | --- | --- | --- | --- |
-| $\mathbb{E}[\Pi]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $\mathbb{E}[\Pi_\alpha] - \beta(1-\alpha)\rho(\theta)$ |
-| $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $(1-\alpha)^2(1-\beta)^2 (P \lambda)^2 \cdot \mathrm{Var}[I_T]$ |
-| kVCM exposure | long | none (terminal), long (interim NAV) | short | short, scaled by $(1-\beta)$ |
-| Downside | bounded below by 0 | deterministic | unbounded | unbounded, scaled by $(1-\beta)$ |
-| Capital requirement | none | $N \cdot P \cdot S_0$ | none | $\alpha \cdot N \cdot P \cdot S_0$ |
-| Counterparty exposure | none | none | none | $\beta \cdot (1-\alpha) \cdot P \cdot \lambda \cdot I_T$ upside (if counterparty defaults) |
+| | Fee-based | Principal 3a (matched) | Principal 3b (back-to-back) | Principal 3d (syndicated) | Principal 3e (switching) |
+| --- | --- | --- | --- | --- | --- |
+| $\mathbb{E}[\Pi]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $\mathbb{E}[\Pi_\alpha] - \beta(1-\alpha)\rho(\theta)$ | MC only (no closed form) |
+| $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $(1-\alpha)^2(1-\beta)^2 (P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | MC only; $\le \mathrm{Var}[\Pi_{\mathrm{ret}}]$ empirically |
+| kVCM exposure | long | none (terminal), long (interim NAV) | short | short, scaled by $(1-\beta)$ | short on $[0, \tau]$, long on $[\tau, T]$ (fee leg) |
+| Downside | bounded below by 0 | deterministic | unbounded | unbounded, scaled by $(1-\beta)$ | bounded above by $\lvert Q\lambda\tau - P\lambda I_\tau \rvert$ on $\{\tau < T\}$; §3b tail on $\{\tau = T\}$ |
+| Capital requirement | none | $N \cdot P \cdot S_0$ | none | $\alpha \cdot N \cdot P \cdot S_0$ | $\alpha \cdot N \cdot P \cdot S_0$ (inherits from $\alpha$) |
+| Counterparty exposure | none | none | none | $\beta \cdot (1-\alpha) \cdot P \cdot \lambda \cdot I_T$ upside (if counterparty defaults) | same as §3d on the switched leg |
 
 ### Break-even quote
 
@@ -341,7 +393,7 @@ This table is the authoritative scope statement for the programme; the landing p
 | GBM price dynamics | Phase C — Merton jump-diffusion implemented (§6); two-state regime switching pending |
 | No historical calibration | Phase C — kVCM proxy (KLIMA, BCT, NCT) |
 | No discounting, gas, or on-chain slippage | Phase C — parameterized |
-| Static (or absent) hedging | Phase C — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d |
+| Static (or absent) hedging | Phase C — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d; barrier-triggered mode switching is now in §3e (one-way and non-adaptive; two-way switching and adaptive/optimal-$h$ remain pending) |
 | No credit / counterparty layer | Not scoped (§3d treats syndication as default-free; tranching remains out of scope — non-linear in $I_T$, would break the closed-form backbone) |
 
 ## References

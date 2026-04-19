@@ -13,14 +13,24 @@
   stochastic book on this site: the fee book is linear in $I_T$, the
   back-to-back principal book is affine in $I_T$, and the
   partially-hedged book is an affine mix of the two.
-- **$J_\tau := \int_{\tau T}^{T} S_t\,dt$.** The same integral, but
-  restricted to the uncovered tail window (after inventory runs out).
-  Drives the custom-inventory book.
-- **Coverage $\tau := \min(1,\, k / (N \cdot P))$.** Fraction of the
-  horizon that the pre-purchased inventory lasts under deterministic
-  demand. $\tau = 0$ is fully back-to-back; $\tau = 1$ is (at least)
-  fully matched. In Phase B this is the hedge ratio $\alpha$; in Phase
-  C it is derived from inventory $k$ and demand $N \cdot P$.
+- **Coverage $\tau_{\mathrm{cov}} := \min(1,\, k / (N \cdot P))$.** Fraction
+  of the horizon that the pre-purchased inventory lasts under deterministic
+  demand. $\tau_{\mathrm{cov}} = 0$ is fully back-to-back; $\tau_{\mathrm{cov}} = 1$
+  is (at least) fully matched. In Phase B this is the hedge ratio $\alpha$;
+  in Phase C it is derived from inventory $k$ and demand $N \cdot P$.
+- **Barrier $h$, level $H = h \cdot S_0$.** §3e switching strategy. The
+  intermediary flips from fixed-quote principal to live-cost fee the first
+  time $S_t$ crosses the upper barrier $H$. $h$ is the dimensionless ratio
+  over the spot at $t = 0$; $h = \infty$ disables the switch.
+- **Stopping time $\tau := \inf\{t : S_t \ge H\} \wedge T$.** First-passage
+  time of $S_t$ to the §3e barrier, truncated at the horizon. Distinct from
+  the §3c coverage fraction $\tau_{\mathrm{cov}}$: here $\tau$ carries units
+  of time (0 ≤ $\tau$ ≤ $T$) and indexes a random event, not a deterministic
+  schedule.
+- **$I_\tau := \int_0^\tau S_t\,dt$, $J_\tau := \int_\tau^T S_t\,dt$.**
+  Pre- and post-switch slices of the price integral; $I_\tau + J_\tau = I_T$
+  exactly. In §3c with deterministic coverage we recycle the same letter
+  pair replacing $\tau$ by $\tau_{\mathrm{cov}} \cdot T$.
 - **VaR$_{95}$ (Value-at-Risk).** The loss threshold exceeded with 5%
   probability — the 5th percentile of P&L, sign-flipped. Says
   *where* the bad tail begins, not how deep it goes.

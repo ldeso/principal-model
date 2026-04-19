@@ -55,7 +55,10 @@ export interface SimulateRunResult {
   ITSamples: Float64Array;
   terminalS: Float64Array;
   sampledPaths: Float64Array[];
-  /** Fraction of horizon covered by pre-purchased inventory, clamped to [0,1]. */
+  /** Coverage fraction τ_cov of the horizon that the pre-purchased inventory
+   *  funds, clamped to [0, 1]. Distinct from §3e's stopping time τ (see
+   *  `./simulate-switching.ts`); the two quantities share a letter in the
+   *  research note but never in code. */
   tauFrac: number;
   tokensUsedInternal: number;
   tokensLeftover: number;
@@ -83,8 +86,8 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     : 1;
   const tokensUsedInternal = Math.min(kPre, lambda * T * P);
   const tokensLeftover = Math.max(0, kPre - lambda * T * P);
-  // Snap tauFrac onto the integration grid and treat "only the endpoint falls
-  // in [τT, T]" as an empty range — otherwise the trapezoid rule would add
+  // Snap tauFrac (τ_cov) onto the integration grid and treat "only the endpoint
+  // falls in [τ_cov·T, T]" as an empty range — otherwise the trapezoid rule adds
   // 0.5·S_T·dt for a zero-length interval.
   const tailStartRaw = Math.ceil(tauFrac * nSteps);
   const tailStartStep = tailStartRaw >= nSteps ? nSteps + 1 : tailStartRaw;
@@ -105,7 +108,7 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     const IT = path.IT;
     const ST = S[nSteps] as number;
 
-    // Uncovered-tail integral ∫_{τT}^{T} S_t dt, trapezoid on the same grid
+    // Uncovered-tail integral ∫_{τ_cov·T}^{T} S_t dt, trapezoid on the same grid
     // so the same realisation drives fee, b2b and custom-principal books.
     let tailInt = 0;
     for (let k = tailStartStep; k <= nSteps; k++) {
@@ -127,7 +130,7 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
   // §3d quota-share on the residual stochastic leg. Phase B uses a
   // closed-form premium because Π_α is linear in I_T; Phase C's custom
   // inventory has no clean closed-form counterpart (the matched slice mixes
-  // τ_frac with a sunk basis), so we price the cession from this run's own
+  // τ_cov with a sunk basis), so we price the cession from this run's own
   // MC sample moments. With nPaths ≥ 5000 the estimator is tight enough for
   // the slider feedback loop. `cBasis` is the deterministic translation of
   // the principal book, so the stochastic residual is principal − (Q·N − cBasis).

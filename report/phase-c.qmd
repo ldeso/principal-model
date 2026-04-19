@@ -214,6 +214,36 @@ viewof theta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "counterparty
 viewof premiumMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
 ```
 
+### §3e Switching strategy
+
+A separate lever: flip from the fixed-quote principal book to the fee
+book the first time $S_t$ crosses $H = h \cdot S_0$. $h = \infty$ disables
+the switch (§3d baseline); $h = 1$ starts in fee mode from $t = 0$. The
+post-switch fee rate defaults to $f$ but can be independently raised to
+compensate for lost principal upside once the barrier is breached.
+
+```{ojs}
+//| echo: false
+viewof barrierRatio = Inputs.range([1, 3], { step: 0.01, value: 3, label: "switching barrier h = H/S₀ (3 ≈ no switch on most runs)" })
+```
+
+```{ojs}
+//| echo: false
+viewof feePostLocked = Inputs.toggle({ label: "lock f_post to f", value: true })
+```
+
+```{ojs}
+//| echo: false
+viewof feePostSlider = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "post-switch fee rate f_post" })
+```
+
+```{ojs}
+//| echo: false
+// null when locked (simulateSwitching interprets this as "use inputs.fee");
+// a numeric value when the user wants an independent post-switch rate.
+feePost = feePostLocked ? null : feePostSlider
+```
+
 ### Monte Carlo
 
 Knobs for the simulator itself — how many random trajectories, how
@@ -245,6 +275,7 @@ mcResetButton = {
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
     beta: 0, theta: 0, premiumMode: "sharpe",
+    barrierRatio: 3, feePostLocked: true, feePostSlider: 0.4,
     nPaths: 5000, nSteps: 100, seed: 42,
   };
   const views = {
@@ -253,6 +284,8 @@ mcResetButton = {
     lambdaDay: viewof lambdaDay, kPre: viewof kPre, cBasis: viewof cBasis,
     Tdays: viewof Tdays, Q: viewof Q, fee: viewof fee,
     beta: viewof beta, theta: viewof theta, premiumMode: viewof premiumMode,
+    barrierRatio: viewof barrierRatio, feePostLocked: viewof feePostLocked,
+    feePostSlider: viewof feePostSlider,
     nPaths: viewof nPaths, nSteps: viewof nSteps, seed: viewof seed,
   };
   const wrap = document.createElement("div");
@@ -356,7 +389,7 @@ the network.
 ```{ojs}
 //| echo: false
 import {
-  expm1OverX, xTicksForHorizon, simulate, summarise,
+  expm1OverX, xTicksForHorizon, simulate, summarise, simulateSwitching,
 } from "./lib/compiled/src/core/index.js"
 ```
 
@@ -408,6 +441,40 @@ run = {
 
 ```{ojs}
 //| echo: false
+// Sibling run of the §3e switching book. α is implicit in the Phase C custom
+// book via (k, C_basis), not as a Params field; drive the switching book with
+// α=0 (pure b2b-plus-switch) and β=0 (no syndication) for a clean reading. The
+// barrier composes with β / θ in the core module but Phase C surfaces the
+// simpler story first — users who want composition should look at Phase B.
+switchRun = {
+  const inputs = {
+    S0: derived.S0, mu, sigma: derived.sigma, P,
+    lambda: derived.lambda, T: derived.T,
+    Q, fee, alpha: 0, beta: 0, premiumLoad: 0, premiumMode,
+    barrierRatio, feePost,
+    lambdaJ, muJ, sigmaJ,
+    nPaths, nSteps, seed,
+    keepPaths: 0,
+  };
+  const t0 = performance.now();
+  const raw = simulateSwitching(inputs);
+  const elapsedMs = performance.now() - t0;
+  let switched = 0, tauSum = 0;
+  for (let i = 0; i < raw.switchedMask.length; i++) {
+    switched += raw.switchedMask[i];
+    tauSum += raw.tauSamples[i];
+  }
+  return {
+    inputs, ...raw, elapsedMs,
+    summary: summarise(raw.pnlSamples),
+    probSwitch: switched / raw.switchedMask.length,
+    expectedTau: tauSum / raw.tauSamples.length,
+  };
+}
+```
+
+```{ojs}
+//| echo: false
 html`<div class="phase-c-derived">
   <div class="card"><div class="label">paths simulated</div><div class="value">${nPaths.toLocaleString()}</div></div>
   <div class="card"><div class="label">wall time</div><div class="value">${run.elapsedMs.toFixed(1)} ms</div></div>
@@ -418,6 +485,21 @@ html`<div class="phase-c-derived">
   <div class="card"><div class="label">retained CVaR₉₅</div><div class="value">${(run.retained.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.retained.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">SD reduction vs. principal</div><div class="value">${run.principal.sd > 0 ? (100 * (1 - run.retained.sd / run.principal.sd)).toFixed(1) + "%" : "—"}</div></div>
 </div>`
+```
+
+```{ojs}
+//| echo: false
+html`${(isFinite(barrierRatio) && barrierRatio < 3)
+  ? `<div class="phase-c-derived">
+    <div class="card"><div class="label">§3e barrier h</div><div class="value">${barrierRatio.toFixed(2)} (H = $${(barrierRatio * derived.S0).toFixed(4)})</div></div>
+    <div class="card"><div class="label">f_post</div><div class="value">${(feePost ?? fee).toFixed(3)}${feePost === null ? " (locked to f)" : ""}</div></div>
+    <div class="card"><div class="label">P[τ &lt; T]</div><div class="value">${(switchRun.probSwitch * 100).toFixed(1)}%</div></div>
+    <div class="card"><div class="label">E[τ]</div><div class="value">${(switchRun.expectedTau * 365 / derived.T).toFixed(1)} days</div></div>
+    <div class="card"><div class="label">switching E[Π]</div><div class="value">${(switchRun.summary.mean >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.mean).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+    <div class="card"><div class="label">switching CVaR₉₅</div><div class="value">${(switchRun.summary.cvar95 >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  </div>`
+  : `<div class="phase-c-derived"><div class="card"><div class="label">§3e switching</div><div class="value">disabled (h ≈ ∞) — set the slider below 3 to activate</div></div></div>`
+}`
 ```
 
 ### Summary statistics
@@ -461,6 +543,11 @@ summaryRows = [
   { book: "principal (custom)", ...run.principal },
   { book: "principal (retained, §3d)", ...run.retained },
   { book: "principal (back-to-back)", ...run.b2b },
+  // §3e row sourced from the switching-book sibling run. Isfinite guard keeps
+  // the row out of the table when the barrier is effectively disabled.
+  ...(isFinite(barrierRatio) && barrierRatio < 3
+    ? [{ book: `principal (switching §3e, h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
+    : []),
 ]
 ```
 

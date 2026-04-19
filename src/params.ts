@@ -27,6 +27,15 @@ export interface Params {
    *  the Gaussian-CVaR95 proxy ≈ 2.063·SD[Π_b2b]. */
   premiumMode: "sharpe" | "cvar";
 
+  /** §3e upper barrier ratio h = H/S0. Switch from b2b to fee the first time
+   *  S_t ≥ h·S0. h = Infinity disables the switch (falls back to §3d retained);
+   *  h ≤ 1 fires the switch at t = 0. */
+  barrierRatio: number;
+  /** §3e post-switch fee rate applied to the tail integral J_τ. `null` locks
+   *  it to `f` (zero-config path); a number sets it independently for the
+   *  "richer markup after the flip" research lever. */
+  feePost: number | null;
+
   /** Merton jump intensity (expected jumps per unit time). 0 ⇒ pure GBM. */
   lambdaJ: number;
   /** Mean of log-jump size. */
@@ -58,6 +67,9 @@ export const defaultParams: Params = {
   beta: 0,
   premiumLoad: 0,
   premiumMode: "sharpe",
+
+  barrierRatio: Infinity,
+  feePost: null,
 
   lambdaJ: 20,
   muJ: -0.05,

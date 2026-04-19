@@ -83,6 +83,10 @@ Same conventions as [Phase A](phase-a.qmd) §1–§5.
 | $\Pi_{\mathrm{matched}} = N \cdot (Q - P \cdot S_0)$ | matched P&L ($\alpha=1$, deterministic) | USD |
 | $\Pi_\alpha = (1-\alpha) \cdot \Pi_{\mathrm{b2b}} + \alpha \cdot \Pi_{\mathrm{matched}}$ | partial-hedge P&L | USD |
 | $\Pi_{\mathrm{ret}} = \alpha \cdot \Pi_{\mathrm{matched}} + (1-\alpha)(1-\beta) \cdot \Pi_{\mathrm{b2b}} + \pi$ | retained P&L after syndication (§3d) | USD |
+| $h \in [1, \infty]$, $H = h \cdot S_0$ | §3e barrier ratio and level; $h=\infty$ disables the switch | dimensionless / USD / kVCM |
+| $\tau := \inf\{t : S_t \ge H\} \wedge T$ | §3e first-passage time of $S_t$ to the barrier | years |
+| $I_\tau, J_\tau := \int_0^\tau S_t\,dt,\ \int_\tau^T S_t\,dt$ | pre- / post-switch price integrals (§3e); $I_\tau + J_\tau = I_T$ | (USD/kVCM)·year |
+| $\Pi_{\mathrm{sw}}^{(1-\alpha)} = Q\lambda\tau - P\lambda I_\tau + f_{\mathrm{post}}P\lambda J_\tau$ | switched stochastic leg (§3e) | USD |
 | $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T}-1)/(\mu T)$ | break-even quote equating $\mathbb{E}[\Pi_{\mathrm{b2b}}] = \mathbb{E}[R_{\mathrm{fee}}]$ | USD / tonne |
 
 {{< include _alpha-bridge.qmd >}}
@@ -127,10 +131,13 @@ html`<div class="metric-grid">
 ### §4 — P&L moments: closed-form vs Monte Carlo
 
 The central scorecard. One row per book (`fee`, matched `3a`,
-back-to-back `3b`, partial `3c`); one column per statistic. The left
-block compares closed-form and MC values — if the simulator is
-correct, they agree within $|z| \leq 2$ sampling noise. The right
-block reports the tail metrics that have no closed form.
+back-to-back `3b`, partial `3c`, retained `3d`, plus `3e` when a
+switching barrier is set on this run); one column per statistic. The
+left block compares closed-form and MC values — if the simulator is
+correct, they agree within $|z| \leq 2$ sampling noise. The `3e` row
+reports `NaN` in the closed-form columns because the switching book's
+moments have no closed form (see §3e below). The right block reports
+the tail metrics that have no closed form.
 
 <div class="legend-table">
 
@@ -152,7 +159,10 @@ half-plane; `principal_3a` has zero terminal randomness (SD, CI95, $z$
 all zero to machine precision); `principal_3b` owns the real loss tail
 (read its $\mathrm{CVaR}_{99}$); `principal_3c` should have SD and CVaR
 smaller than `3b`'s by exactly $(1-\alpha)$ — the variance collapse
-from Phase A §3c.
+from Phase A §3c; `principal_3d` adds a further $(1-\beta)^2$ variance
+collapse via quota-share syndication, invariant in mean at $\theta = 0$.
+`principal_3e` (if present) bounds the loss tail by the fee book on
+$[\tau, T]$ — see §3e below.
 
 ```{ojs}
 //| echo: false
@@ -716,6 +726,138 @@ Plot.plot({
     Plot.line(meanShiftCurves, { x: "beta", y: "shift", stroke: "theta", strokeWidth: 2 }),
   ]
 })
+```
+
+## §3e — Switching strategy ($h$)
+
+§3c and §3d **rescale** the loss tail (multiply it by $(1-\alpha)(1-\beta)$);
+§3e is the first primitive that **truncates** it. The intermediary operates
+the §3b back-to-back book normally, but the first time $S_t$ crosses an upper
+barrier $H = h \cdot S_0$ (stopping time $\tau$), every subsequent retirement
+flow is paid at the fee rate $f_{\mathrm{post}}$ rather than at the fixed
+quote $Q$. The stochastic leg becomes
+
+$$
+\Pi_{\mathrm{sw}}^{(1-\alpha)} = Q \, \lambda \, \tau - P \, \lambda \, I_\tau + f_{\mathrm{post}} \, P \, \lambda \, J_\tau
+$$
+
+and composes with §3c ($\alpha$) and §3d ($\beta$) exactly as $\Pi_{\mathrm{b2b}}$
+did — three orthogonal levers: capital, counterparty, market timing. Because
+$\tau$ is a stopping time rather than a path-average, there is no closed-form
+P&L density; Monte Carlo is authoritative. Under pure GBM the Harrison (1985)
+first-passage distribution anchors $\mathbb{P}[\tau \le T]$ and $\mathbb{E}[\tau \wedge T]$
+(test oracles); Merton jumps invalidate both anchors but raise the switch
+probability by punching through the barrier in one step.
+
+```{ojs}
+//| echo: false
+switchingSweep = FileAttachment("data/switching-sweep.json").json()
+```
+
+```{ojs}
+//| echo: false
+switchingRows = switchingSweep.cells.map(c => ({
+  // h = Infinity is serialised as null — label it for the x-axis.
+  h: c.h === null ? Infinity : c.h,
+  hLabel: c.h === null ? "∞ (no switch)" : c.h.toFixed(2),
+  mean: c.row.mean,
+  cvar95: c.row.cvar95,
+  cvar99: c.row.cvar99,
+  probLoss: c.row.probLoss,
+  probSwitch: c.switching ? c.switching.probSwitch.mc : 0,
+  expectedTau: c.switching ? c.switching.expectedTau.mc : switchingSweep.base.T,
+  meanFracInFeeMode: c.switching ? c.switching.meanFracInFeeMode : 0,
+  retainedMean: c.retained.mean,
+  retainedCvar95: c.retained.cvar95,
+  feeMean: c.fee.mean,
+  feeCvar95: c.fee.cvar95
+}))
+```
+
+### CVaR₉₅ and $\mathbb{E}[\Pi]$ vs barrier $h$
+
+The headline operator-decision chart. Left axis: CVaR₉₅ — tightening the
+barrier (lowering $h$) collapses the tail from §3d's wide loss distribution
+down toward the fee book's lightly-negative CVaR. Right axis: expected
+P&L — tightening the barrier simultaneously lifts the mean (moving losses
+into fee-captured revenue). The two lines cross the §3d reference (dashed)
+at the "knee" of the trade-off.
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 400,
+  marginLeft: 80,
+  marginRight: 60,
+  marginBottom: 55,
+  grid: true,
+  caption: "§3e switching book — CVaR₉₅ (USD loss, lower is better) and E[Π] (USD gain, higher is better) as a function of barrier h. Finite h on a log scale; the right-most 'no switch' anchor reproduces §3d. Lower h truncates more of the loss tail but also caps more of the upside by handing flow to the fee book earlier.",
+  x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
+  y: { label: "CVaR95 of Π_{3e}   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "#c33", strokeWidth: 2 }),
+    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", fill: "#c33", r: 4 }),
+    Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "§3d retained (h=∞)"}],
+      { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
+  ]
+})
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 320,
+  marginLeft: 80,
+  marginBottom: 55,
+  grid: true,
+  caption: "Expected P&L across barriers. Tighter h shifts mean upward because the fee book's positive-revenue payoff replaces the b2b book's mean-zero-but-fat-tailed payoff on switched paths.",
+  x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
+  y: { label: "E[Π_{3e}]   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "#2a7", strokeWidth: 2 }),
+    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", fill: "#2a7", r: 4 }),
+    Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "§3d retained (h=∞)"}],
+      { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
+  ]
+})
+```
+
+### Switch-activation profile
+
+Two diagnostics summarising how the barrier is actually exercised: the
+empirical probability of switching over $[0, T]$ and the expected fraction
+of the horizon operated in fee mode. Both drop as $h$ increases; both are
+zero at $h = \infty$ by definition.
+
+```{ojs}
+//| echo: false
+Inputs.table(
+  switchingRows.filter(r => isFinite(r.h) || true),
+  {
+    columns: ["hLabel", "probSwitch", "expectedTau", "meanFracInFeeMode", "mean", "cvar95"],
+    header: {
+      hLabel: "h",
+      probSwitch: "P[τ<T]",
+      expectedTau: "E[τ∧T]",
+      meanFracInFeeMode: "E[(T−τ)/T]",
+      mean: "E[Π_{3e}]",
+      cvar95: "CVaR95"
+    },
+    format: {
+      probSwitch: x => x.toFixed(3),
+      expectedTau: x => x.toFixed(3),
+      meanFracInFeeMode: x => x.toFixed(3),
+      mean: x => "$" + x.toFixed(2),
+      cvar95: x => "$" + x.toFixed(2)
+    }
+  }
+)
 ```
 
 ## Break-even quote surface $Q^*(\mu, T)$
