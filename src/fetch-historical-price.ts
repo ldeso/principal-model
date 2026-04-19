@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   if (!apiKey) {
     console.warn(
       "ALCHEMY_API_KEY not set; writing empty kvcm-historical.json. " +
-        "The phase-c 'Historical' button will be inert.",
+        "The Summary page's 'Historical' button will be inert.",
     );
     writeOutput({
       address: ADDRESS,

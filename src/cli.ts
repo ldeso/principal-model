@@ -269,8 +269,8 @@ const QSTAR_TS = [0.25, 0.5, 1, 2, 3];
 
 // Canonical Merton overlay used to verify research-note.md §6: the compensated
 // drift keeps every closed-form *mean* identical to the GBM anchor even with
-// fat, negatively-biased jumps. Fixed parameters so the Phase B verification
-// table is stable across reruns.
+// fat, negatively-biased jumps. Fixed parameters so the Validation-page
+// verification table is stable across reruns.
 const JUMP_CHECK: { lambdaJ: number; muJ: number; sigmaJ: number } = {
   lambdaJ: 3,
   muJ: -0.1,

@@ -302,8 +302,8 @@ derived = {
 ```{ojs}
 //| echo: false
 // Self-contained comparison MC for the drawn-curve table. Drift and
-// variance are fixed at the Phase C defaults; open Phase C to vary
-// them. nPaths / nSteps are hardcoded at Phase C's defaults too.
+// variance are fixed at the Simulator's defaults; open the Simulator
+// to vary them. nPaths / nSteps are hardcoded at those defaults too.
 run = {
   const inputs = {
     S0: derived.S0, mu: 0.05, sigma: Math.sqrt(0.25), P,

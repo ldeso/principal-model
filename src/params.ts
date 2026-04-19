@@ -50,8 +50,8 @@ export interface Params {
 
 // Defaults for μ, σ, λ_J, μ_J, σ_J are calibrated from the kVCM daily series
 // in report/data/kvcm-historical.json via a 5σ-bulk Merton split (the "low
-// volume / low liquidity" regime of Phase A). S0, P, Q, f, λ, T, α remain at
-// their scale-free research-note values so the closed-form identities in
+// volume / low liquidity" regime of the model). S0, P, Q, f, λ, T, α remain
+// at their scale-free research-note values so the closed-form identities in
 // test/models.test.ts stay numerically convenient.
 export const defaultParams: Params = {
   S0: 1.0,

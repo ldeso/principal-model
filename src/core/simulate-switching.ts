@@ -56,8 +56,9 @@ export interface SwitchingResult {
   /** Composed P&L Π_{3e} = α·N·(Q − P·S0) + (1−α)(1−β)·Π_sw + π_loaded. */
   pnlSamples: Float64Array;
   /** Per-path stochastic leg Π_sw^{(1-α)} = Q·λ·τ − P·λ·I_τ + f_post·P·λ·J_τ
-   *  (before composition with α, β). Exposed so Phase B and tests can read
-   *  the switching formula directly without re-deriving it from pnlSamples. */
+   *  (before composition with α, β). Exposed so the Validation page and
+   *  tests can read the switching formula directly without re-deriving it
+   *  from pnlSamples. */
   stochLegSamples: Float64Array;
   /** Same-seed §3b reference: Q·N − P·λ·I_T. */
   b2bSamples: Float64Array;

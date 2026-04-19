@@ -496,11 +496,11 @@ the landing page links here rather than duplicating it.
 
 | Baseline simplification | Removed in |
 | --- | --- |
-| Deterministic demand | Phase C — compound-Poisson order flow |
-| GBM price dynamics | Phase C — Merton jump-diffusion implemented (§6); two-state regime switching pending |
-| No historical calibration | Phase C — kVCM proxy (KLIMA, BCT, NCT) |
-| No discounting, gas, or on-chain slippage | Phase C — parameterised |
-| Static (or absent) hedging | Phase C — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d; barrier-triggered mode switching is now in §3e (one-way and non-adaptive; two-way switching and adaptive/optimal-$h$ remain pending) |
+| Deterministic demand | Simulator — compound-Poisson order flow |
+| GBM price dynamics | Simulator — Merton jump-diffusion implemented (§6); two-state regime switching pending |
+| No historical calibration | Simulator — kVCM proxy (KLIMA, BCT, NCT) |
+| No discounting, gas, or on-chain slippage | Simulator — parameterised |
+| Static (or absent) hedging | Simulator — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d; barrier-triggered mode switching is now in §3e (one-way and non-adaptive; two-way switching and adaptive/optimal-$h$ remain pending) |
 | No credit / counterparty layer | Not scoped (§3d treats syndication as default-free; tranching remains out of scope — non-linear in $I_T$, would break the closed-form backbone) |
 
 ## References
