@@ -21,6 +21,9 @@ This is **Phase A** of a three-phase roadmap:
 | $f$ | Fee rate (e.g. 0.05) |
 | $Q$ | Fixed USD quote per tonne in the principal model |
 | $\alpha \in [0, 1]$ | Fraction of inventory pre-purchased (principal, generalized) |
+| $\beta \in [0, 1]$ | Fraction of the $(1-\alpha)$ stochastic leg ceded to a third-party counterparty (§3d) |
+| $\pi$ | Up-front premium received for ceding $\beta \cdot (1-\alpha)$ of the book |
+| $\theta \geq 0$ | Counterparty risk-load multiplier (§3d) |
 
 **Price dynamics.** $S_t$ follows Geometric Brownian Motion under the physical measure:
 
@@ -155,6 +158,52 @@ $$
 
 $\alpha$ is the company's hedge ratio against spot. $\alpha = 1$ gives a deterministic P&L (fully hedged at inception); $\alpha = 0$ is the unhedged short-forward strip.
 
+### 3d. Quota-share syndication ($\beta \in [0, 1]$)
+
+§3c is an **internal** hedge — the intermediary trades capital ($\alpha \cdot N \cdot P \cdot S_0$ at inception) for variance reduction on its own balance sheet. It does not address the §5 asymmetry observation that follows: at $Q = Q^*$ the principal book inherits the shared $I_T$ kernel with a *minus* sign, so mean preservation buys a left-skewed loss tail. Raising $\alpha$ contracts that tail, but every unit of contraction costs a unit of capital tied up in kVCM at $t = 0$.
+
+Quota-share syndication is the complementary primitive. At $t = 0$ the intermediary sells a share $\beta \in [0, 1]$ of the $(1 - \alpha)$ stochastic leg to an external counterparty in exchange for an up-front premium $\pi$. No capital is tied up: the counterparty simply receives $\beta \cdot (1 - \alpha) \cdot \Pi_{\mathrm{b2b}}$ at $T$ against the premium paid at $0$. The matched slice has zero variance, so syndicating it is vacuous and $\beta$ touches the stochastic leg only.
+
+**Retained P&L.** Combining §3a and §3b net of the ceded fraction,
+
+$$
+\Pi_{\mathrm{ret}} = \alpha \cdot N \cdot (Q - P \cdot S_0) + (1 - \alpha)(1 - \beta) \cdot \bigl( Q \cdot N - P \cdot \lambda \cdot I_T \bigr) + \pi.
+$$
+
+This is still **linear in $I_T$**, so the Dufresne-moment backbone carries over unchanged:
+
+$$
+\mathbb{E}[\Pi_{\mathrm{ret}}] = \alpha \cdot \Pi_{\mathrm{matched}} + (1 - \alpha)(1 - \beta) \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}] + \pi,
+$$
+
+$$
+\mathrm{Var}[\Pi_{\mathrm{ret}}] = (1-\alpha)^2 (1-\beta)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}].
+$$
+
+The variance collapses as the *product* $(1-\alpha)^2 (1-\beta)^2$ — $\alpha$ and $\beta$ are multiplicatively equivalent on the variance scale, but not on the capital or counterparty scale.
+
+**Premium.** Write the per-unit-cession risk load as
+
+$$
+\rho(\theta) = \begin{cases} \theta \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}] & \text{sharpe mode}, \\ \theta \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}] \cdot \phi\!\bigl(\Phi^{-1}(0.95)\bigr)/0.05 & \text{cvar mode}, \end{cases}
+$$
+
+where $\phi, \Phi$ are the standard-normal density and CDF (the Gaussian shape factor evaluates to $\approx 2.063$). Then
+
+$$
+\pi(\alpha, \beta, \theta) = \beta \cdot (1 - \alpha) \cdot \bigl( \mathbb{E}[\Pi_{\mathrm{b2b}}] - \rho(\theta) \bigr).
+$$
+
+Both modes keep $\pi$ a closed-form scalar, so the retained-variance identity above is **exact** under Monte Carlo (no sample-moment dependence). $\theta = 0$ yields the actuarially fair premium $\pi_{\mathrm{fair}} = \beta(1-\alpha) \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}]$, at which $\mathbb{E}[\Pi_{\mathrm{ret}}] = \mathbb{E}[\Pi_\alpha]$ independently of $\beta$ (no free lunch: mean preservation across cession levels). $\theta > 0$ buys the counterparty a risk premium — the intermediary sacrifices expected P&L in exchange for tail contraction.
+
+The CVaR mode is a **Gaussian-approximate** surrogate — $I_T$ is not log-normal and its true tail is heavier than Gaussian, so Monte Carlo is authoritative for the retained book's tail metrics (CVaR₉₅, skew, $\mathbb{P}[\Pi_{\mathrm{ret}} < 0]$). The Gaussian-CVaR factor lets the sharpe and cvar modes be compared on a common SD unit.
+
+**$Q^*$ invariance.** $Q^* = (1 + f) \cdot P \cdot S_0 \cdot (e^{\mu T} - 1)/(\mu T)$ is defined by $\mathbb{E}[R_{\mathrm{fee}}] = \mathbb{E}[\Pi_{\mathrm{b2b}}]$, which predates the cession. Hence $Q^\ast$ is invariant in $\beta$ — the break-even quote is unaffected by how the principal book is syndicated.
+
+**Capital vs. counterparty exposure.** $\alpha$ and $\beta$ are **orthogonal** along two balance-sheet dimensions: $\alpha$ consumes capital $\alpha N P S_0$ at $t = 0$ and eliminates spot beta on its slice; $\beta$ consumes no capital but exposes the intermediary to counterparty credit risk (scoped out here, consistent with §7). The two-dimensional $(\alpha, \beta)$ surface Pareto-dominates either axis alone for any counterparty who prices $\theta < \theta_{\mathrm{max}}$.
+
+**Tranching is out of scope.** A first-loss / senior split would price the ceded leg as $\max(L - K, 0)$ — non-linear in $I_T$, breaking the Dufresne-moment backbone. It belongs in a separate MC-only note and is not part of this extension.
+
 ## 4. Risk quantification
 
 For each model, the Phase B simulator should report:
@@ -186,13 +235,14 @@ This is the handle for Phase C hedging: the natural static hedge for the princip
 
 ## 5. Direct comparison
 
-| | Fee-based | Principal 3a (matched) | Principal 3b (back-to-back) |
-| --- | --- | --- | --- |
-| $\mathbb{E}[\Pi]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ |
-| $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ |
-| kVCM exposure | long | none (terminal), long (interim NAV) | short |
-| Downside | bounded below by 0 | deterministic | unbounded |
-| Capital requirement | none | $N \cdot P \cdot S_0$ | none |
+| | Fee-based | Principal 3a (matched) | Principal 3b (back-to-back) | Principal 3d (syndicated) |
+| --- | --- | --- | --- | --- |
+| $\mathbb{E}[\Pi]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $\mathbb{E}[\Pi_\alpha] - \beta(1-\alpha)\rho(\theta)$ |
+| $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $(1-\alpha)^2(1-\beta)^2 (P \lambda)^2 \cdot \mathrm{Var}[I_T]$ |
+| kVCM exposure | long | none (terminal), long (interim NAV) | short | short, scaled by $(1-\beta)$ |
+| Downside | bounded below by 0 | deterministic | unbounded | unbounded, scaled by $(1-\beta)$ |
+| Capital requirement | none | $N \cdot P \cdot S_0$ | none | $\alpha \cdot N \cdot P \cdot S_0$ |
+| Counterparty exposure | none | none | none | $\beta \cdot (1-\alpha) \cdot P \cdot \lambda \cdot I_T$ upside (if counterparty defaults) |
 
 ### Break-even quote
 
@@ -291,8 +341,8 @@ This table is the authoritative scope statement for the programme; the landing p
 | GBM price dynamics | Phase C — Merton jump-diffusion implemented (§6); two-state regime switching pending |
 | No historical calibration | Phase C — kVCM proxy (KLIMA, BCT, NCT) |
 | No discounting, gas, or on-chain slippage | Phase C — parameterized |
-| Static (or absent) hedging | Phase C — dynamic delta hedge with inventory; perp/futures hedge if available |
-| No credit / counterparty layer | Not scoped |
+| Static (or absent) hedging | Phase C — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d |
+| No credit / counterparty layer | Not scoped (§3d treats syndication as default-free; tranching remains out of scope — non-linear in $I_T$, would break the closed-form backbone) |
 
 ## References
 

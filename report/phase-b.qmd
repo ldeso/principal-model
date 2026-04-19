@@ -74,11 +74,15 @@ Same conventions as [Phase A](phase-a.qmd) §1–§5.
 | $f$ | fee rate | dimensionless |
 | $Q$ | fixed USD quote per tonne (principal model) | USD / tonne |
 | $\alpha \in [0,1]$ | pre-purchase (hedge) fraction — $0$ back-to-back, $1$ fully matched | dimensionless |
+| $\beta \in [0,1]$ | quota-share cession of the $(1-\alpha)$ stochastic leg (§3d) | dimensionless |
+| $\theta \geq 0$ | counterparty risk-load multiplier (§3d) | dimensionless |
+| $\pi$ | up-front syndication premium | USD |
 | $I_T := \int_0^T S_t\,dt$ | area under the price curve — the shared random kernel | (USD/kVCM)·year |
 | $R_{\mathrm{fee}} = f \cdot P \cdot \lambda \cdot I_T$ | fee revenue (always $\geq 0$) | USD |
 | $\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$ | back-to-back P&L ($\alpha=0$) | USD |
 | $\Pi_{\mathrm{matched}} = N \cdot (Q - P \cdot S_0)$ | matched P&L ($\alpha=1$, deterministic) | USD |
 | $\Pi_\alpha = (1-\alpha) \cdot \Pi_{\mathrm{b2b}} + \alpha \cdot \Pi_{\mathrm{matched}}$ | partial-hedge P&L | USD |
+| $\Pi_{\mathrm{ret}} = \alpha \cdot \Pi_{\mathrm{matched}} + (1-\alpha)(1-\beta) \cdot \Pi_{\mathrm{b2b}} + \pi$ | retained P&L after syndication (§3d) | USD |
 | $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T}-1)/(\mu T)$ | break-even quote equating $\mathbb{E}[\Pi_{\mathrm{b2b}}] = \mathbb{E}[R_{\mathrm{fee}}]$ | USD / tonne |
 
 {{< include _alpha-bridge.qmd >}}
@@ -516,6 +520,200 @@ Plot.plot({
     Plot.ruleY([0]),
     Plot.line(byAlpha, { x: "alpha", y: d => d.partial.cvar95, stroke: "#35a", strokeWidth: 2 }),
     Plot.dot(byAlpha, { x: "alpha", y: d => d.partial.cvar95, fill: "#35a", r: 4 })
+  ]
+})
+```
+
+## §3d — Quota-share syndication ($\beta$)
+
+Phase A §3d adds a second dimension $\beta \in [0, 1]$ — the fraction of
+the $(1 - \alpha)$ stochastic leg ceded to a third-party counterparty
+for an up-front premium $\pi$. The retained P&L
+
+$$
+\Pi_{\mathrm{ret}} = \mathbb{E}[\Pi_\alpha] + (1 - \alpha)(1 - \beta) \cdot (\Pi_{\mathrm{b2b}} - \mathbb{E}[\Pi_{\mathrm{b2b}}])
+$$
+
+(at the fair premium, $\theta = 0$) is an affine rescaling of
+$\Pi_{\mathrm{b2b}}$ with slope $(1-\alpha)(1-\beta)$ around
+$\mathbb{E}[\Pi_\alpha]$. The figures below derive the reshape from the
+sweep cells' $\Pi_{\mathrm{b2b}}$ statistics — **no new Monte Carlo is
+needed** because the affine identity pushes every quantile, CVaR, and
+mean through a closed-form map. The Gaussian CVaR shape factor used by
+the `cvar` premium mode is $\phi(\Phi^{-1}(0.95))/0.05 \approx 2.063$.
+
+```{ojs}
+//| echo: false
+viewof pickSigma = Inputs.select(sweep.grid.sigmas, { value: sweep.grid.sigmas[1], label: "volatility σ" })
+```
+
+```{ojs}
+//| echo: false
+viewof pickTheta = Inputs.range([0, 1], { step: 0.05, value: 0, label: "counterparty load θ" })
+```
+
+```{ojs}
+//| echo: false
+viewof pickMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
+```
+
+### Retained CVaR₉₅ vs $\beta$ across hedge ratios $\alpha$
+
+At the selected $(\mu, \sigma, \theta)$, the retained-book tail collapses
+linearly with $(1-\beta)$ for each $\alpha$ — the two axes multiply into
+$(1-\alpha)(1-\beta)$, so the top and bottom lines of this plot are
+$\alpha = 0$ (back-to-back, no internal hedge) and $\alpha = 1$ (fully
+matched, deterministic before syndication). Moving $\theta$ up shifts
+every curve *downward* by $\beta(1-\alpha) \cdot \rho(\theta)$ — the
+risk premium the intermediary pays the counterparty.
+
+```{ojs}
+//| echo: false
+gaussianCvar95 = 2.062713055949736
+```
+
+```{ojs}
+//| echo: false
+betaGrid = Array.from({ length: 21 }, (_, i) => i / 20)
+```
+
+```{ojs}
+//| echo: false
+retainedCvarCurves = {
+  // E[Π_α] = α · matched + (1-α) · E[Π_b2b]; at θ=0 the cession is mean-preserving.
+  // CVaR95(Π_ret) = (1-α)(1-β)·cvar95(b2b) − (1-α)·β·mean(b2b) − α·matched
+  //                 + β(1-α)·loadFactor·sd(b2b)·θ   (θ load is an extra loss to the
+  //                 intermediary and therefore adds to -E[Π_ret]).
+  const loadFactor = pickMode === "cvar" ? gaussianCvar95 : 1;
+  const rows = [];
+  for (const alpha of sweep.grid.alphas) {
+    for (const beta of betaGrid) {
+      const cell = sweep.cells.find(c => c.alpha === alpha && c.mu === pickMu && c.sigma === pickSigma);
+      if (!cell) continue;
+      const b2bMean = cell.b2b.mean;
+      const b2bCvar = cell.b2b.cvar95;
+      const b2bSd = cell.b2b.sd;
+      const matchedMean = cell.matched.mean;
+      // Identity derived from Π_ret = E[Π_α] + (1-α)(1-β)·(Π_b2b − E[Π_b2b]) + (π_loaded − π_fair).
+      // The last term is −β(1-α)·θ·loadFactor·sd(b2b); it translates the distribution.
+      const fairCvar = (1 - alpha) * (1 - beta) * b2bCvar
+                      - (1 - alpha) * beta * b2bMean
+                      - alpha * matchedMean;
+      const loadShift = beta * (1 - alpha) * pickTheta * loadFactor * b2bSd;
+      rows.push({ alpha, beta, cvar: fairCvar + loadShift });
+    }
+  }
+  return rows;
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 380,
+  marginLeft: 80,
+  marginBottom: 55,
+  grid: true,
+  caption: "Retained CVaR₉₅ at the selected (μ, σ, θ). Each line is one α from the sweep grid; β sweeps 0→1. The collapse is linear in (1-β) for every α, and θ > 0 shifts curves upward (more tail loss) because the intermediary pays away mean.",
+  x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
+  y: { label: "CVaR95 of Π_ret   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  color: { legend: true, label: "hedge ratio α", domain: sweep.grid.alphas, scheme: "viridis", type: "ordinal" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(retainedCvarCurves, { x: "beta", y: "cvar", stroke: "alpha", strokeWidth: 2 }),
+  ]
+})
+```
+
+### Fair vs loaded premium across retention
+
+At fixed $\alpha = 0$ (pure back-to-back) the fair premium is
+$\pi_{\mathrm{fair}} = \beta \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}]$ —
+linear in $\beta$. Raising $\theta$ carves the loaded premium downward
+proportionally to $\beta \cdot \rho(\theta)$; the gap between the two
+curves is the risk premium the counterparty extracts.
+
+```{ojs}
+//| echo: false
+premiumCurves = {
+  const loadFactor = pickMode === "cvar" ? gaussianCvar95 : 1;
+  const cell0 = sweep.cells.find(c => c.alpha === 0 && c.mu === pickMu && c.sigma === pickSigma);
+  if (!cell0) return [];
+  const thetaLevels = [0, 0.25, 0.5, 1];
+  const rows = [];
+  for (const theta of thetaLevels) {
+    for (const beta of betaGrid) {
+      const piFair = beta * cell0.b2b.mean;
+      const piLoaded = piFair - beta * theta * loadFactor * cell0.b2b.sd;
+      rows.push({ theta: `θ = ${theta}`, beta, pi: piLoaded, isFair: theta === 0 });
+    }
+  }
+  return rows;
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 360,
+  marginLeft: 90,
+  marginBottom: 55,
+  grid: true,
+  caption: "Premium paid to the intermediary as a function of β, for a handful of θ values. θ = 0 is the actuarially fair premium (the straight blue line). Larger θ carves the curve down — the intermediary surrenders expected P&L to tighten the retained tail.",
+  x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
+  y: { label: "premium π   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  color: { legend: true, label: "load θ" },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.line(premiumCurves, { x: "beta", y: "pi", stroke: "theta", strokeWidth: 2 }),
+  ]
+})
+```
+
+### Expected-P&L cost of syndication
+
+At $\theta = 0$ the mean is invariant in $\beta$ — that is the "no free
+lunch" identity. At $\theta > 0$ the intermediary pays the counterparty
+a premium strictly below fair; the shortfall appears directly on its
+expected P&L. This plot is $\mathbb{E}[\Pi_{\mathrm{ret}}] -
+\mathbb{E}[\Pi_\alpha]$ at $\alpha = 0$ as a function of $\beta$, one
+curve per load level.
+
+```{ojs}
+//| echo: false
+meanShiftCurves = {
+  const loadFactor = pickMode === "cvar" ? gaussianCvar95 : 1;
+  const cell0 = sweep.cells.find(c => c.alpha === 0 && c.mu === pickMu && c.sigma === pickSigma);
+  if (!cell0) return [];
+  const thetaLevels = [0, 0.25, 0.5, 1];
+  const rows = [];
+  for (const theta of thetaLevels) {
+    for (const beta of betaGrid) {
+      const shift = -beta * theta * loadFactor * cell0.b2b.sd;
+      rows.push({ theta: `θ = ${theta}`, beta, shift });
+    }
+  }
+  return rows;
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 860,
+  height: 320,
+  marginLeft: 90,
+  marginBottom: 55,
+  grid: true,
+  caption: "Expected-P&L cost of syndication as a function of β, at α = 0. The θ = 0 curve is the flat no-free-lunch line at zero; larger θ carves linearly downward.",
+  x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
+  y: { label: "E[Π_ret] − E[Π_α]   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  color: { legend: true, label: "load θ" },
+  marks: [
+    Plot.ruleY([0], { stroke: "#888", strokeDasharray: "2 4" }),
+    Plot.line(meanShiftCurves, { x: "beta", y: "shift", stroke: "theta", strokeWidth: 2 }),
   ]
 })
 ```

@@ -18,6 +18,15 @@ export interface Params {
   /** Pre-purchase fraction for 3c ∈ [0, 1]; α = 1 ↔ 3a, α = 0 ↔ 3b. */
   alpha: number;
 
+  /** §3d external cession fraction of the (1−α) stochastic leg; 0 ⇒ no
+   *  syndication and Π_ret ≡ Π_α. */
+  beta: number;
+  /** §3d counterparty risk-load multiplier θ ≥ 0. θ = 0 ⇒ fair premium. */
+  premiumLoad: number;
+  /** §3d load basis: `"sharpe"` multiplies θ·SD[Π_b2b]; `"cvar"` multiplies
+   *  the Gaussian-CVaR95 proxy ≈ 2.063·SD[Π_b2b]. */
+  premiumMode: "sharpe" | "cvar";
+
   /** Merton jump intensity (expected jumps per unit time). 0 ⇒ pure GBM. */
   lambdaJ: number;
   /** Mean of log-jump size. */
@@ -45,6 +54,10 @@ export const defaultParams: Params = {
   f: 0.05,
   Q: 1.08,
   alpha: 0.5,
+
+  beta: 0,
+  premiumLoad: 0,
+  premiumMode: "sharpe",
 
   lambdaJ: 20,
   muJ: -0.05,

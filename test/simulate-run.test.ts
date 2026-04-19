@@ -102,4 +102,44 @@ describe("simulateRun — Phase C custom-principal book", () => {
     expect(rZero.tokensUsedInternal).toBe(0);
     expect(rZero.tokensLeftover).toBe(0);
   });
+
+  it("β = 0 collapses retained to principal and emits zero premium", () => {
+    const r = simulateRun({ ...base, kPre: 50_000, cBasis: 4_000, beta: 0 });
+    expect(r.premium).toBe(0);
+    for (let i = 0; i < r.principalSamples.length; i++) {
+      expect(r.retainedSamples[i]).toBeCloseTo(r.principalSamples[i] as number, 12);
+    }
+  });
+
+  it("β = 1 at θ = 0 freezes retained at (det-shift + fair premium)", () => {
+    // Ceding the full stochastic residual at the fair price collapses
+    // variance; mean equals Q·N − C_basis + β·E[stochastic residual].
+    const p = { ...base, nPaths: 5_000, kPre: 80_000, cBasis: 6_000, beta: 1 };
+    const r = simulateRun(p);
+    const s = summarize(r.retainedSamples);
+    expect(s.variance).toBeLessThan(1e-12);
+    // stochMean is the MC mean of (principal − (Q·N − cBasis)); at β = 1 the
+    // retained sample equals (Q·N − cBasis) + stochMean, which is exactly
+    // the sample mean of principalSamples.
+    const principalMean = summarize(r.principalSamples).mean;
+    expect(s.mean).toBeCloseTo(principalMean, 6);
+  });
+
+  it("CVaR-mode premium differs from Sharpe-mode by the Gaussian factor at θ > 0", () => {
+    // Same seed/params ⇒ same MC tape ⇒ same stochastic moments; only the
+    // load factor (1 vs. GAUSS) differs between modes.
+    const GAUSS = 2.062713055949736;
+    const shared = { ...base, nPaths: 4_000, seed: 777, kPre: 60_000, cBasis: 3_000 };
+    const rFair = simulateRun({ ...shared, beta: 0.4, premiumLoad: 0 });
+    const rSharpe = simulateRun({
+      ...shared, beta: 0.4, premiumLoad: 0.6, premiumMode: "sharpe",
+    });
+    const rCvar = simulateRun({
+      ...shared, beta: 0.4, premiumLoad: 0.6, premiumMode: "cvar",
+    });
+    expect(rSharpe.premium).toBeLessThan(rFair.premium);
+    const loadSharpe = rFair.premium - rSharpe.premium;
+    const loadCvar = rFair.premium - rCvar.premium;
+    expect(loadCvar / loadSharpe).toBeCloseTo(GAUSS, 8);
+  });
 });

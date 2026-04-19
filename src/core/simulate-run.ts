@@ -25,6 +25,12 @@ export interface SimulateRunInputs {
   kPre: number;
   /** Sunk cost basis of the pre-purchase. */
   cBasis: number;
+  /** §3d external cession fraction of the residual stochastic leg. Default 0. */
+  beta?: number;
+  /** §3d counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
+  premiumLoad?: number;
+  /** §3d risk-measure basis for the load. Default `"sharpe"`. */
+  premiumMode?: "sharpe" | "cvar";
   /** Merton jump intensity. 0 ⇒ pure GBM. */
   lambdaJ?: number;
   /** Mean of log-jump size. */
@@ -42,6 +48,10 @@ export interface SimulateRunResult {
   feeSamples: Float64Array;
   principalSamples: Float64Array;
   b2bSamples: Float64Array;
+  /** §3d retained P&L after quota-share syndication of the residual leg. */
+  retainedSamples: Float64Array;
+  /** §3d loaded premium applied to `retainedSamples` (MC-moment derived). */
+  premium: number;
   ITSamples: Float64Array;
   terminalS: Float64Array;
   sampledPaths: Float64Array[];
@@ -53,9 +63,13 @@ export interface SimulateRunResult {
   N: number;
 }
 
+// §3d Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
+const GAUSSIAN_CVAR95_FACTOR = 2.062713055949736;
+
 export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
   const {
     S0, mu, sigma, P, lambda, T, Q, fee, kPre, cBasis,
+    beta = 0, premiumLoad = 0, premiumMode = "sharpe",
     lambdaJ = 0, muJ = 0, sigmaJ = 0,
     nPaths, nSteps, seed,
     keepPaths = 0,
@@ -110,10 +124,42 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     if (i < keep) sampledPaths.push(S);
   }
 
+  // §3d quota-share on the residual stochastic leg. Phase B uses a
+  // closed-form premium because Π_α is linear in I_T; Phase C's custom
+  // inventory has no clean closed-form counterpart (the matched slice mixes
+  // τ_frac with a sunk basis), so we price the cession from this run's own
+  // MC sample moments. With nPaths ≥ 5000 the estimator is tight enough for
+  // the slider feedback loop. `cBasis` is the deterministic translation of
+  // the principal book, so the stochastic residual is principal − (Q·N − cBasis).
+  const detShift = Q * N - cBasis;
+  let stochMean = 0;
+  for (let i = 0; i < nPaths; i++) {
+    stochMean += (principalSamples[i] as number) - detShift;
+  }
+  stochMean /= nPaths;
+  let stochVar = 0;
+  for (let i = 0; i < nPaths; i++) {
+    const d = (principalSamples[i] as number) - detShift - stochMean;
+    stochVar += d * d;
+  }
+  stochVar = nPaths > 1 ? stochVar / (nPaths - 1) : 0;
+  const stochSd = Math.sqrt(stochVar);
+  const loadFactor = premiumMode === "cvar" ? GAUSSIAN_CVAR95_FACTOR : 1;
+  const piFair = beta * stochMean;
+  const premium = piFair - beta * premiumLoad * loadFactor * stochSd;
+
+  const retainedSamples = new Float64Array(nPaths);
+  for (let i = 0; i < nPaths; i++) {
+    retainedSamples[i] =
+      detShift + (1 - beta) * ((principalSamples[i] as number) - detShift) + premium;
+  }
+
   return {
     feeSamples,
     principalSamples,
     b2bSamples,
+    retainedSamples,
+    premium,
     ITSamples,
     terminalS,
     sampledPaths,

@@ -25,6 +25,8 @@ earlier at a different price can be studied directly, lifting Phase B's
 
 {{< include _alpha-bridge.qmd >}}
 
+{{< include _beta-bridge.qmd >}}
+
 {{< include _glossary.qmd >}}
 
 ### Notation
@@ -55,9 +57,13 @@ $k_{\mathrm{left}}$, and $\Pi_{\mathrm{cust}}$.
 | $k_{\mathrm{left}} := \max(0,\; k - N \cdot P)$ | leftover tokens at horizon (over-hedge) | kVCM |
 | $I_T := \int_0^T S_t\,dt$ | full-horizon time-integral of the price | (USD/kVCM)·year |
 | $J_\tau := \int_{\tau T}^{T} S_t\,dt$ | tail integral over the uncovered-by-inventory window | (USD/kVCM)·year |
+| $\beta \in [0,1]$ | quota-share cession of the custom book's stochastic residual (§3d) | dimensionless |
+| $\theta \geq 0$ | counterparty risk-load multiplier (§3d) | dimensionless |
+| $\pi$ | up-front syndication premium; scalar derived from the MC moments of this run | USD |
 | $R_{\mathrm{fee}} = f \cdot P \cdot \lambda \cdot I_T$ | fee-based revenue | USD |
 | $\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$ | back-to-back principal P&L | USD |
 | $\Pi_{\mathrm{cust}} = Q \cdot N - C_{\mathrm{basis}} - P \cdot \lambda \cdot J_\tau + k_{\mathrm{left}} \cdot S_T$ | custom-inventory principal P&L | USD |
+| $\Pi_{\mathrm{ret}} = (Q \cdot N - C_{\mathrm{basis}}) + (1-\beta) \cdot (\Pi_{\mathrm{cust}} - (Q \cdot N - C_{\mathrm{basis}})) + \pi$ | retained P&L after syndication (§3d) | USD |
 | $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T}-1)/(\mu T)$ | break-even quote equating $\mathbb{E}[\Pi_{\mathrm{b2b}}] = \mathbb{E}[R_{\mathrm{fee}}]$ | USD / tonne |
 
 :::: {.pc-section}
@@ -181,6 +187,33 @@ viewof Q = Inputs.range([0, 1000], { step: 0.5, value: 180, label: "fixed quote 
 viewof fee = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fee rate f" })
 ```
 
+### Syndication (§3d)
+
+Quota-share cession of the custom book's stochastic residual to a
+third-party counterparty. $\beta$ is the fraction ceded; $\theta$ is
+the counterparty's risk-load (0 = actuarially fair premium). The
+premium mode selects the risk measure θ multiplies — `sharpe`
+multiplies $\theta \cdot \mathrm{SD}$, `cvar` multiplies $\theta \cdot
+\mathrm{SD} \cdot \phi(\Phi^{-1}(0.95))/0.05 \approx \theta \cdot
+\mathrm{SD} \cdot 2.063$. Variance of the retained book collapses as
+$(1-\beta)^2$ on top of the $(1-\tau)^2$ collapse already bought by
+internal coverage.
+
+```{ojs}
+//| echo: false
+viewof beta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "cession β" })
+```
+
+```{ojs}
+//| echo: false
+viewof theta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "counterparty load θ" })
+```
+
+```{ojs}
+//| echo: false
+viewof premiumMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
+```
+
 ### Monte Carlo
 
 Knobs for the simulator itself — how many random trajectories, how
@@ -211,6 +244,7 @@ mcResetButton = {
     lambdaJ: 20, muJ: -0.05, sigmaJ: 0.35,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
+    beta: 0, theta: 0, premiumMode: "sharpe",
     nPaths: 5000, nSteps: 100, seed: 42,
   };
   const views = {
@@ -218,6 +252,7 @@ mcResetButton = {
     lambdaJ: viewof lambdaJ, muJ: viewof muJ, sigmaJ: viewof sigmaJ,
     lambdaDay: viewof lambdaDay, kPre: viewof kPre, cBasis: viewof cBasis,
     Tdays: viewof Tdays, Q: viewof Q, fee: viewof fee,
+    beta: viewof beta, theta: viewof theta, premiumMode: viewof premiumMode,
     nPaths: viewof nPaths, nSteps: viewof nSteps, seed: viewof seed,
   };
   const wrap = document.createElement("div");
@@ -351,6 +386,7 @@ run = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
     Q, fee, kPre, cBasis,
+    beta, premiumLoad: theta, premiumMode,
     lambdaJ, muJ, sigmaJ,
     nPaths, nSteps, seed,
     keepPaths: 20,
@@ -364,6 +400,7 @@ run = {
     fee: summarise(raw.feeSamples),
     principal: summarise(raw.principalSamples),
     b2b: summarise(raw.b2bSamples),
+    retained: summarise(raw.retainedSamples),
     elapsedMs,
   };
 }
@@ -376,6 +413,10 @@ html`<div class="phase-c-derived">
   <div class="card"><div class="label">wall time</div><div class="value">${run.elapsedMs.toFixed(1)} ms</div></div>
   <div class="card"><div class="label">coverage this run</div><div class="value">${(run.tauFrac * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">leftover tokens at T</div><div class="value">${run.tokensLeftover.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">cession β</div><div class="value">${(beta * 100).toFixed(0)}%</div></div>
+  <div class="card"><div class="label">premium π received</div><div class="value">${(run.premium >= 0 ? "$" : "−$") + Math.abs(run.premium).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">retained CVaR₉₅</div><div class="value">${(run.retained.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.retained.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">SD reduction vs. principal</div><div class="value">${run.principal.sd > 0 ? (100 * (1 - run.retained.sd / run.principal.sd)).toFixed(1) + "%" : "—"}</div></div>
 </div>`
 ```
 
@@ -418,6 +459,7 @@ per-tonne figure. What to watch as sliders move:
 summaryRows = [
   { book: "fee", ...run.fee },
   { book: "principal (custom)", ...run.principal },
+  { book: "principal (retained, §3d)", ...run.retained },
   { book: "principal (back-to-back)", ...run.b2b },
 ]
 ```
@@ -478,6 +520,7 @@ pnlRecords = {
   for (let i = 0; i < run.feeSamples.length; i += stride) {
     rows.push({ book: "fee", pnl: run.feeSamples[i] });
     rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
+    rows.push({ book: "principal (retained, §3d)", pnl: run.retainedSamples[i] });
     rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
   }
   return rows;
@@ -488,7 +531,7 @@ pnlRecords = {
 //| echo: false
 Plot.plot({
   width: 900,
-  height: 440,
+  height: 560,
   marginLeft: 80,
   marginRight: 30,
   marginBottom: 50,
@@ -496,7 +539,7 @@ Plot.plot({
   x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
   y: { label: "empirical density" },
   fy: { label: "book" },
-  color: { legend: true, domain: ["fee","principal (custom)","principal (back-to-back)"] },
+  color: { legend: true, domain: ["fee","principal (custom)","principal (retained, §3d)","principal (back-to-back)"] },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -504,6 +547,7 @@ Plot.plot({
     Plot.ruleX([
       { book: "fee", x: run.fee.mean },
       { book: "principal (custom)", x: run.principal.mean },
+      { book: "principal (retained, §3d)", x: run.retained.mean },
       { book: "principal (back-to-back)", x: run.b2b.mean },
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
@@ -512,7 +556,9 @@ Plot.plot({
 
 _Solid black: MC-estimated $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$. The
 custom-principal panel collapses toward a spike as coverage approaches
-100% — that's the §3a matched book limit._
+100% — that's the §3a matched book limit. The retained panel sits on
+top of the custom panel at $\beta = 0$ and collapses to a spike as
+$\beta \to 1$ — that is the §3d syndication limit._
 
 ### Sample price paths and inventory decay
 

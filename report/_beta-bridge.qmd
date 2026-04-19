@@ -1,0 +1,38 @@
+::: {.callout-note appearance="simple"}
+## Phase B vs. Phase C: how syndication is parameterised
+
+Phase B's §3d specifies the external cession as a single ratio
+$\beta \in [0, 1]$ — the share of the $(1 - \alpha)$ stochastic leg
+sold to a third-party counterparty at $t = 0$. The retained P&L is
+linear in $I_T$ and every closed-form moment carries over from §3a–§3c.
+
+Phase C applies $\beta$ to the **residual stochastic leg of the custom
+book** rather than to an idealised $(1 - \alpha)$ slice: the Phase C
+coverage is $\tau = \min(1, k / (N \cdot P))$, not $\alpha$, so the
+deterministic shift is $(Q \cdot N - C_{\mathrm{basis}})$ and the
+residual carries everything else — the uncovered-tail integral
+$J_\tau$ and, when the inventory is over-sized, the terminal
+mark-to-spot $k_{\mathrm{left}} \cdot S_T$. Ceding $\beta$ of that
+residual gives
+
+$$
+\Pi_{\mathrm{ret}}
+  = (Q \cdot N - C_{\mathrm{basis}})
+  + (1 - \beta) \cdot \bigl( \Pi_{\mathrm{cust}} - (Q \cdot N - C_{\mathrm{basis}}) \bigr)
+  + \pi.
+$$
+
+| Phase B | Phase C equivalent |
+| --- | --- |
+| $\beta$ | $\beta$ (same symbol) |
+| Ceded mass $\beta \cdot (1-\alpha) \cdot \Pi_{\mathrm{b2b}}$ | Ceded mass $\beta \cdot (\Pi_{\mathrm{cust}} - (Q \cdot N - C_{\mathrm{basis}}))$ |
+| Premium $\pi = \beta(1-\alpha)\bigl(\mathbb{E}[\Pi_{\mathrm{b2b}}] - \rho(\theta)\bigr)$ | Premium $\pi = \beta \bigl(\mathbb{E}[\mathrm{residual}] - \rho(\theta) \cdot \mathrm{SD}[\mathrm{residual}]\bigr)$ |
+| Closed-form premium (Dufresne moments) | MC-moment-derived premium (custom inventory has no clean closed form) |
+
+The MC-moment premium is the deliberate Phase C choice: with the
+custom-inventory specification there is no closed-form shortcut for
+$\mathbb{E}[\Pi_{\mathrm{cust}}]$ in the over-hedged regime, so the
+premium is priced off the same sample tape the histograms are drawn
+from. The counterparty's pricing model is therefore *consistent with
+whatever the slider produces* — a useful stress-test lens.
+:::

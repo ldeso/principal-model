@@ -10,11 +10,15 @@ import { defaultParams, withOverrides } from "./params.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(HERE, "..", "report", "data");
 
-const FLAG_TO_PARAM: Record<string, keyof Params> = {
+type NumericParamKey = Exclude<keyof Params, "premiumMode">;
+
+const FLAG_TO_PARAM: Record<string, NumericParamKey> = {
   seed: "seed",
   paths: "nPaths",
   steps: "nSteps",
   alpha: "alpha",
+  beta: "beta",
+  theta: "premiumLoad",
   mu: "mu",
   sigma: "sigma",
   Q: "Q",
@@ -43,6 +47,13 @@ function parseArgs(argv: string[]): CliArgs {
     const key = tok.slice(2);
     const val = argv[++i];
     if (val === undefined) throw new Error(`missing value for --${key}`);
+    if (key === "premiumMode") {
+      if (val !== "sharpe" && val !== "cvar") {
+        throw new Error(`--premiumMode must be "sharpe" or "cvar"`);
+      }
+      overrides.premiumMode = val;
+      continue;
+    }
     const field = FLAG_TO_PARAM[key];
     if (!field) throw new Error(`unknown flag --${key}`);
     overrides[field] = Number(val);
@@ -114,6 +125,15 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
       `  q99=${fmt(report.drawdown.var99)}` +
       `  max=${fmt(report.drawdown.max)}`,
   );
+
+  if (params.beta > 0 || params.premiumLoad > 0) {
+    console.log(
+      `\n§3d — Syndication  β=${params.beta}  θ=${params.premiumLoad}` +
+        `  mode=${params.premiumMode}` +
+        `  π_fair=${fmt(report.syndication.premiumFair)}` +
+        `  π_loaded=${fmt(report.syndication.premiumLoaded)}`,
+    );
+  }
 
   console.log(`\n§5 — Break-even quote  Q* = ${fmt(report.closed.QStar, 4)}`);
   console.log(

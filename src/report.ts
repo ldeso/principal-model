@@ -46,7 +46,15 @@ export interface Report {
     fee: number[];
     b2b: number[];
     partial: number[];
+    retained: number[];
     navDrawdown: number[];
+  };
+  syndication: {
+    beta: number;
+    premiumLoad: number;
+    premiumMode: "sharpe" | "cvar";
+    premiumFair: number;
+    premiumLoaded: number;
   };
 }
 
@@ -127,6 +135,7 @@ export function buildReport(
     makeRow("fee", closed.fee.mean, closed.fee.sd, mc.fee),
     makeRow("principal_3b", closed.b2b.mean, closed.b2b.sd, mc.b2b),
     makeRow("principal_3c", closed.partial.mean, closed.partial.sd, mc.partial),
+    makeRow("principal_3d", closed.retained.mean, closed.retained.sd, mc.retained),
   ];
   // 3a is deterministic: closed-form with zero variance, no MC row.
   rows.unshift({
@@ -174,7 +183,15 @@ export function buildReport(
       fee: subsample(mc.fee, traceSize),
       b2b: subsample(mc.b2b, traceSize),
       partial: subsample(mc.partial, traceSize),
+      retained: subsample(mc.retained, traceSize),
       navDrawdown: subsample(mc.navDrawdowns, traceSize),
+    },
+    syndication: {
+      beta: params.beta,
+      premiumLoad: params.premiumLoad,
+      premiumMode: params.premiumMode,
+      premiumFair: closed.premium.fair,
+      premiumLoaded: closed.premium.loaded,
     },
   };
 }
