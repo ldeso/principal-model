@@ -15,61 +15,6 @@ subtitle: "Revenue and risk for a carbon-retirement intermediary"
 </style>
 ```
 
-::: {.side-panel-right}
-```{=html}
-<aside class="side-panel glossary-sidebar">
-<details open>
-<summary>Glossary</summary>
-<dl>
-  <dt>Operating book</dt>
-  <dd>A zero-capital book: P&amp;L(0) = 0, every tonne sourced at
-  spot. Four flavours — fee, b2b, retained (syndicated-on-b2b),
-  switching.</dd>
-
-  <dt>Fee</dt>
-  <dd>Quote <code>(1 + f) · P · S<sub>t</sub></code>, remit the
-  protocol price, keep the markup <code>f · P · S<sub>t</sub></code>.
-  Revenue <code>≥ 0</code> by construction.</dd>
-
-  <dt>b2b (back-to-back)</dt>
-  <dd>Quote a fixed <code>Q</code>, source each tonne at spot. Short
-  kVCM beta over <code>[0, T]</code>; upside capped, downside
-  unbounded.</dd>
-
-  <dt>Retained (syndicated)</dt>
-  <dd>Cede a fraction <code>β</code> of b2b to a counterparty
-  against an up-front premium. Variance collapses as
-  <code>(1 − β)²</code>.</dd>
-
-  <dt>Switching</dt>
-  <dd>Flip pricing from <code>Q</code> to a fee book when
-  <code>S<sub>t</sub></code> first crosses an upper barrier
-  <code>h · S<sub>0</sub></code>. Truncates the loss tail rather
-  than rescaling it.</dd>
-
-  <dt>Treasury</dt>
-  <dd>Active consuming inventory, parameterised by pre-purchased
-  tokens <code>k</code> and sunk basis <code>C<sub>basis</sub></code>.
-  Feeds retirement at spot over <code>[0, min(T, k/(P·λ))]</code>;
-  leftover tokens are marked at <code>S<sub>T</sub></code>. Opens at
-  MTM <code>k · S<sub>0</sub> − C<sub>basis</sub></code>.</dd>
-
-  <dt>Desk total</dt>
-  <dd>Any strategy = operating book + treasury. Matched desk =
-  <code>b2b + treasury(N·P, N·P·S<sub>0</sub>)</code> is
-  deterministic <code>N(Q − P·S<sub>0</sub>)</code>: <code>I<sub>T</sub></code>
-  cancels between b2b's stochastic leg and the treasury's
-  consumption.</dd>
-
-  <dt><code>Q*</code></dt>
-  <dd>The fixed quote at which fee and b2b share expected revenue.
-  Matching means does <em>not</em> match distributions.</dd>
-</dl>
-</details>
-</aside>
-```
-:::
-
 A carbon-retirement intermediary retires carbon credits for its
 clients by buying kVCM tokens on the open market and burning them.
 Two pricing choices frame the business: pass the token cost through
@@ -97,31 +42,40 @@ not carry.
 
 ### The treasury cancels b2b's $I_T$ term when fully matched
 
-Buying the full $N P$ tokens at $t = 0$ gives a treasury whose
-consumption integral contributes $+ P \lambda I_T$ to desk P&L —
-exactly opposite to b2b's $- P \lambda I_T$. The sum collapses to
-the deterministic $N(Q - P S_0)$. Partial pre-purchase
-$(k, C_{\mathrm{basis}})$ leaves a tail $J_\alpha = \int_{\alpha T}^T
-S_t \, dt$ uncancelled; the desk SD shrinks with the length of the
-covered window, and $C_{\mathrm{basis}}$ translates the distribution
-without changing its shape. Quota-share syndication of the b2b
-operating book is a second, multiplicative dial: variance collapses
-as $(1 - \beta)^2$, and at the fair premium ($\theta = 0$) cession
-preserves expected P&L. Risk managers should track coverage and
-cession separately from the unrealised P&L on held tokens.
+With retirement flow $\lambda$ tonnes per unit time and total tonnes
+$N = \lambda T$, buying the full $N P$ tokens at $t = 0$ gives a
+treasury whose consumption integral contributes $+ P \lambda I_T$ to
+desk P&L — exactly opposite to b2b's $- P \lambda I_T$. The sum
+collapses to the deterministic $N(Q - P S_0)$. Partial pre-purchase
+$(k, C_{\mathrm{basis}})$ — inventory notional $k$ in kVCM and sunk
+USD basis $C_{\mathrm{basis}}$ — leaves a tail $J_\alpha =
+\int_{\alpha T}^T S_t \, dt$ uncancelled, where the coverage fraction
+$\alpha = \min(1, k / (N P))$ is the share of retirements the
+treasury can source from inventory; the desk SD shrinks with the
+length of the covered window $[0, \alpha T]$, and $C_{\mathrm{basis}}$
+translates the distribution without changing its shape. Quota-share
+syndication of the b2b operating book is a second, multiplicative
+dial: ceding a fraction $\beta$ to a counterparty against an up-front
+premium collapses variance as $(1 - \beta)^2$, and at the actuarially
+fair premium (counterparty risk load $\theta = 0$) cession preserves
+expected P&L. Risk managers should track coverage and cession
+separately from the unrealised P&L on held tokens.
 
 ### A barrier truncates the tail rather than rescaling it
 
 Pre-buying and syndication multiply the loss tail by a constant.
-Switching pricing to the fee book when the token crosses $H = h \cdot
-S_0$ caps every post-barrier retirement at non-negative fee revenue,
-so the tail is bounded rather than scaled. Under the default
-calibration, $h = 1.25$ collapses CVaR₉₅ from ≈ \$3,900 to ≈ \$49
-($\approx 80\times$) while *raising* expected P&L. The three levers
-— capital (via the treasury), counterparty credit (β), market
-timing ($h$) — compose multiplicatively and consume distinct
-resources; together they close the asymmetry the first finding
-identifies.
+Switching pricing to the fee book when the token crosses the upper
+barrier $H = h \cdot S_0$ (with barrier multiple $h \ge 1$) caps every
+post-barrier retirement at non-negative fee revenue, so the tail is
+bounded rather than scaled. Under the default calibration, $h = 1.25$
+collapses $\mathrm{CVaR}_{95}$ — the mean loss in the worst 5 % of
+paths — from ≈ \$3,900 to ≈ \$49 ($\approx 80\times$) while *raising*
+expected P&L. The three levers — capital (via the treasury),
+counterparty credit ($\beta$), market timing ($h$) — compose
+multiplicatively and consume distinct resources; together they close
+the asymmetry the first finding identifies. Every symbol above is
+defined in the [Model page's setup and notation
+section](model.qmd#setup-and-notation).
 
 ---
 
@@ -139,12 +93,18 @@ been fetched.
 ::: {.callout-note appearance="simple"}
 ## How the drawn curve enters the books
 
-Your samples define a base path. Setting
-$\sigma^2_{\mathrm{noise}} > 0$ layers an accumulated log-normal shock
-on top, seeded by the PRNG slider for reproducibility. $I_T$, the
-coverage-uncovered tail integral, and the switching split $I_\tau,
-J_\tau$ are taken by trapezoid rule over the realised path, and
-$S_T$ is the last sample — the same quantities every book on the
+Your samples define a base path. The noise slider sets
+$\sigma^2_{\mathrm{noise}} \ge 0$, the annualised variance of an
+additive log-normal shock layered on top of the base curve (a
+robustness dial distinct from the GBM volatility $\sigma$ that drives
+the comparison Monte Carlo); $\sigma^2_{\mathrm{noise}} > 0$ activates
+the overlay, seeded by the PRNG slider for reproducibility. From the
+realised path we compute $I_T$, the coverage-uncovered tail integral
+$J_\alpha = \int_{\alpha T}^T S_t \, dt$, the switching split $I_\tau
+= \int_0^\tau S_t \, dt$ and $J_\tau = \int_\tau^T S_t \, dt$ — where
+$\tau$ is the first time the realised path crosses $H = h \cdot S_0$,
+or $T$ if it never does — all by trapezoid rule, and $S_T$ as the
+last sample. These are the same quantities every book on the
 [Simulator](simulator.qmd) consumes. Leave noise at zero to read
 deterministic P&L off the curve; raise it to see how robust a
 narrative is to typical day-to-day jitter.
@@ -203,8 +163,8 @@ buildDate = {
 
 Inventory, contract, horizon, and the price process (drift, variance,
 and optional Merton jumps) driving the comparison Monte Carlo. Jumps
-are off by default ($\lambda_J = 0$); see the
-[Simulator](simulator.qmd) for a wider-ranging sweep.
+are off by default — Poisson jump intensity $\lambda_J = 0$ jumps per
+year; see the [Simulator](simulator.qmd) for a wider-ranging sweep.
 
 ### Price process
 

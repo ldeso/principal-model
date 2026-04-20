@@ -20,53 +20,6 @@ format:
 </style>
 ```
 
-::: {.side-panel-right}
-```{=html}
-<aside class="side-panel scorecard-sidebar">
-<details open>
-<summary>Reading the validation plots</summary>
-<dl>
-  <dt><code>z = (MC − cf) / stderr</code></dt>
-  <dd><code>|z| ≤ 2</code> is sampling noise; <code>|z| &gt; 3</code>
-  points at a simulator bug.</dd>
-
-  <dt><code>±CI<sub>95</sub> = 1.96 · SD / √n</code></dt>
-  <dd>95% half-width of the MC mean. Shrinks as
-  <code>1 / √n<sub>paths</sub></code>.</dd>
-
-  <dt>Variance ratio</dt>
-  <dd>Fee and b2b satisfy
-  <code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P / f)²</code>
-  — algebraic, not statistical.</dd>
-
-  <dt>Retained SD scaling</dt>
-  <dd><code>SD[Π<sub>ret</sub>] = (1 − β) · SD[Π<sub>b2b</sub>]</code>
-  at the operating layer. The α scaling moves to the desk
-  composition `retained + treasury`.</dd>
-
-  <dt>Matched desk determinism</dt>
-  <dd><code>b2b + treasury(N·P, N·P·S<sub>0</sub>)</code>
-  = <code>N(Q − P·S<sub>0</sub>)</code> path-by-path. The <em>I<sub>T</sub></em>
-  cancellation is the core identity.</dd>
-
-  <dt>VaR / CVaR on the fee book</dt>
-  <dd>Read as "low end of revenue", not loss — fee revenue is
-  <code>≥ 0</code> by construction.</dd>
-
-  <dt>Merton row</dt>
-  <dd>Expect <code>|z| ≲ 2</code> against the GBM closed form
-  (compensation is firing) and SD (merton) strictly above SD (gbm).
-  Flat SD means the overlay is inert.</dd>
-
-  <dt>Switching row</dt>
-  <dd>Closed-form columns are <code>NaN</code> — no closed-form
-  density. Compare MC tails directly to the b2b anchor.</dd>
-</dl>
-</details>
-</aside>
-```
-:::
-
 The closed-form identities on the [Model](model.qmd) page are the
 anchors of this page, and the simulator is the instrument. Each
 section below takes one identity — a mean, a variance ratio, a
@@ -77,12 +30,19 @@ same view. All computation runs in TypeScript under `src/` and emits
 the JSON this page reads; regenerate with `npm run simulate -- --seed
 42 && npm run sweep -- --seed 42`.
 
-The sidebar spells out the scorecard conventions in full; in short,
-the $z$ column is the primary sanity check ($|z| \le 2$ healthy,
-$|z| > 3$ points at a bug), and the variance ratio $(P/f)^2$ between
-b2b and fee is algebraic — any disagreement there is a bug, not a
-sampling artifact. P&L is the horizon total in USD; divide by $N =
-\lambda T$ for a per-tonne figure.
+The scorecard convention: the $z$ column is the primary sanity check
+($|z| \le 2$ healthy, $|z| > 3$ points at a simulator bug), and the
+variance ratio $\mathrm{Var}[\Pi_{\mathrm{b2b}}] /
+\mathrm{Var}[R_{\mathrm{fee}}] = (P/f)^2$ between b2b and fee is
+algebraic — any disagreement there is a bug, not a sampling artifact.
+The matched-desk identity $b2b + \mathrm{treasury}(N P, N P S_0) =
+N (Q - P S_0)$ is pathwise deterministic, and the syndicated
+operating book satisfies $\mathrm{SD}[\Pi_{\mathrm{ret}}] = (1 -
+\beta) \, \mathrm{SD}[\Pi_{\mathrm{b2b}}]$ exactly; both are regression
+oracles in this page. P&L is the horizon total in USD; divide by $N =
+\lambda T$ for a per-tonne figure. All risk-metric definitions live
+on [Model →
+Risk metrics](model.qmd#risk-metrics).
 
 ## One parameter setting, full distributions
 
@@ -143,11 +103,11 @@ comparable.
 | $\mathbb{E}[\Pi]$ (cf) / (mc) | closed-form and Monte Carlo mean |
 | $\pm \mathrm{CI}_{95}$ | 95% half-width of the MC mean, $1.96 \cdot \mathrm{SD} / \sqrt{n}$ |
 | SD (cf) / (mc) | closed-form and MC standard deviation |
-| $z$ | $(\mathrm{MC} - \mathrm{cf}) / \mathrm{stderr}$ — primary sanity check |
-| $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | loss thresholds at 5% / 1% |
+| $z$ | $(\mathbb{E}_{\mathrm{mc}}[\Pi] - \mathbb{E}_{\mathrm{cf}}[\Pi]) / \mathrm{stderr}$ — primary sanity check |
+| $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | loss thresholds at the 5% / 1% quantile, reported as positive USD (on the fee book: "low end of revenue" — $R_{\mathrm{fee}} \ge 0$ by construction) |
 | $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | tail-mean losses inside those thresholds |
 | $\mathbb{P}[\Pi < 0]$ | probability of a losing realisation |
-| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ — $f$-invariant on the fee book |
+| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ — horizon-absolute (not annualised); $f$-invariant on the fee book |
 
 </div>
 
@@ -268,7 +228,9 @@ compensation $-\lambda_J \kappa$ with $\kappa = e^{\mu_J + \sigma_J^2
 t}$. Variances should not — jumps genuinely fatten the tail. The
 table below checks both at a canonical overlay ($\lambda_J = 3$/yr,
 $\mu_J = -0.1$, $\sigma_J = 0.15$) by comparing the overlay's MC
-moments against the GBM closed form.
+moments against the GBM closed form. Expect $|z| \lesssim 2$ against
+the GBM closed form (compensation firing) and SD (merton) strictly
+above SD (gbm); a flat SD column means the overlay is inert.
 
 ```{ojs}
 //| echo: false
@@ -773,7 +735,9 @@ rate $f_{\mathrm{post}}$ the first time $S_t$ crosses $H = h \cdot
 S_0$ (stopping time $\tau$). See [the switching book in the
 model](model.qmd#switching-book) for the formulae. No closed-form
 density exists — $\tau$ is a stopping time — so Monte Carlo is
-authoritative. Under pure GBM the Harrison (1985) first-passage
+authoritative: on the scorecard the switching row prints closed-form
+columns as `NaN` and is compared directly against the b2b anchor on
+the tail metrics. Under pure GBM the Harrison (1985) first-passage
 distribution gives $\mathbb{P}[\tau \le T]$ and
 $\mathbb{E}[\tau \wedge T]$ as test oracles; Merton jumps inflate
 $\mathbb{P}[\tau \le T]$ and shorten $\mathbb{E}[\tau \wedge T]$.

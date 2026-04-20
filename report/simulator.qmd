@@ -3,50 +3,6 @@ title: "Simulator"
 subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
 ---
 
-::: {.side-panel-right}
-```{=html}
-<aside class="side-panel notation-sidebar">
-<details open>
-<summary>Simulator notation</summary>
-<p>Symbols introduced on the
-<a href="model.qmd#setup-and-notation">Model page</a>. The Simulator
-admits raw inventory state and splits the desk into operating books
-and an active treasury:</p>
-<dl>
-  <dt><code>k</code>, <code>C<sub>basis</sub></code></dt>
-  <dd>Pre-purchased inventory (kVCM) and its sunk USD cost — the
-  treasury's two parameters.</dd>
-
-  <dt><code>τ = min(T, k / (P·λ))</code></dt>
-  <dd>Inventory-exhaustion time; the treasury feeds retirement at
-  spot over <code>[0, τ]</code>.</dd>
-
-  <dt><code>k<sub>left</sub> = max(0, k − N · P)</code></dt>
-  <dd>Over-hedge tokens; marked at <code>S<sub>T</sub></code>.</dd>
-
-  <dt>Treasury P&amp;L</dt>
-  <dd><code>P·λ·∫₀<sup>τ</sup> S<sub>t</sub> dt + k<sub>left</sub>·S<sub>T</sub> − C<sub>basis</sub></code>.
-  Opens at MTM <code>k·S₀ − C<sub>basis</sub></code>.</dd>
-
-  <dt>Operating books</dt>
-  <dd>All start at <code>P&amp;L(0) = 0</code>, all source tonnes at
-  spot: fee, b2b, retained (syndicated-on-b2b), switching.</dd>
-
-  <dt>Desk totals</dt>
-  <dd>Any strategy = one operating book + treasury, sample-wise.
-  The <em>custom desk</em> is <code>b2b + treasury</code> at the
-  slider's <code>(k, C<sub>basis</sub>)</code>.</dd>
-
-  <dt>Jump sliders</dt>
-  <dd>Set <code>λ<sub>J</sub> = 0</code> for pure GBM; otherwise the
-  process is compensated Merton, so means survive but SD / VaR / CVaR
-  inflate.</dd>
-</dl>
-</details>
-</aside>
-```
-:::
-
 Every slider on this page kicks off a fresh Monte Carlo in your
 browser; the [Model](model.qmd) page defines the symbols. Two
 things are slightly different here. First, the desk is split into
@@ -379,6 +335,12 @@ html`<div class="derived-stats">
 </div>`
 ```
 
+When the barrier slider sits below 3 the switching book is active; the
+diagnostic cards below report $\mathbb{P}[\tau < T]$ (empirical switch
+probability over the MC paths) and $\mathbb{E}[\tau \wedge T]$
+(expected barrier-crossing time, with $a \wedge b := \min(a, b)$ so
+paths that never cross contribute $T$).
+
 ```{ojs}
 //| echo: false
 html`${(isFinite(barrierRatio) && barrierRatio < 3)
@@ -409,7 +371,7 @@ switching row appears only when the barrier slider sits below 3.
 | $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | 5% / 1% loss thresholds |
 | $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | tail-mean losses inside those thresholds |
 | $\mathbb{P}[\Pi < 0]$ | probability of a losing realisation |
-| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ |
+| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ (horizon-absolute, not annualised) |
 
 P&L is the USD total over $[0, T]$; divide by $N = \lambda T$ for a
 per-tonne figure. Three things to watch as you sweep:

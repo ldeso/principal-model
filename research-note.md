@@ -25,35 +25,110 @@ source of randomness. The kVCM spot is modelled as Geometric Brownian
 Motion,
 
 $$
-dS_t = \mu \, S_t \, dt + \sigma \, S_t \, dW_t, \qquad S_0 \text{ given.}
+dS_t = \mu \, S_t \, dt + \sigma \, S_t \, dW_t,
+\qquad S_0 \text{ given (equal to } \pi_0 / P \text{ where } \pi_0
+\text{ is the market carbon price per tonne at } t = 0\text{).}
 $$
 
 The carbon price per tonne $\pi_t := P \cdot S_t$ inherits the same
-$(\mu, \sigma)$.
+$(\mu, \sigma)$. The meet operator $a \wedge b := \min(a, b)$ recurs
+below in stopping times.
+
+*Price process.*
 
 | Symbol | Meaning |
 | --- | --- |
 | $S_t$ | kVCM spot price at time $t$ (USD / kVCM) |
-| $P$ | Protocol constant — kVCM required per tonne |
+| $S_0$ | Initial kVCM spot at $t = 0$; $S_0 = \pi_0 / P$ |
+| $\pi_0$ | Initial carbon price per tonne (USD) — market input |
 | $\pi_t = P \cdot S_t$ | Carbon price per tonne (USD) |
+| $\mu$ | GBM drift coefficient (annualised) |
+| $\sigma$ | GBM volatility coefficient (annualised) |
+| $W_t$ | Standard Brownian motion driving the GBM |
+| $\mathcal{F}_t$ | Filtration — information available up to time $t$ |
+
+*Contract and demand.*
+
+| Symbol | Meaning |
+| --- | --- |
+| $P$ | Protocol constant — kVCM required per tonne |
 | $\lambda$ | Retirement flow (tonnes / unit time), deterministic |
 | $T$ | Horizon |
 | $N = \lambda T$ | Total tonnes retired over $[0, T]$ |
 | $f$ | Fee rate (e.g. $0.05$) |
 | $Q$ | Fixed USD quote per tonne under the principal book |
+
+*Treasury.*
+
+| Symbol | Meaning |
+| --- | --- |
 | $k$ | Treasury's initial token notional (kVCM) |
 | $C_{\mathrm{basis}}$ | Sunk USD cost of the treasury's opening position |
 | $\alpha = \min(1, k / (N P))$ | Coverage fraction derived from $(k, P, \lambda, T)$ |
 | $\tau_{\mathrm{cov}} = \min(T, k / (P \lambda))$ | Inventory-exhaustion time |
+
+*Syndication.*
+
+| Symbol | Meaning |
+| --- | --- |
 | $\beta \in [0, 1]$ | Ceded fraction of the b2b operating book |
 | $\theta \ge 0$ | Counterparty risk load |
 | $\pi_{\mathrm{syn}}$ | Up-front syndication premium (USD) |
+
+*Switching.*
+
+| Symbol | Meaning |
+| --- | --- |
 | $h \ge 1$ | Barrier multiple — switching book flips at $S_t = h \cdot S_0$ |
 | $\tau$ | Switching stopping time |
 | $f_{\mathrm{post}}$ | Fee rate applied after the switch fires |
 
+*Jumps (compensated Merton overlay; details in §[Jumps](#compensated-merton-jump-diffusion)).*
+
+| Symbol | Meaning |
+| --- | --- |
+| $\lambda_J$ | Poisson jump intensity (arrivals / yr) |
+| $\mu_J$ | Mean log-jump size |
+| $\sigma_J$ | Log-jump standard deviation |
+| $\kappa = e^{\mu_J + \sigma_J^2 / 2} - 1$ | Merton compensation |
+
 All P&L figures are **totals over $[0, T]$** in USD; divide by $N$ for
-a per-tonne reading.
+a per-tonne reading. $\mathbb{E}[\cdot]$, $\mathrm{Var}[\cdot]$,
+$\mathrm{SD}[\cdot] := \sqrt{\mathrm{Var}[\cdot]}$,
+$\mathrm{Cov}[\cdot, \cdot]$, and $\mathbb{P}[\cdot]$ carry their
+standard probability-theory meanings.
+
+### Risk metrics {#risk-metrics}
+
+Tail-risk vocabulary used throughout the note and on every downstream
+page:
+
+$$
+\mathrm{VaR}_p[\Pi] := -\inf\{ x : \mathbb{P}[\Pi \le x] \ge 1 - p \}
+\qquad \text{(loss threshold at the $p$ quantile, reported as a positive USD figure),}
+$$
+
+$$
+\mathrm{CVaR}_p[\Pi] := \mathbb{E}\!\left[ -\Pi \;\middle|\; \Pi \le -\mathrm{VaR}_p[\Pi] \right]
+\qquad \text{(mean loss conditional on landing in the worst $1 - p$ fraction of paths),}
+$$
+
+$$
+\mathrm{Sharpe}[\Pi] := \frac{\mathbb{E}[\Pi]}{\mathrm{SD}[\Pi]}
+\qquad \text{(horizon-absolute, not annualised, not risk-free-rate adjusted),}
+$$
+
+$$
+z := \frac{\mathbb{E}_{\mathrm{mc}}[\Pi] - \mathbb{E}_{\mathrm{cf}}[\Pi]}{\mathrm{stderr}}
+\qquad \text{(MC-vs-closed-form sanity check; $|z| \le 2$ is sampling noise, $|z| > 3$ points at a bug).}
+$$
+
+The $\pm\mathrm{CI}_{95} = 1.96 \cdot \mathrm{SD} / \sqrt{n}$ half-width
+accompanies every Monte-Carlo mean. Conventions specific to individual
+books: $\mathrm{Sharpe}[R_{\mathrm{fee}}]$ is invariant in the fee rate
+$f$, and $\mathrm{VaR}_p, \mathrm{CVaR}_p$ on the fee book read as
+"low end of revenue" rather than loss ($R_{\mathrm{fee}} \ge 0$ by
+construction).
 
 ### The kernel that runs through everything
 
