@@ -127,24 +127,48 @@ nav#TOC > ul { font-size: 0.82rem; }
   grid-column: auto !important;
 }
 
-/* Wide viewports: pin each side-panel column to the edge of the window.
+/* Wide viewports: park each side-panel beside the centred body column and
+   let it stick while scrolling. position: sticky preserves the panel's
+   natural flow position (so a .side-panel-left declared next to the
+   section it controls lands beside that section on first paint, instead
+   of jumping to the top of the viewport) and then pins it at
+   --side-top once that threshold scrolls past. Because the panel lives
+   inside main.content (max-width: --content-w, margin-inline: auto),
+   `calc(var(--side-offset) - 50vw + 50%)` offsets from main.content's
+   centred left edge to the viewport edge — the same position the old
+   `left: var(--side-offset)` produced under position: fixed. Floating
+   removes the panel from block flow so the next in-flow section (the
+   one it's meant to sit beside) starts at the panel's own top rather
+   than below it.
+
    Reserve equal padding on both sides of #quarto-content, unconditionally,
    so the centred main column is the same width on every page — whether it
    carries a .side-panel-left, Quarto's TOC sidebar, or nothing at all. */
 @media (min-width: 1400px) {
   .side-panel-left,
-  .side-panel-right,
-  #quarto-sidebar {
-    position: fixed !important;
+  .side-panel-right {
+    position: sticky !important;
     top: var(--side-top);
     width: var(--side-w);
     max-height: calc(100vh - var(--side-top) - 1rem);
     overflow-y: auto;
     z-index: 500;
   }
-  .side-panel-left,
-  #quarto-sidebar { left:  var(--side-offset); }
-  .side-panel-right { right: var(--side-offset); }
+  .side-panel-left  { float: left;  margin-left:  calc(var(--side-offset) - 50vw + 50%); }
+  .side-panel-right { float: right; margin-right: calc(var(--side-offset) - 50vw + 50%); }
+
+  /* Quarto's own TOC sidebar is not declared inline in markdown — it's
+     rendered outside main.content — so it can't use sticky-from-flow and
+     stays on the fixed-to-viewport path. */
+  #quarto-sidebar {
+    position: fixed !important;
+    top: var(--side-top);
+    left: var(--side-offset);
+    width: var(--side-w);
+    max-height: calc(100vh - var(--side-top) - 1rem);
+    overflow-y: auto;
+    z-index: 500;
+  }
 
   /* Stack wrapper: multiple cards share one pinned column. */
   .side-panel-stack {
