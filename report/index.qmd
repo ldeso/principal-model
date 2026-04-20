@@ -15,12 +15,6 @@ subtitle: "Revenue and risk for a carbon-retirement intermediary"
 </style>
 ```
 
-::: {.side-panel-right .side-panel-stack}
-{{< include _findings.qmd >}}
-{{< include _glossary.qmd >}}
-{{< include _stress-presets.qmd >}}
-:::
-
 A carbon-retirement intermediary buys carbon tokens (kVCM) on the open
 market and burns them to retire carbon credits on behalf of clients.
 It can charge a **fee** — a markup on the live token price — or quote

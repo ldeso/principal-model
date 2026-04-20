@@ -4,33 +4,24 @@
 <summary>Glossary</summary>
 <dl>
   <dt><code>S<sub>t</sub></code>, <code>P</code></dt>
-  <dd>Token spot price (USD/kVCM) and protocol constant (kVCM / tonne retired).
-  Per-tonne USD protocol price is <code>π<sub>t</sub> = P · S<sub>t</sub></code>.</dd>
+  <dd>Token spot (USD/kVCM) and protocol constant (kVCM/tonne).
+  Carbon price: <code>π<sub>t</sub> = P·S<sub>t</sub></code>.</dd>
 
   <dt><code>I<sub>T</sub> = ∫₀<sup>T</sup> S<sub>t</sub> dt</code></dt>
-  <dd>Area under the price curve. The shared random kernel: fee revenue is
-  linear in <code>I<sub>T</sub></code>, back-to-back P&amp;L is affine in
-  <code>I<sub>T</sub></code>.</dd>
+  <dd>Shared random kernel. Fee revenue enters with +, principal books with −.</dd>
 
-  <dt>Coverage <code>τ<sub>cov</sub></code></dt>
+  <dt>Coverage <code>τ</code></dt>
   <dd>Fraction of the horizon pre-bought inventory lasts,
-  <code>min(1, k / (N·P))</code>. The Model calls the same dial
-  <code>α</code>; the Simulator derives it from <code>(k, C<sub>basis</sub>)</code>.</dd>
-
-  <dt>Stopping time <code>τ</code> (switching)</dt>
-  <dd>First time <code>S<sub>t</sub></code> crosses the upper barrier
-  <code>H = h · S<sub>0</sub></code>, truncated at <code>T</code>. Distinct from
-  the coverage fraction above: this one carries units of time.</dd>
+  <code>min(1, k/(N·P))</code>. Model calls this <code>α</code>.</dd>
 
   <dt>VaR<sub>95</sub> / CVaR<sub>95</sub></dt>
-  <dd>Loss threshold at the 5% quantile of <code>−Π</code> / mean loss inside
-  that 5% tail. CVaR is the informative figure once a tail is fat or skewed.
-  On the fee book these are "low end of revenue", not loss.</dd>
+  <dd>5% loss threshold / mean loss inside that tail.
+  On the fee book: "low end of revenue", not loss.</dd>
 
-  <dt>Fee book / principal book</dt>
-  <dd>Fee: markup <code>f · π<sub>t</sub></code> per tonne, no inventory.
-  Principal: fixed quote <code>Q</code>, five variants — Matched,
-  Back-to-back, Partial, Syndicated, Switching.</dd>
+  <dt>Fee / principal book</dt>
+  <dd>Fee: markup <code>f·π<sub>t</sub></code>, no inventory.
+  Principal: fixed quote <code>Q</code>, five variants (matched,
+  back-to-back, partial, syndicated, switching).</dd>
 </dl>
 </details>
 </aside>
