@@ -108,7 +108,7 @@ export function summarise(samples: ArrayLike<number>): FullSummary {
   };
 }
 
-/** §3a NAV shortfall against the deterministic decay schedule:
+/** Matched-book NAV shortfall against the deterministic decay schedule:
  *   shortfall_t = max(0, N · P · (1 − k/N_steps) · (S_0 − S_k)).
  *
  * The research note's literal V_0 − V_t is pinned to V_0 by the V_T = 0 burn

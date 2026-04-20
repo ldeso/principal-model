@@ -33,9 +33,9 @@ in this baseline; the sole source of randomness is the token price.
 | $f$ | Fee rate (e.g. 0.05) |
 | $Q$ | Fixed USD quote per tonne in the principal model |
 | $\alpha \in [0, 1]$ | Fraction of inventory pre-purchased (principal, generalised) |
-| $\beta \in [0, 1]$ | Fraction of the $(1-\alpha)$ stochastic leg ceded (§3d) |
+| $\beta \in [0, 1]$ | Fraction of the $(1-\alpha)$ stochastic leg ceded (syndicated variant) |
 | $\pi$ | Up-front premium received for ceding $\beta \cdot (1-\alpha)$ of the book |
-| $\theta \geq 0$ | Counterparty risk-load multiplier (§3d) |
+| $\theta \geq 0$ | Counterparty risk-load multiplier (syndicated variant) |
 
 **Price dynamics.** $S_t$ follows Geometric Brownian Motion under the
 physical measure,
@@ -100,7 +100,7 @@ $$
 
 The intermediary fixes a USD quote $Q$ at $t = 0$. Five variants
 follow, in order of increasing complexity: the first three set the
-balance-sheet dial $\alpha$; §3d adds a counterparty dial $\beta$; §3e
+balance-sheet dial $\alpha$; the syndicated variant adds a counterparty dial $\beta$; the switching variant
 adds a dynamic switch $h$.
 
 ### 3a. Matched (fully pre-bought, $\alpha = 1$)
@@ -175,12 +175,12 @@ $$
 \mathrm{Var}[\Pi_\alpha] = (1 - \alpha)^2 \cdot \mathrm{Var}[\Pi_{\mathrm{b2b}}].
 $$
 
-$\alpha = 1$ recovers §3a (deterministic); $\alpha = 0$ recovers §3b.
+$\alpha = 1$ recovers the matched variant (deterministic); $\alpha = 0$ recovers the back-to-back variant.
 
 ### 3d. Syndicated (quota-share cession, $\beta \in [0, 1]$)
 
-§3c is an **internal** hedge: capital on the balance sheet buys
-variance reduction. §3d is the complementary primitive — sell part of
+The partial variant is an **internal** hedge: capital on the balance sheet buys
+variance reduction. The syndicated variant is the complementary primitive — sell part of
 the stochastic leg to a third-party counterparty against an up-front
 premium. No capital is tied up; the counterparty receives $\beta \cdot
 (1-\alpha) \cdot \Pi_{\mathrm{b2b}}$ at $T$ against the premium paid at
@@ -249,8 +249,8 @@ Dufresne-moment backbone. It belongs in an MC-only note.
 
 ### 3e. Switching (barrier $h \geq 1$, post-switch rate $f_{\mathrm{post}}$)
 
-§3c and §3d **rescale** the loss tail by a constant factor — they
-shrink it but cannot bound it. §3e is the first primitive that
+The partial and syndicated variants **rescale** the loss tail by a constant factor — they
+shrink it but cannot bound it. The switching variant is the first primitive that
 **truncates** it. The intuition: the principal book's left tail is
 driven by paths where $S_t$ rises materially above $S_0$. If the
 intermediary flips pricing from the fixed quote $Q$ to the fee-book
@@ -279,7 +279,7 @@ $$
 
 — back-to-back up to $\tau$, fee-book revenue after. $h \to \infty$
 gives $\tau = T$ and recovers $\Pi_{\mathrm{b2b}}$; $h \le 1$ forces
-$\tau = 0$ and recovers the §2 fee book at rate $f_{\mathrm{post}}$.
+$\tau = 0$ and recovers the fee book at rate $f_{\mathrm{post}}$.
 The post-switch rate defaults to $f$ but is a free parameter.
 
 **Composition with $\alpha$ and $\beta$.** The switch touches only the
@@ -328,8 +328,8 @@ where the second term is non-negative a.s. because the fee book is
 bounded below by $0$. Equality is not exact (CVaR is not linear in
 arbitrary partitions), but the inequality makes the claim "the barrier
 truncates the loss tail" precise: the unswitched residual is bounded
-by a vanilla §3b CVaR on its own measure; the switched residual is
-bounded by a non-negative §2 object. As $h \downarrow 1$ the first
+by a vanilla back-to-back CVaR on its own measure; the switched residual is
+bounded by a non-negative fee-book object. As $h \downarrow 1$ the first
 term's weight shrinks and the bound tightens. The simulator reports
 `CVaR95|no-switch` and `CVaR95|switched` separately for this reason.
 
@@ -338,8 +338,8 @@ and sweep $h$. $\mathbb{E}[\Pi_{3e}]$ and
 $\mathrm{CVaR}_{95}[\Pi_{3e}]$ are monotone functions of $h$ in
 opposite directions: a tighter barrier lifts the mean (fee revenue
 replaces negative-skewed b2b exposure) and tightens the tail. The
-curves' knee against the §3d reference is the operator's decision
-point. Optimal-$h$ is a control-problem formulation (scope §7); the
+curves' knee against the syndicated reference is the operator's decision
+point. Optimal-$h$ is a control-problem formulation (scope: Limitations and next steps); the
 eyeball-the-knee presentation is deliberate — matching means does not
 match distributions, and choosing a tail cap is a business decision,
 not a pricing optimum.
@@ -350,12 +350,12 @@ For each book, the simulator reports:
 
 | Metric | How |
 | --- | --- |
-| $\mathbb{E}[\Pi]$, $\mathrm{Var}[\Pi]$, $\mathrm{SD}[\Pi]$ | Closed form from §2–§3 |
+| $\mathbb{E}[\Pi]$, $\mathrm{Var}[\Pi]$, $\mathrm{SD}[\Pi]$ | Closed form from the fee-based and principal models |
 | VaR<sub>95</sub>, VaR<sub>99</sub> | Monte Carlo empirical quantile of $-\Pi$ |
 | CVaR<sub>95</sub>, CVaR<sub>99</sub> | Monte Carlo tail mean of $-\Pi$ |
 | $\mathbb{P}[\Pi < 0]$ | Monte Carlo |
 | Sharpe-like $= \mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ | Closed form |
-| Max NAV drawdown (§3a only) | Monte Carlo on $V_t$ path |
+| Max NAV drawdown (matched variant only) | Monte Carlo on $V_t$ path |
 
 ### Itô dynamics and delta
 
@@ -367,7 +367,7 @@ $$
 $$
 
 $$
-\text{Principal §3b:} \quad \frac{\partial\,\mathbb{E}[\Pi_{\mathrm{b2b}} - \Pi(t) \mid \mathcal{F}_t]}{\partial S_t} = -P \cdot \lambda \cdot \frac{e^{\mu(T-t)} - 1}{\mu} \approx -P \cdot \lambda \cdot (T - t).
+\text{Principal, back-to-back:} \quad \frac{\partial\,\mathbb{E}[\Pi_{\mathrm{b2b}} - \Pi(t) \mid \mathcal{F}_t]}{\partial S_t} = -P \cdot \lambda \cdot \frac{e^{\mu(T-t)} - 1}{\mu} \approx -P \cdot \lambda \cdot (T - t).
 $$
 
 Signs are opposite: the fee book is **long** kVCM beta; the
@@ -380,14 +380,14 @@ exactly the matched strategy amortised to the remaining horizon.
 
 ## 5. Direct comparison
 
-| | Fee-based | Matched (§3a) | Back-to-back (§3b) | Syndicated (§3d) | Switching (§3e) |
+| | Fee-based | Matched | Back-to-back | Syndicated | Switching |
 | --- | --- | --- | --- | --- | --- |
 | $\mathbb{E}[\Pi]$ | $f \cdot P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $N \cdot (Q - P \cdot S_0)$ | $Q \cdot N - P \cdot \lambda \cdot \mathbb{E}[I_T]$ | $\mathbb{E}[\Pi_\alpha] - \beta(1-\alpha)\rho(\theta)$ | MC only (no closed form) |
 | $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $0$ (terminal) | $(P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | $(1-\alpha)^2(1-\beta)^2 (P \lambda)^2 \cdot \mathrm{Var}[I_T]$ | MC only; $\le \mathrm{Var}[\Pi_{\mathrm{ret}}]$ empirically |
 | kVCM exposure | long | none (terminal), long (interim NAV) | short | short, scaled by $(1-\beta)$ | short on $[0, \tau]$, long on $[\tau, T]$ (fee leg) |
-| Downside | bounded below by 0 | deterministic | unbounded | unbounded, scaled by $(1-\beta)$ | bounded above by $\lvert Q\lambda\tau - P\lambda I_\tau \rvert$ on $\{\tau < T\}$; §3b tail on $\{\tau = T\}$ |
+| Downside | bounded below by 0 | deterministic | unbounded | unbounded, scaled by $(1-\beta)$ | bounded above by $\lvert Q\lambda\tau - P\lambda I_\tau \rvert$ on $\{\tau < T\}$; back-to-back tail on $\{\tau = T\}$ |
 | Capital requirement | none | $N \cdot P \cdot S_0$ | none | $\alpha \cdot N \cdot P \cdot S_0$ | $\alpha \cdot N \cdot P \cdot S_0$ (inherits from $\alpha$) |
-| Counterparty exposure | none | none | none | $\beta \cdot (1-\alpha) \cdot P \cdot \lambda \cdot I_T$ upside (if counterparty defaults) | same as §3d on the switched leg |
+| Counterparty exposure | none | none | none | $\beta \cdot (1-\alpha) \cdot P \cdot \lambda \cdot I_T$ upside (if counterparty defaults) | same as the syndicated variant on the switched leg |
 
 ### Break-even quote
 
@@ -469,7 +469,7 @@ Every mean-level quantity linear in $I_T$ does too:
 - $\mathbb{E}[\Pi_\alpha] = (1-\alpha) \cdot \mathbb{E}[\Pi_{\mathrm{b2b}}] + \alpha \cdot \Pi_{\mathrm{matched}}$,
 - $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T} - 1)/(\mu T)$.
 
-§3a's P&L is already pathwise-deterministic, so jumps leave it alone.
+The matched variant's P&L is already pathwise-deterministic, so jumps leave it alone.
 
 ### Variance is not
 
@@ -484,8 +484,8 @@ anchor.
 
 ### Itô deltas are unchanged in expectation
 
-The jump contribution to $\mathbb{E}[S_t]$ is zero, so §4's delta
-expressions and §3a's static hedge $(P \cdot \lambda) \cdot (T - t)$
+The jump contribution to $\mathbb{E}[S_t]$ is zero, so the
+risk-quantification delta expressions and the matched variant's static hedge $(P \cdot \lambda) \cdot (T - t)$
 carry over verbatim under compensated Merton — with fatter realised
 hedging error.
 
@@ -497,14 +497,14 @@ the landing page links here rather than duplicating it.
 | Baseline simplification | Removed in |
 | --- | --- |
 | Deterministic demand | Simulator — compound-Poisson order flow |
-| GBM price dynamics | Simulator — Merton jump-diffusion implemented (§6); two-state regime switching pending |
+| GBM price dynamics | Simulator — compensated Merton jump-diffusion implemented (see jump-diffusion section); two-state regime switching pending |
 | No historical calibration | Simulator — kVCM proxy (KLIMA, BCT, NCT) |
 | No discounting, gas, or on-chain slippage | Simulator — parameterised |
-| Static (or absent) hedging | Simulator — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in §3d; barrier-triggered mode switching is now in §3e (one-way and non-adaptive; two-way switching and adaptive/optimal-$h$ remain pending) |
-| No credit / counterparty layer | Not scoped (§3d treats syndication as default-free; tranching remains out of scope — non-linear in $I_T$, would break the closed-form backbone) |
+| Static (or absent) hedging | Simulator — dynamic delta hedge with inventory; perp/futures hedge if available; quota-share syndication is now in the syndicated variant; barrier-triggered mode switching is now in the switching variant (one-way and non-adaptive; two-way switching and adaptive/optimal-$h$ remain pending) |
+| No credit / counterparty layer | Not scoped (the syndicated variant treats syndication as default-free; tranching remains out of scope — non-linear in $I_T$, would break the closed-form backbone) |
 
 ## References
 
 - Dufresne, D. (2001). *The integral of geometric Brownian motion.* Advances in Applied Probability, 33(1), 223–241. — closed-form moments of $I_T$.
-- Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, §3.4. — simulation of path integrals of GBM.
-- Harrison, J. M. (1985). *Brownian Motion and Stochastic Flow Systems.* — first-passage distribution used as the §3e GBM test oracle.
+- Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, Section 3.4. — simulation of path integrals of GBM.
+- Harrison, J. M. (1985). *Brownian Motion and Stochastic Flow Systems.* — first-passage distribution used as the switching-variant GBM test oracle.

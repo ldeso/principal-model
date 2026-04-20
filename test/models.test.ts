@@ -35,7 +35,7 @@ describe("closed-form ↔ Monte Carlo cross-check", () => {
   });
 
   it("Var[Π_b2b] = (P · λ)² · Var[I_T], ~ (P/f)² · Var[R_fee]", () => {
-    // Research note §3b observation: the two books share the I_T kernel.
+    // Research note back-to-back observation: the two books share the I_T kernel.
     const sB = summarize(mc.b2b);
     const sF = summarize(mc.fee);
     const ratio = sB.variance / sF.variance;
@@ -113,7 +113,7 @@ describe("3a deterministic P&L", () => {
   });
 });
 
-describe("§3d quota-share syndication (β)", () => {
+describe("Syndicated variant — quota-share syndication (β)", () => {
   // Pure GBM baseline so the closed-form variance is exact under MC.
   const base = withOverrides(defaultParams, {
     nPaths: 50_000,
@@ -126,7 +126,7 @@ describe("§3d quota-share syndication (β)", () => {
 
   it("β = 0 reduces Π_ret to Π_α path-by-path", () => {
     // With no cession and zero load the retained book must coincide with the
-    // existing §3c partial book bit-for-bit; closed-form moments agree.
+    // existing partial book bit-for-bit; closed-form moments agree.
     const p = withOverrides(base, { beta: 0, premiumLoad: 0 });
     const mc = simulate(p);
     const cf = closedForm(p);

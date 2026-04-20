@@ -2,7 +2,7 @@
 <aside class="side-panel notation-sidebar">
 <details>
 <summary>Notation</summary>
-<p><a href="phase-a.qmd#setup-and-notation">The model</a> §1 covers the
+<p><a href="phase-a.qmd#setup-and-notation">The model's setup and notation section</a> covers the
 shared symbols. Simulator-specific additions:</p>
 <dl>
   <dt><code>k</code></dt>

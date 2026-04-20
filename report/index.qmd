@@ -58,11 +58,11 @@ token rallies.
    unrealised gain or loss on inventory.
 
 3. **A switch truncates the tail rather than rescaling it.**
-   Pre-buying (§3c) and quota-share syndication (§3d) multiply the
+   Pre-buying (partial variant) and quota-share syndication multiply the
    left tail by constants — they shrink it but cannot bound it. If
    the intermediary quotes $Q$ up front but keeps the option to flip
    to fee pricing the first time $S_t$ crosses an upper barrier $H =
-   h \cdot S_0$ (§3e), every path where the barrier fires has its
+   h \cdot S_0$ (switching variant), every path where the barrier fires has its
    post-barrier exposure replaced by the non-negative fee book on
    $[\tau, T]$. At $h = 1.25$ under the default calibration, CVaR₉₅
    collapses from ≈ \$3,900 to ≈ \$49 (≈ 80×) while $\mathbb{E}[\Pi]$
@@ -792,6 +792,6 @@ specific scenario compares to the average across random GBM futures._
 Baseline: GBM with an optional Merton jump-diffusion overlay and
 deterministic retirement demand. Gas, on-chain slippage, discounting,
 and credit are out of scope; the
-[§7 limitations table](phase-a.qmd#limitations-and-next-steps) is
+[limitations and next steps table](phase-a.qmd#limitations-and-next-steps) is
 authoritative on what is and isn't modelled. Treat all outputs as
 illustrative, not forecasts.

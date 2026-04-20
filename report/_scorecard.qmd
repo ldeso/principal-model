@@ -2,7 +2,7 @@
 <aside class="side-panel scorecard-sidebar">
 <details open>
 <summary>Reading the scorecard</summary>
-<p>The §4 table is the primary sanity check. Three conventions:</p>
+<p>The P&amp;L moments table is the primary sanity check. Three conventions:</p>
 <dl>
   <dt><code>z</code></dt>
   <dd><code>(MC − cf) / stderr</code>. <code>|z| ≤ 2</code> is healthy
@@ -26,7 +26,7 @@
   <dd>P&amp;L is total USD over <code>[0, T]</code>. Divide by
   <code>N = λT</code> for a per-tonne figure.</dd>
 
-  <dt>§6 Merton row</dt>
+  <dt>Merton row</dt>
   <dd>Expect <code>|z| ≲ 2</code> against the GBM closed form and
   <strong>SD (merton) &gt; SD (gbm-cf)</strong>. Flat SD means the
   overlay is inert; persistent large <code>|z|</code> means broken

@@ -25,11 +25,11 @@ export interface SimulateRunInputs {
   kPre: number;
   /** Sunk cost basis of the pre-purchase. */
   cBasis: number;
-  /** §3d external cession fraction of the residual stochastic leg. Default 0. */
+  /** Syndicated-variant external cession fraction of the residual stochastic leg. Default 0. */
   beta?: number;
-  /** §3d counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
+  /** Syndicated-variant counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
   premiumLoad?: number;
-  /** §3d risk-measure basis for the load. Default `"sharpe"`. */
+  /** Syndicated-variant risk-measure basis for the load. Default `"sharpe"`. */
   premiumMode?: "sharpe" | "cvar";
   /** Merton jump intensity. 0 ⇒ pure GBM. */
   lambdaJ?: number;
@@ -48,15 +48,15 @@ export interface SimulateRunResult {
   feeSamples: Float64Array;
   principalSamples: Float64Array;
   b2bSamples: Float64Array;
-  /** §3d retained P&L after quota-share syndication of the residual leg. */
+  /** Syndicated-variant retained P&L after quota-share syndication of the residual leg. */
   retainedSamples: Float64Array;
-  /** §3d loaded premium applied to `retainedSamples` (MC-moment derived). */
+  /** Syndicated-variant loaded premium applied to `retainedSamples` (MC-moment derived). */
   premium: number;
   ITSamples: Float64Array;
   terminalS: Float64Array;
   sampledPaths: Float64Array[];
   /** Coverage fraction τ_cov of the horizon that the pre-purchased inventory
-   *  funds, clamped to [0, 1]. Distinct from §3e's stopping time τ (see
+   *  funds, clamped to [0, 1]. Distinct from the switching variant's stopping time τ (see
    *  `./simulate-switching.ts`); the two quantities share a letter in the
    *  research note but never in code. */
   tauFrac: number;
@@ -66,7 +66,7 @@ export interface SimulateRunResult {
   N: number;
 }
 
-// §3d Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
+// Syndicated-variant Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
 const GAUSSIAN_CVAR95_FACTOR = 2.062713055949736;
 
 export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
@@ -127,7 +127,7 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     if (i < keep) sampledPaths.push(S);
   }
 
-  // §3d quota-share on the residual stochastic leg. The Validation page
+  // Syndicated-variant quota-share on the residual stochastic leg. The Validation page
   // uses a closed-form premium because Π_α is linear in I_T; the custom
   // inventory has no clean closed-form counterpart (the matched slice mixes
   // τ_cov with a sunk basis), so we price the cession from this run's own

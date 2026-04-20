@@ -90,7 +90,7 @@ viewof Q = Inputs.range([0, 1000], { step: 0.5, value: 180, label: "fixed quote 
 viewof fee = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fee rate f" })
 ```
 
-### Syndication (§3d)
+### Syndication
 
 ```{ojs}
 //| echo: false
@@ -107,7 +107,7 @@ viewof theta = Inputs.range([0, 1], { step: 0.01, value: 0, label: "counterparty
 viewof premiumMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
 ```
 
-### Switching (§3e)
+### Switching
 
 ```{ojs}
 //| echo: false
@@ -318,7 +318,7 @@ run = {
 
 ```{ojs}
 //| echo: false
-// Sibling run of the §3e switching book. α is implicit in the custom book via
+// Sibling run of the switching book. α is implicit in the custom book via
 // (k, C_basis), not as a Params field; drive the switching book with α=0
 // (pure b2b-plus-switch) and β=0 (no syndication) for a clean reading. The
 // barrier composes with β / θ in the core module but this page surfaces the
@@ -368,14 +368,14 @@ html`<div class="phase-c-derived">
 //| echo: false
 html`${(isFinite(barrierRatio) && barrierRatio < 3)
   ? `<div class="phase-c-derived">
-    <div class="card"><div class="label">§3e barrier h</div><div class="value">${barrierRatio.toFixed(2)} (H = $${(barrierRatio * derived.S0).toFixed(4)})</div></div>
+    <div class="card"><div class="label">switching barrier h</div><div class="value">${barrierRatio.toFixed(2)} (H = $${(barrierRatio * derived.S0).toFixed(4)})</div></div>
     <div class="card"><div class="label">f_post</div><div class="value">${(feePost ?? fee).toFixed(3)}${feePost === null ? " (locked to f)" : ""}</div></div>
     <div class="card"><div class="label">P[τ &lt; T]</div><div class="value">${(switchRun.probSwitch * 100).toFixed(1)}%</div></div>
     <div class="card"><div class="label">E[τ]</div><div class="value">${(switchRun.expectedTau * 365 / derived.T).toFixed(1)} days</div></div>
     <div class="card"><div class="label">switching E[Π]</div><div class="value">${(switchRun.summary.mean >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.mean).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
     <div class="card"><div class="label">switching CVaR₉₅</div><div class="value">${(switchRun.summary.cvar95 >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   </div>`
-  : `<div class="phase-c-derived"><div class="card"><div class="label">§3e switching</div><div class="value">disabled (h ≈ ∞) — set the slider below 3 to activate</div></div></div>`
+  : `<div class="phase-c-derived"><div class="card"><div class="label">switching</div><div class="value">disabled (h ≈ ∞) — set the slider below 3 to activate</div></div></div>`
 }`
 ```
 
@@ -384,7 +384,7 @@ html`${(isFinite(barrierRatio) && barrierRatio < 3)
 Three books per draw: **fee** ($R_{\mathrm{fee}} = f \cdot P \cdot
 \lambda \cdot I_T$), **principal (back-to-back)**
 ($\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$;
-§3b), and **principal (custom inventory)** ($\Pi_{\mathrm{cust}} = Q
+back-to-back variant), and **principal (custom inventory)** ($\Pi_{\mathrm{cust}} = Q
 \cdot N - C_{\mathrm{basis}} - P \cdot \lambda \cdot J_\tau +
 k_{\mathrm{left}} \cdot S_T$). Back-to-back is the reference against
 which the custom row's hedging is measured.
@@ -417,12 +417,12 @@ per-tonne figure. What to watch:
 summaryRows = [
   { book: "fee", ...run.fee },
   { book: "principal (custom)", ...run.principal },
-  { book: "principal (retained, §3d)", ...run.retained },
+  { book: "principal (retained, syndicated)", ...run.retained },
   { book: "principal (back-to-back)", ...run.b2b },
-  // §3e row sourced from the switching-book sibling run. Isfinite guard keeps
+  // Switching-book row sourced from the sibling run. Isfinite guard keeps
   // the row out of the table when the barrier is effectively disabled.
   ...(isFinite(barrierRatio) && barrierRatio < 3
-    ? [{ book: `principal (switching §3e, h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
+    ? [{ book: `principal (switching, h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
     : []),
 ]
 ```
@@ -482,7 +482,7 @@ pnlRecords = {
   for (let i = 0; i < run.feeSamples.length; i += stride) {
     rows.push({ book: "fee", pnl: run.feeSamples[i] });
     rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
-    rows.push({ book: "principal (retained, §3d)", pnl: run.retainedSamples[i] });
+    rows.push({ book: "principal (retained, syndicated)", pnl: run.retainedSamples[i] });
     rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
   }
   return rows;
@@ -501,7 +501,7 @@ Plot.plot({
   x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
   y: { label: "empirical density" },
   fy: { label: "book" },
-  color: { legend: true, domain: ["fee","principal (custom)","principal (retained, §3d)","principal (back-to-back)"] },
+  color: { legend: true, domain: ["fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)"] },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -509,7 +509,7 @@ Plot.plot({
     Plot.ruleX([
       { book: "fee", x: run.fee.mean },
       { book: "principal (custom)", x: run.principal.mean },
-      { book: "principal (retained, §3d)", x: run.retained.mean },
+      { book: "principal (retained, syndicated)", x: run.retained.mean },
       { book: "principal (back-to-back)", x: run.b2b.mean },
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
@@ -518,9 +518,9 @@ Plot.plot({
 
 _Solid black: MC-estimated $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$. The
 custom-principal panel collapses toward a spike as coverage approaches
-100% — that's the §3a matched book limit. The retained panel sits on
+100% — that's the matched book limit. The retained panel sits on
 top of the custom panel at $\beta = 0$ and collapses to a spike as
-$\beta \to 1$ — that is the §3d syndication limit._
+$\beta \to 1$ — that is the syndication limit._
 
 ### Sample price paths and inventory decay
 

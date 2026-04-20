@@ -88,7 +88,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\n§4 — P&L moments, closed-form vs MC`);
+  console.log(`\nP&L moments, closed-form vs MC`);
   console.log(
     "  model          E[Π] (cf)     E[Π] (mc)     ±CI95          SD (cf)       SD (mc)       z",
   );
@@ -104,7 +104,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\n§4 — Tail risk (Monte Carlo)`);
+  console.log(`\nTail risk (Monte Carlo)`);
   console.log(
     "  model          VaR95         VaR99         CVaR95        CVaR99        P[Π<0]    Sharpe",
   );
@@ -121,7 +121,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
   }
 
   console.log(
-    `\n§3a — NAV drawdown  mean=${fmt(report.drawdown.mean)}` +
+    `\nMatched book — NAV drawdown  mean=${fmt(report.drawdown.mean)}` +
       `  sd=${fmt(report.drawdown.sd)}` +
       `  q95=${fmt(report.drawdown.var95)}` +
       `  q99=${fmt(report.drawdown.var99)}` +
@@ -130,7 +130,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
 
   if (params.beta > 0 || params.premiumLoad > 0) {
     console.log(
-      `\n§3d — Syndication  β=${params.beta}  θ=${params.premiumLoad}` +
+      `\nSyndication  β=${params.beta}  θ=${params.premiumLoad}` +
         `  mode=${params.premiumMode}` +
         `  π_fair=${fmt(report.syndication.premiumFair)}` +
         `  π_loaded=${fmt(report.syndication.premiumLoaded)}`,
@@ -142,7 +142,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     const fmtMaybe = (x: number | null, d = 3) =>
       x === null || !isFinite(x) ? "—" : fmt(x, d);
     console.log(
-      `\n§3e — Switching  h=${params.barrierRatio}  H=${fmt(sw.barrierLevel, 4)}` +
+      `\nSwitching  h=${params.barrierRatio}  H=${fmt(sw.barrierLevel, 4)}` +
         `  f_post=${fmt(sw.feePost, 4)}` +
         (params.feePost === null ? " (locked to f)" : ""),
     );
@@ -167,7 +167,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\n§5 — Break-even quote  Q* = ${fmt(report.closed.QStar, 4)}`);
+  console.log(`\nBreak-even quote  Q* = ${fmt(report.closed.QStar, 4)}`);
   console.log(
     `     E[R_fee] = ${fmt(report.closed.fee.mean)}` +
       `   E[Π_b2b]|Q=Q* = ${fmt(
@@ -236,9 +236,9 @@ function extractRowMetrics(
   };
 }
 
-// §3e barrier sweep: the operator-decision chart (CVaR₉₅ and E[Π] vs h) is
+// Switching-variant barrier sweep: the operator-decision chart (CVaR₉₅ and E[Π] vs h) is
 // derived from these cells. Infinity = "switch disabled", which anchors the
-// curve to the §3d retained book. Kept separate from SWEEP_ALPHAS/MUS/SIGMAS
+// curve to the syndicated retained book. Kept separate from SWEEP_ALPHAS/MUS/SIGMAS
 // so we don't blow up the (α, μ, σ) grid into a 4-dim product.
 const SWEEP_BARRIERS = [1.0, 1.1, 1.25, 1.5, 2.0, Infinity];
 
@@ -267,7 +267,8 @@ function runSwitchingSweep(baseParams: Params): unknown {
 const QSTAR_MUS = [-0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];
 const QSTAR_TS = [0.25, 0.5, 1, 2, 3];
 
-// Canonical Merton overlay used to verify research-note.md §6: the compensated
+// Canonical Merton overlay used to verify the compensated Merton section of research-note.md:
+// the compensated
 // drift keeps every closed-form *mean* identical to the GBM anchor even with
 // fat, negatively-biased jumps. Fixed parameters so the Validation-page
 // verification table is stable across reruns.
@@ -325,10 +326,10 @@ function printJumpCheck(check: unknown): void {
   const c = check as JumpCheck;
   const { lambdaJ, muJ, sigmaJ } = c.overlay;
   console.log(
-    `\n§6 — Compensated Merton overlay (λ_J=${lambdaJ}, μ_J=${muJ}, σ_J=${sigmaJ})`,
+    `\nCompensated Merton overlay (λ_J=${lambdaJ}, μ_J=${muJ}, σ_J=${sigmaJ})`,
   );
   console.log(
-    "  means still match the GBM closed form; SD inflates; see research-note.md §6",
+    "  means still match the GBM closed form; SD inflates; see the compensated Merton section of research-note.md",
   );
   console.log(
     "  model          E[Π] gbm-cf   E[Π] merton   ±CI95          SD gbm-cf    SD merton     z",
@@ -366,7 +367,7 @@ function main(): void {
     writeFileSync(sweepPath, JSON.stringify(sweep, null, 2));
     console.log(`wrote ${sweepPath}`);
 
-    console.log(`\nRunning §3e switching barrier sweep…`);
+    console.log(`\nRunning switching-variant barrier sweep…`);
     const switchingSweep = runSwitchingSweep(params);
     const switchingSweepPath = resolve(DATA_DIR, "switching-sweep.json");
     writeFileSync(switchingSweepPath, JSON.stringify(switchingSweep, null, 2));

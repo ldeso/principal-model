@@ -1,6 +1,6 @@
-// §3e switching-strategy Monte Carlo runner. Start in principal (§3b) mode,
-// flip to fee-based the first time S_t ≥ h·S0, compose with §3c (α) and §3d
-// (β, θ, mode). No closed form for the P&L density: τ is a stopping time so
+// Switching-strategy Monte Carlo runner. Start in principal back-to-back mode,
+// flip to fee-based the first time S_t ≥ h·S0, compose with the partial variant (α)
+// and the syndicated variant (β, θ, mode). No closed form for the P&L density: τ is a stopping time so
 // the distribution depends on path geometry rather than I_T alone. Two pure-
 // GBM anchors survive for validation: P[τ ≤ T] and E[τ ∧ T] live in
 // ./moments.ts (`firstPassageProb`, `expectedHittingTime`).
@@ -25,21 +25,21 @@ export interface SwitchingInputs {
   T: number;
   /** Fixed USD quote per tonne (pre-switch). */
   Q: number;
-  /** Fee rate applied to pre-switch §2 revenue AND to J_τ when `feePost`
+  /** Fee rate applied to pre-switch fee-book revenue AND to J_τ when `feePost`
    *  resolves to `null`. */
   fee: number;
-  /** Pre-purchase fraction for §3c. */
+  /** Pre-purchase fraction for the partial variant. */
   alpha: number;
-  /** §3d external cession fraction. Default 0. */
+  /** Syndicated-variant external cession fraction. Default 0. */
   beta?: number;
-  /** §3d counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
+  /** Syndicated-variant counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
   premiumLoad?: number;
-  /** §3d risk-measure basis for the load. Default `"sharpe"`. */
+  /** Syndicated-variant risk-measure basis for the load. Default `"sharpe"`. */
   premiumMode?: "sharpe" | "cvar";
-  /** §3e barrier ratio h = H/S0. Infinity disables the switch (returns a
-   *  §3d-equivalent run). h ≤ 1 fires the switch immediately at t = 0. */
+  /** Switching-variant barrier ratio h = H/S0. Infinity disables the switch (returns a
+   *  syndicated-variant-equivalent run). h ≤ 1 fires the switch immediately at t = 0. */
   barrierRatio: number;
-  /** §3e post-switch fee rate. `null` locks it to `fee`. */
+  /** Switching-variant post-switch fee rate. `null` locks it to `fee`. */
   feePost: number | null;
   /** Merton jump intensity. 0 ⇒ pure GBM. */
   lambdaJ?: number;
@@ -60,9 +60,9 @@ export interface SwitchingResult {
    *  tests can read the switching formula directly without re-deriving it
    *  from pnlSamples. */
   stochLegSamples: Float64Array;
-  /** Same-seed §3b reference: Q·N − P·λ·I_T. */
+  /** Same-seed back-to-back reference: Q·N − P·λ·I_T. */
   b2bSamples: Float64Array;
-  /** Same-seed §2 reference: fee·P·λ·I_T (uses `fee`, not `feePost`). */
+  /** Same-seed fee-book reference: fee·P·λ·I_T (uses `fee`, not `feePost`). */
   feeSamples: Float64Array;
   /** Stopping time ∈ [0, T]; = T on paths that never cross the barrier. */
   tauSamples: Float64Array;
@@ -87,7 +87,7 @@ export interface SwitchingResult {
   barrierLevel: number;
 }
 
-// §3d Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
+// Syndicated-variant Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
 // Same constant as in simulate-run.ts and models.ts — kept co-located so the
 // CVaR proxy story lives beside the code that uses it.
 const GAUSSIAN_CVAR95_FACTOR = 2.062713055949736;
@@ -202,7 +202,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
   // same closure as simulate-run.ts:134-149 but applied to Π_sw^{(1-α)}
   // rather than to a custom-inventory book. Under λ_J = 0, the first two
   // moments have no nice closed form even for the stochastic leg, so MC is
-  // authoritative here (unlike §3c/§3d which pipe through Dufresne).
+  // authoritative here (unlike the partial/syndicated variants which pipe through Dufresne).
   let stochMean = 0;
   for (let i = 0; i < nPaths; i++) stochMean += stochLegSamples[i] as number;
   stochMean /= nPaths;

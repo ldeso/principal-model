@@ -28,10 +28,10 @@ format:
 This page cross-checks the closed-form moments from the
 [Model](phase-a.qmd) against Monte Carlo and adds the tail metrics
 (VaR, CVaR, loss probability) that the closed form cannot give. The
-`z` column in the §4 scorecard is the numerical sanity check;
+`z` column in the scorecard is the numerical sanity check;
 histograms, NAV paths, and break-even surfaces surround it to make the
 comparison and its consequences easy to read. Price model is GBM, with
-a compensated Merton jump overlay in §6. All computation happens in
+a compensated Merton jump overlay. All computation happens in
 TypeScript under `src/`; this page reads the emitted JSON. Regenerate
 with `npm run simulate -- --seed 42 && npm run sweep -- --seed 42`.
 
@@ -48,7 +48,7 @@ Three reading conventions:
   \lambda T$ for a per-tonne figure. The fee book's VaR / CVaR read
   as *low end of revenue*, not loss — revenue is $\ge 0$ by construction.
 
-Notation follows [the model](phase-a.qmd#setup-and-notation) §1 and
+Notation follows [the model's setup and notation](phase-a.qmd#setup-and-notation) and
 the on-page glossary.
 
 ## Single-run outputs
@@ -69,7 +69,7 @@ $(\mu, \sigma, T)$ set the price process, $\lambda$ the throughput,
 $(f, Q, \alpha)$ the business levers. $Q^*$ is the break-even quote
 derived from the others — setting $Q = Q^*$ equalises the means of
 the fee and back-to-back books (their distributions still differ;
-see §5).
+see the [direct comparison](phase-a.qmd#direct-comparison)).
 
 ```{ojs}
 //| echo: false
@@ -87,7 +87,7 @@ html`<div class="metric-grid">
 </div>`
 ```
 
-### §4 — P&L moments: closed-form vs Monte Carlo
+### P&L moments: closed-form vs Monte Carlo
 
 The central scorecard. One row per book — `fee`, Matched (`3a`),
 Back-to-back (`3b`), Partial (`3c`), Syndicated retained (`3d`), and
@@ -147,9 +147,9 @@ Inputs.table(run.rows, {
 })
 ```
 
-### §6 — Compensated Merton: closed-form means survive jumps
+### Compensated Merton: closed-form means survive jumps
 
-Under the compensated Merton overlay ([§6 of the model](phase-a.qmd#compensated-merton-jump-diffusion)),
+Under the compensated Merton overlay ([compensated Merton jump-diffusion in the model](phase-a.qmd#compensated-merton-jump-diffusion)),
 the drift absorbs $-\lambda_J \kappa$ with $\kappa = e^{\mu_J +
 \sigma_J^2/2} - 1$, so $\mathbb{E}[S_t] = S_0 e^{\mu t}$ regardless of
 the jump parameters. Every GBM closed-form mean carries over;
@@ -210,11 +210,11 @@ Mass to the left of the dashed rule is the loss probability
 $\mathbb{P}[\Pi < 0]$ in the table above.
 
 - **Fee.** Non-negative, right-skewed (inherits $I_T$'s right skew).
-- **Back-to-back (§3b).** Mirror of the fee panel — same kernel $I_T$
+- **Back-to-back.** Mirror of the fee panel — same kernel $I_T$
   with opposite sign. Upside capped at $Q \cdot N$ (token collapses to
   zero); downside unbounded (token rallies). This left-skewed loss
   tail is the central risk concern.
-- **Partial (§3c)** at $\alpha = 0.5$. Same shape as §3b but narrower
+- **Partial** at $\alpha = 0.5$. Same shape as back-to-back but narrower
   by $(1-\alpha) = 0.5$ on the SD scale — the visible signature of
   pre-buying inventory.
 
@@ -296,7 +296,7 @@ Plot.plot({
 
 _Solid black: $\mathbb{E}[I_T]$ (Dufresne closed form). Dashed black: $\mathbb{E}[I_T] \pm \mathrm{SD}[I_T]$._
 
-### Sample GBM paths — matched-book NAV view (§3a)
+### Sample GBM paths — matched-book NAV view
 
 The Matched book's terminal P&L is deterministic, but its
 mark-to-market inventory value is not:
@@ -344,7 +344,7 @@ _Grey lines: sampled Monte Carlo NAV paths. Orange line: the first path,
 highlighted for visibility. $V_T$ is pinned to zero by the burn schedule
 regardless of $S_T$._
 
-### NAV shortfall vs. schedule (§3a)
+### NAV shortfall vs. schedule (matched book)
 
 The Matched book's solvency question: *how far below the flat-price
 schedule did NAV dip?* Formally,
@@ -383,7 +383,7 @@ book even though its terminal P&L is deterministic._
 ## Parameter sweep
 
 The single-run view above fixes all parameters. Here instead the book
-is fixed (Partial, §3c) and the summary is a single risk statistic
+is fixed (Partial) and the summary is a single risk statistic
 ($\mathrm{CVaR}_{95}$, larger = worse); business parameters $(\alpha,
 \mu, \sigma)$ sweep. Data from `data/sweep.json`; slice it with the
 controls below.
@@ -439,7 +439,7 @@ tail of $\Pi_\alpha$._
 ### Tail risk vs hedge ratio $\alpha$ (fixed $\mu$, $\sigma$ at grid[1])
 
 Dose-response for pre-buying. $\sigma$ held at the middle grid value
-while $\alpha$ sweeps 0 (Back-to-back) to 1 (Matched). §3c gives
+while $\alpha$ sweeps 0 (Back-to-back) to 1 (Matched). The partial variant gives
 $\mathrm{SD}[\Pi_\alpha] = (1-\alpha) \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}]$,
 so CVaR collapses roughly linearly toward zero. At $\alpha = 1$ the
 book is deterministic and CVaR resolves to the sign of the Matched
@@ -469,9 +469,9 @@ Plot.plot({
 })
 ```
 
-## §3d — Syndicated (quota-share, $\beta$)
+## Syndicated (quota-share, $\beta$)
 
-See [§3d of the model](phase-a.qmd#d.-syndicated-quota-share-cession-beta-in-0-1)
+See [the syndicated variant in the model](phase-a.qmd#d.-syndicated-quota-share-cession-beta-in-0-1)
 for the formulae. At the fair premium ($\theta = 0$),
 $\Pi_{\mathrm{ret}} = \mathbb{E}[\Pi_\alpha] + (1-\alpha)(1-\beta) \cdot
 (\Pi_{\mathrm{b2b}} - \mathbb{E}[\Pi_{\mathrm{b2b}}])$ is an affine
@@ -657,13 +657,13 @@ Plot.plot({
 })
 ```
 
-## §3e — Switching ($h$)
+## Switching ($h$)
 
-§3c and §3d **rescale** the loss tail by $(1-\alpha)(1-\beta)$; §3e
+The partial and syndicated variants **rescale** the loss tail by $(1-\alpha)(1-\beta)$; switching
 **truncates** it by flipping the stochastic leg from the fixed quote
 $Q$ to the fee rate $f_{\mathrm{post}}$ the first time $S_t$ crosses
 $H = h \cdot S_0$ (stopping time $\tau$). See
-[§3e of the model](phase-a.qmd#e.-switching-barrier-h-geq-1-post-switch-rate-f_mathrmpost)
+[the switching variant in the model](phase-a.qmd#e.-switching-barrier-h-geq-1-post-switch-rate-f_mathrmpost)
 for the formulae. Three orthogonal levers — capital, counterparty,
 market timing. Because $\tau$ is a stopping time rather than a
 path-average, there is no closed-form density; Monte Carlo is
@@ -699,9 +699,9 @@ switchingRows = switchingSweep.cells.map(c => ({
 ### CVaR₉₅ and $\mathbb{E}[\Pi]$ vs barrier $h$
 
 The headline operator-decision chart. Tightening the barrier (lowering
-$h$) collapses CVaR₉₅ from §3d's wide loss distribution toward the fee
+$h$) collapses CVaR₉₅ from the syndicated book's wide loss distribution toward the fee
 book's lightly-negative CVaR, and simultaneously lifts $\mathbb{E}[\Pi]$
-by moving losses into fee-captured revenue. The knee against the §3d
+by moving losses into fee-captured revenue. The knee against the syndicated
 reference (dashed) is the operator's decision point.
 
 ```{ojs}
@@ -713,7 +713,7 @@ Plot.plot({
   marginRight: 60,
   marginBottom: 55,
   grid: true,
-  caption: "§3e switching book — CVaR₉₅ (USD loss, lower is better) and E[Π] (USD gain, higher is better) as a function of barrier h. Finite h on a log scale; the right-most 'no switch' anchor reproduces §3d. Lower h truncates more of the loss tail but also caps more of the upside by handing flow to the fee book earlier.",
+  caption: "Switching book — CVaR₉₅ (USD loss, lower is better) and E[Π] (USD gain, higher is better) as a function of barrier h. Finite h on a log scale; the right-most 'no switch' anchor reproduces the syndicated book. Lower h truncates more of the loss tail but also caps more of the upside by handing flow to the fee book earlier.",
   x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
   y: { label: "CVaR95 of Π_{3e}   (USD)", labelAnchor: "center", tickFormat: "$~s" },
   marks: [
@@ -721,7 +721,7 @@ Plot.plot({
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "#c33", strokeWidth: 2 }),
     Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", fill: "#c33", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
-    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "§3d retained (h=∞)"}],
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "syndicated retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
   ]
 })
@@ -743,7 +743,7 @@ Plot.plot({
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "#2a7", strokeWidth: 2 }),
     Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", fill: "#2a7", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
-    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "§3d retained (h=∞)"}],
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "syndicated retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
   ]
 })

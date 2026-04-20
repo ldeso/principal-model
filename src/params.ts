@@ -15,23 +15,23 @@ export interface Params {
   f: number;
   /** Fixed USD quote per tonne (principal model). */
   Q: number;
-  /** Pre-purchase fraction for 3c ∈ [0, 1]; α = 1 ↔ 3a, α = 0 ↔ 3b. */
+  /** Pre-purchase fraction for the partial variant ∈ [0, 1]; α = 1 ↔ matched, α = 0 ↔ back-to-back. */
   alpha: number;
 
-  /** §3d external cession fraction of the (1−α) stochastic leg; 0 ⇒ no
+  /** Syndicated-variant external cession fraction of the (1−α) stochastic leg; 0 ⇒ no
    *  syndication and Π_ret ≡ Π_α. */
   beta: number;
-  /** §3d counterparty risk-load multiplier θ ≥ 0. θ = 0 ⇒ fair premium. */
+  /** Syndicated-variant counterparty risk-load multiplier θ ≥ 0. θ = 0 ⇒ fair premium. */
   premiumLoad: number;
-  /** §3d load basis: `"sharpe"` multiplies θ·SD[Π_b2b]; `"cvar"` multiplies
+  /** Syndicated-variant load basis: `"sharpe"` multiplies θ·SD[Π_b2b]; `"cvar"` multiplies
    *  the Gaussian-CVaR95 proxy ≈ 2.063·SD[Π_b2b]. */
   premiumMode: "sharpe" | "cvar";
 
-  /** §3e upper barrier ratio h = H/S0. Switch from b2b to fee the first time
-   *  S_t ≥ h·S0. h = Infinity disables the switch (falls back to §3d retained);
+  /** Switching-variant upper barrier ratio h = H/S0. Switch from b2b to fee the first time
+   *  S_t ≥ h·S0. h = Infinity disables the switch (falls back to the syndicated retained book);
    *  h ≤ 1 fires the switch at t = 0. */
   barrierRatio: number;
-  /** §3e post-switch fee rate applied to the tail integral J_τ. `null` locks
+  /** Switching-variant post-switch fee rate applied to the tail integral J_τ. `null` locks
    *  it to `f` (zero-config path); a number sets it independently for the
    *  "richer markup after the flip" research lever. */
   feePost: number | null;

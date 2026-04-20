@@ -72,7 +72,7 @@ export function gbmMoments(
 }
 
 // Abramowitz-Stegun 7.1.26 rational approximation of erf; |error| < 1.5e-7.
-// Good enough for the §3e first-passage anchor (tests use 4·stderr tolerance
+// Good enough for the switching-variant first-passage anchor (tests use 4·stderr tolerance
 // which dominates for nPaths ≤ 100k).
 function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;

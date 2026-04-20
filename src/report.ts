@@ -1,4 +1,4 @@
-// Assembles the §4 / §5 report table and JSON artifact from a simulation run.
+// Assembles the P&L moments scorecard and break-even table / JSON artifact from a simulation run.
 
 import type { ClosedForm, McResult } from "./core/models.js";
 import { closedForm, simulate } from "./core/models.js";
@@ -61,7 +61,7 @@ export interface Report {
     premiumFair: number;
     premiumLoaded: number;
   };
-  /** §3e switching block. Only present when `params.barrierRatio !== Infinity`;
+  /** Switching-variant block. Only present when `params.barrierRatio !== Infinity`;
    *  closed-form anchors populated only under pure GBM (lambdaJ = 0). */
   switching?: {
     barrierRatio: number;
@@ -152,7 +152,7 @@ export function buildReport(
 
   const closed = closedForm(params);
   const mc: McResult = simulate(params, { keepPaths });
-  // §3e switching run — shares seed with `simulate(params)` so path-reuse
+  // Switching-variant run — shares seed with `simulate(params)` so path-reuse
   // invariance holds (tested explicitly in simulate-switching.test.ts). We
   // always run it even when the barrier is disabled: the wrapper short-
   // circuits expensive-looking work to a no-op when h = Infinity (the inner
@@ -189,7 +189,7 @@ export function buildReport(
     makeRow("principal_3d", closed.retained.mean, closed.retained.sd, mc.retained),
   ];
   if (isFinite(params.barrierRatio)) {
-    // §3e has no closed-form moments; NaNs flag this in downstream tables
+    // The switching variant has no closed-form moments; NaNs flag this in downstream tables
     // rather than feeding a nonsense z-score to the scorecard.
     rows.push(makeSwitchingRow(switchingRun.pnlSamples));
   }
@@ -260,7 +260,7 @@ export function buildReport(
   };
 }
 
-// §3e scorecard row: MC-only, no closed-form mean/sd (so NaN-flag those and
+// Switching-variant scorecard row: MC-only, no closed-form mean/sd (so NaN-flag those and
 // zero out the z-score). VaR/CVaR/probLoss/Sharpe come from the standard
 // path-sample closure, identical to every other row.
 export function makeSwitchingRow(samples: Float64Array): ModelRow {

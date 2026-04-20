@@ -35,7 +35,7 @@ const base: SwitchingInputs = {
   seed: 2026,
 };
 
-describe("simulateSwitching — §3e barrier-triggered mode switch", () => {
+describe("simulateSwitching — switching-variant barrier-triggered mode switch", () => {
   it("barrierRatio = Infinity makes every path unswitched (τ = T)", () => {
     const r = simulateSwitching(base);
     for (let i = 0; i < r.switchedMask.length; i++) {

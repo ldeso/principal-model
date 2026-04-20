@@ -1,4 +1,5 @@
-// Per-model P&L closed-form moments and Monte Carlo sampler. See §2, §3, §5.
+// Per-model P&L closed-form moments and Monte Carlo sampler. See the
+// fee-based, principal, and direct-comparison sections of research-note.md.
 
 import { samplePath } from "./gbm.js";
 import { gbmMoments, expm1OverX } from "./moments.js";
@@ -11,9 +12,9 @@ export interface ClosedForm {
   matched: { mean: number; variance: 0; sd: 0 };
   b2b: { mean: number; variance: number; sd: number };
   partial: { mean: number; variance: number; sd: number };
-  /** §3d retained P&L after ceding β of the (1−α) stochastic leg for π. */
+  /** Syndicated-variant retained P&L after ceding β of the (1−α) stochastic leg for π. */
   retained: { mean: number; variance: number; sd: number };
-  /** §3d premium scalars. `fair = β(1−α)·E[Π_b2b]`; `loaded` deducts
+  /** Syndicated-variant premium scalars. `fair = β(1−α)·E[Π_b2b]`; `loaded` deducts
    *  θ·(risk-measure of the ceded leg) and is what `simulate()` applies. */
   premium: { fair: number; loaded: number };
   /** Break-even quote equalising E[Π_b2b] with E[R_fee]. */
@@ -25,7 +26,7 @@ export interface ClosedForm {
 
 // Gaussian CVaR95 shape factor = φ(Φ^{-1}(0.95)) / (1 − 0.95) ≈ 2.062713.
 // First-pass proxy for E[−(Q·N − P·λ·I_T) | tail] / SD[Π_b2b]; the true
-// I_T tail is non-Gaussian so MC remains authoritative (see research-note §3d).
+// I_T tail is non-Gaussian so MC remains authoritative (see the syndicated-variant section of research-note.md).
 const GAUSSIAN_CVAR95_FACTOR = 2.062713055949736;
 
 // Closed-form moments are derived under pure GBM. Under compensated Merton
@@ -49,7 +50,7 @@ export function closedForm(p: Params): ClosedForm {
   const partialMean = (1 - p.alpha) * b2bMean + p.alpha * matchedMean;
   const partialVar = (1 - p.alpha) ** 2 * b2bVar;
 
-  // §3d quota-share on the (1−α) stochastic leg only — the matched slice is
+  // Syndicated-variant quota-share on the (1−α) stochastic leg only — the matched slice is
   // deterministic, syndicating it is vacuous. Premium is a closed-form scalar
   // so the retained-variance identity stays exact under MC.
   const b2bSd = Math.sqrt(b2bVar);
@@ -90,9 +91,9 @@ export interface McSamples {
   fee: Float64Array;
   b2b: Float64Array;
   partial: Float64Array;
-  /** §3d retained P&L after quota-share syndication of the stochastic leg. */
+  /** Syndicated-variant retained P&L after quota-share syndication of the stochastic leg. */
   retained: Float64Array;
-  /** §3d loaded premium actually applied to `retained` (closed-form scalar). */
+  /** Syndicated-variant loaded premium actually applied to `retained` (closed-form scalar). */
   premium: number;
   /** Deterministic; returned scalar for table symmetry. */
   matched: number;

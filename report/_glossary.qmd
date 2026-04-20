@@ -29,8 +29,8 @@
 
   <dt>Fee book / principal book</dt>
   <dd>Fee: markup <code>f · π<sub>t</sub></code> per tonne, no inventory.
-  Principal: fixed quote <code>Q</code>, five variants — Matched (§3a),
-  Back-to-back (§3b), Partial (§3c), Syndicated (§3d), Switching (§3e).</dd>
+  Principal: fixed quote <code>Q</code>, five variants — Matched,
+  Back-to-back, Partial, Syndicated, Switching.</dd>
 </dl>
 </details>
 </aside>

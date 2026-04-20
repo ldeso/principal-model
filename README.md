@@ -84,7 +84,7 @@ src/
   risk.ts                    quantile, VaR, CVaR, shortfall-vs-schedule
   params.ts                  typed Params + defaults
   models.ts                  closed-form + MC for fee, 3a, 3b, 3c; break-even Q*
-  report.ts                  §4/§5 table assembly + histograms
+  report.ts                  scorecard + break-even table assembly + histograms
   cli.ts                     entrypoint — prints tables, writes JSON
   fetch-historical-price.ts  Alchemy Prices pull for the Summary page's historical preset
 test/                        vitest unit + cross-check suite (43 tests)
@@ -99,12 +99,12 @@ report/
 
 ## Verification notes
 
-- $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] = (P / f)^2$ — same $I_T$ kernel, rescaled (§3b).
+- $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] = (P / f)^2$ — same $I_T$ kernel, rescaled (back-to-back book).
 - $\alpha = 1$ collapses $\Pi_\alpha$ to the deterministic matched P&L path-by-path.
 - $\alpha = 0$ makes $\Pi_\alpha$ coincide with $\Pi_{\mathrm{b2b}}$ path-by-path.
-- $Q = Q^*$ equalises $\mathbb{E}[R_{\mathrm{fee}}]$ and $\mathbb{E}[\Pi_{\mathrm{b2b}}]$ (§5).
+- $Q = Q^*$ equalises $\mathbb{E}[R_{\mathrm{fee}}]$ and $\mathbb{E}[\Pi_{\mathrm{b2b}}]$ (break-even quote).
 - $\mu = 0 \Rightarrow Q^* = (1 + f) \cdot P \cdot S_0$ to machine precision.
-- The §3a NAV drawdown reports $\max_t [N \cdot P \cdot (1-t/T) \cdot (S_0 - S_t)]_+$ —
+- The matched-book NAV drawdown reports $\max_t [N \cdot P \cdot (1-t/T) \cdot (S_0 - S_t)]_+$ —
   shortfall against the deterministic decay schedule — because the
   literal $\max_t (V_0 - V_t)$ from the note is pinned to $V_0$ under
   the $V_T = 0$ burn convention. See `src/risk.ts` for details.
@@ -112,4 +112,4 @@ report/
 ## References
 
 - Dufresne, D. (2001). *The integral of geometric Brownian motion.*
-- Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, §3.4.
+- Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, Section 3.4.

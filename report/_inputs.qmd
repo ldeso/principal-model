@@ -24,7 +24,7 @@ a different <em>kind</em> of tail:</p>
   randomness lives in J<sub>τ</sub>. Loss tail unbounded but softened by
   log-normal averaging.</li>
   <li><strong>Matched (τ = 1, k = N·P).</strong> Custom P&amp;L is
-  Q·N − C<sub>basis</sub> — deterministic (§3a).</li>
+  Q·N − C<sub>basis</sub> — deterministic (matched variant).</li>
   <li><strong>Over-hedged (τ = 1, k &gt; N·P).</strong> Leftover
   k<sub>left</sub> tokens mark to spot at S<sub>T</sub>. Loss tail bounded;
   the heavy mass sits on the gain side.</li>
@@ -32,7 +32,7 @@ a different <em>kind</em> of tail:</p>
 <p>Raising C<sub>basis</sub> translates the distribution leftward by the
 same amount without touching SD, VaR, or CVaR — basis is a sunk cost.</p>
 
-<p><strong>Custom inventory vs. α.</strong> The Validation page's §3c uses a
+<p><strong>Custom inventory vs. α.</strong> The Validation page's partial variant uses a
 single hedge ratio α and assumes inventory was bought today at S<sub>0</sub>.
 This page replaces that with (k, C<sub>basis</sub>), recovering the α-case
 at k = α·N·P, C<sub>basis</sub> = α·N·P·S<sub>0</sub>. Syndication (β)
@@ -46,16 +46,16 @@ internally), fixed USD quote Q of the principal book, fee rate f of the fee
 book. Doubling f doubles both the fee book's mean and its SD, leaving
 Sharpe invariant; f does not touch the principal books.</p>
 
-<p><strong>Syndication (§3d).</strong> Quota-share cession of the custom
+<p><strong>Syndication.</strong> Quota-share cession of the custom
 book's stochastic residual. β is the fraction ceded; θ the counterparty's
 risk-load (0 = actuarially fair). Premium mode selects the risk measure θ
 multiplies — <code>sharpe</code>: θ·SD; <code>cvar</code>:
 θ·SD·φ(Φ<sup>−1</sup>(0.95))/0.05 ≈ 2.063·θ·SD. Retained variance
 collapses as (1−β)² on top of the (1−τ)² collapse from coverage.</p>
 
-<p><strong>Switching (§3e).</strong> Flip from the fixed-quote principal
+<p><strong>Switching.</strong> Flip from the fixed-quote principal
 book to the fee book the first time S<sub>t</sub> crosses H = h·S<sub>0</sub>.
-h = ∞ disables the switch (§3d baseline); h = 1 starts in fee mode.
+h = ∞ disables the switch (syndicated baseline); h = 1 starts in fee mode.
 f<sub>post</sub> defaults to f but can be raised independently to compensate
 for lost upside once the barrier breaches.</p>
 
