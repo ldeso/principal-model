@@ -765,7 +765,11 @@ viewof customCurve = {
     });
   });
   addButton("Random path", () => {
-    const rng = mulberry32(seed);
+    const newSeed = 1 + Math.floor(Math.random() * 9999);
+    const seedView = viewof seed;
+    seedView.value = newSeed;
+    seedView.dispatchEvent(new CustomEvent("input", { bubbles: true }));
+    const rng = mulberry32(newSeed);
     const { S } = samplePath(rng, {
       S0: S0Val,
       mu,
