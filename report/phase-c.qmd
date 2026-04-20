@@ -5,15 +5,17 @@ subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
 
 ::: {.side-panel-right .side-panel-stack}
 {{< include _notation.qmd >}}
-{{< include _glossary.qmd >}}
 :::
 
 Every slider on this page kicks off a fresh Monte Carlo in your
-browser. The price model is GBM with an optional compensated Merton
-jump overlay (leave the jump sliders at zero for pure GBM). The hedge
-is specified by the **raw inventory state** $(k, C_{\mathrm{basis}})$
-— kVCM tokens on hand plus their sunk USD cost — so inventory acquired
-earlier at a different price can be studied directly.
+browser; the [Model](phase-a.qmd) page defines the symbols. Two
+things are slightly different here. First, the hedge is specified in
+raw inventory state $(k, C_{\mathrm{basis}})$ — kVCM tokens on hand
+plus their sunk USD cost — so a position already accumulated at a
+different price can be studied directly; coverage is the derived
+quantity $\alpha = \min(1, k / (N P))$. Second, the price process is
+always the compensated Merton jump-diffusion; set the three jump
+sliders $(\lambda_J, \mu_J, \sigma_J)$ to zero for pure GBM.
 
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Price process
@@ -191,10 +193,10 @@ mcResetButton = {
 ## Derived quantities
 
 Closed-form summaries of the slider state: $S_0 = \pi_0 / P$, horizon
-$T$ in years, $N = \lambda T$ total tonnes, coverage $\tau$, and the
-break-even quote $Q^* = (1+f) \cdot P \cdot S_0 \cdot (e^{\mu T} -
-1)/(\mu T)$ — the one at which the fee and Back-to-back books have
-equal expected P&L.
+$T$ in years, $N = \lambda T$ total tonnes, coverage $\alpha =
+\min(1, k / (N P))$, and the break-even quote $Q^* = (1 + f) P S_0
+\cdot (e^{\mu T} - 1) / (\mu T)$ at which the fee and back-to-back
+books share expected P&L.
 
 ```{ojs}
 //| echo: false
@@ -229,39 +231,10 @@ html`<div class="phase-c-derived">
 </div>`
 ```
 
-`implied basis per token` compares $C_{\mathrm{basis}} / k$ to $S_0$:
-above $S_0$ is an unrealised loss on existing inventory, below an
-unrealised gain. It shifts the location of the custom book's P&L
-distribution, not its shape.
-
-<details>
-<summary>What the simulator computes, step by step</summary>
-
-Every slider change triggers the following sequence. The simulator
-is an in-browser port of `src/rng.ts`, `src/gbm.ts`, `src/moments.ts`,
-and `src/risk.ts`; nothing writes to disk or calls the network.
-
-1. **Seed the PRNG.** Mulberry32 from the `seed` slider; Box–Muller
-   converts uniform pairs into standard normals.
-2. **Simulate $n_{\mathrm{paths}}$ GBM (or jump-GBM) trajectories.**
-   Log-GBM increment $S_{t+dt} = S_t \cdot \exp\!\big((\mu -
-   \tfrac12 \sigma^2 - \lambda_J \kappa)\,dt + \sigma\sqrt{dt}\,Z +
-   \sum_{j=1}^{N_{t+dt} - N_t} Y_j\big)$, with $N$ a Poisson process
-   of intensity $\lambda_J$, $Y_j \sim N(\mu_J, \sigma_J^2)$, and
-   $\kappa = e^{\mu_J + \sigma_J^2/2} - 1$ the Merton compensation.
-   $\lambda_J = 0$ collapses to pure GBM.
-3. **Accumulate integrals.** $I_T = \int_0^T S_t\,dt$ and the tail
-   integral $J_\tau = \int_{\tau T}^T S_t\,dt$ by the trapezoid
-   rule.
-4. **Apply each book's formula.** Fee: $f P \lambda I_T$.
-   Back-to-back: $Q N - P \lambda I_T$. Custom: $Q N -
-   C_{\mathrm{basis}} - P \lambda J_\tau + k_{\mathrm{left}} S_T$.
-5. **Summarise.** Mean, SD, 95/99 VaR and CVaR, loss probability,
-   Sharpe-like ratio.
-6. **Keep ~20 paths for plotting.** The rest contribute only their
-   scalar P&L.
-
-</details>
+`implied basis per token` is $C_{\mathrm{basis}} / k$ versus $S_0$:
+above $S_0$, existing inventory sits on an unrealised loss; below,
+an unrealised gain. It translates the custom book's P&L distribution
+without touching its shape.
 
 ```{ojs}
 //| echo: false
@@ -272,21 +245,14 @@ import {
 
 ## Monte Carlo run
 
-Live output: a run card (paths, wall time, coverage, leftover
-tokens), a summary table, histograms, and sampled price paths. Wall
-time stays sub-second at 5,000–10,000 paths; at 40,000 the bottleneck
-is re-plotting, not simulation.
-
-::: {.callout-note appearance="simple"}
-## What raising $\lambda_J$ does
-
-Compensated drift absorbs the jump mean, so every book's expected
-P&L is invariant in $(\lambda_J, \mu_J, \sigma_J)$ — the black mean
-rule on each histogram stays put. SD, VaR, and CVaR all widen;
-$\mu_J < 0$ tilts skew toward longer left tails on the principal
-books (and right tails on fee, its mirror); sample paths pick up
-visible discrete drops. Set $\lambda_J = 0$ for pure GBM.
-:::
+A run card (paths, wall time, coverage, leftover tokens), a summary
+table, histograms, and sample price paths follow. Wall time stays
+sub-second at 5,000–10,000 paths; at 40,000 the bottleneck is
+re-plotting, not the simulation itself. The [Merton compensation
+identity](phase-a.qmd#compensated-merton-jump-diffusion) tells you
+what to expect when sweeping the jump sliders: the black mean rule
+on each histogram holds position (means survive) while SD, VaR, and
+CVaR widen as the jumps land.
 
 ```{ojs}
 //| echo: false
@@ -357,7 +323,7 @@ html`<div class="phase-c-derived">
   <div class="card"><div class="label">coverage this run</div><div class="value">${(run.tauFrac * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">leftover tokens at T</div><div class="value">${run.tokensLeftover.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">cession β</div><div class="value">${(beta * 100).toFixed(0)}%</div></div>
-  <div class="card"><div class="label">premium π received</div><div class="value">${(run.premium >= 0 ? "$" : "−$") + Math.abs(run.premium).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">premium π_syn received</div><div class="value">${(run.premium >= 0 ? "$" : "−$") + Math.abs(run.premium).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">retained CVaR₉₅</div><div class="value">${(run.retained.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.retained.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">SD reduction vs. principal</div><div class="value">${run.principal.sd > 0 ? (100 * (1 - run.retained.sd / run.principal.sd)).toFixed(1) + "%" : "—"}</div></div>
 </div>`
@@ -380,36 +346,39 @@ html`${(isFinite(barrierRatio) && barrierRatio < 3)
 
 ### Summary statistics
 
-Three books per draw: **fee** ($R_{\mathrm{fee}} = f \cdot P \cdot
-\lambda \cdot I_T$), **principal (back-to-back)**
-($\Pi_{\mathrm{b2b}} = Q \cdot N - P \cdot \lambda \cdot I_T$;
-back-to-back variant), and **principal (custom inventory)** ($\Pi_{\mathrm{cust}} = Q
-\cdot N - C_{\mathrm{basis}} - P \cdot \lambda \cdot J_\tau +
-k_{\mathrm{left}} \cdot S_T$). Back-to-back is the reference against
-which the custom row's hedging is measured.
+One row per book. Three of them — fee, retained (syndicated), and
+back-to-back — match the [Model](phase-a.qmd) page's formulae
+directly. The fourth, `principal (custom)`, is the Simulator's own
+book: it admits the raw inventory state $(k, C_{\mathrm{basis}})$
+rather than a scalar $\alpha$, so its P&L is $\Pi_{\mathrm{cust}} = Q
+N - C_{\mathrm{basis}} - P \lambda J_\alpha + k_{\mathrm{left}}
+\cdot S_T$, where $k_{\mathrm{left}} = \max(0, k - N P)$ is any
+over-hedge and $J_\alpha = \int_{\alpha T}^T S_t \, dt$ is the
+integral over the uncovered window. The fifth row — switching —
+appears only when the barrier slider sits below 3.
 
 | column | meaning |
 | --- | --- |
-| $\mathbb{E}[\Pi]$ (mc) | sample mean of the book's P&L |
+| $\mathbb{E}[\Pi]$ (mc) | sample mean |
 | SD | sample standard deviation |
-| $\pm \mathrm{CI}_{95}$ | 95% half-width of the mean ($1.96 \cdot \mathrm{SD}/\sqrt{n}$) |
-| $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | loss threshold exceeded with 5% / 1% probability |
-| $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | mean loss *inside* the worst 5% / 1% tail |
+| $\pm \mathrm{CI}_{95}$ | 95% half-width of the mean, $1.96 \cdot \mathrm{SD} / \sqrt{n}$ |
+| $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | 5% / 1% loss thresholds |
+| $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | tail-mean losses inside those thresholds |
 | $\mathbb{P}[\Pi < 0]$ | probability of a losing realisation |
 | Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ |
 
-P&L is total USD over $[0, T]$; divide by $N = \lambda T$ for a
-per-tonne figure. What to watch:
+P&L is the USD total over $[0, T]$; divide by $N = \lambda T$ for a
+per-tonne figure. Three things to watch as you sweep:
 
-- **Custom row** responds to everything: $Q$ shifts its mean,
-  $\sigma$ widens its tails, $k$ reshapes it via $\tau$,
-  $C_{\mathrm{basis}}$ translates only its location.
-- **Back-to-back row** depends only on $Q$ and the price process. If
-  the custom row converges to it as $k, C_{\mathrm{basis}} \to 0$,
-  the identity $\Pi_{\mathrm{cust}} \to \Pi_{\mathrm{b2b}}$ is wired
-  correctly.
-- **$\tau = 100\%$** collapses the custom row's SD and CVaR toward
-  zero — the Matched limit.
+- **The custom row** responds to every slider — $Q$ moves its mean,
+  $\sigma$ widens its tails, $k$ reshapes through $\alpha$, and
+  $C_{\mathrm{basis}}$ translates the location without changing
+  shape.
+- **The back-to-back row** depends only on $Q$ and the price
+  process. Setting $k = C_{\mathrm{basis}} = 0$ collapses the custom
+  row onto it — a useful sanity check.
+- **$\alpha = 100\%$** drives the custom row's SD and CVaR toward
+  zero, the matched limit.
 
 ```{ojs}
 //| echo: false
@@ -458,16 +427,13 @@ Inputs.table(summaryRows, {
 
 ### P&L distributions
 
-One panel per book. Solid black rule: MC mean. Dashed grey rule:
-$\Pi = 0$.
-
-- **Fee.** Non-negative, right-skewed (inherits $I_T$'s right skew).
-- **Principal (custom).** The responsive panel. Low coverage: wide,
-  left-skewed (Back-to-back regime). $\tau = 100\%$: spike (Matched
-  limit). Over-hedge: width returns but with a different shape —
-  terminal-$S_T$ exposure.
-- **Principal (back-to-back).** Mirror of the fee panel. The custom
-  panel collapses onto this one at $k = C_{\mathrm{basis}} = 0$.
+One panel per book, terminal P&L on the x-axis. Solid black rule is
+the MC mean; dashed grey rule is $\Pi = 0$. The fee panel is
+non-negative and right-skewed (it inherits $I_T$'s right skew); the
+back-to-back panel is the mirror. The custom panel is the
+responsive one — wide and left-skewed under low coverage, a spike at
+$\alpha = 100\%$ (the matched limit), and a recovered but reshaped
+width under over-hedge (the terminal-$S_T$ exposure kicks in).
 
 ```{ojs}
 //| echo: false
@@ -515,21 +481,22 @@ Plot.plot({
 })
 ```
 
-_Solid black: MC-estimated $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$. The
-custom-principal panel collapses toward a spike as coverage approaches
-100% — that's the matched book limit. The retained panel sits on
-top of the custom panel at $\beta = 0$ and collapses to a spike as
-$\beta \to 1$ — that is the syndication limit._
+_Solid black: MC mean. Dashed grey: $\Pi = 0$. The custom panel
+collapses to a spike as coverage $\alpha$ approaches 100% (matched
+limit); the retained panel sits on top of the custom panel at
+$\beta = 0$ and collapses to a spike as $\beta \to 1$ (syndication
+limit)._
 
-### Sample price paths and inventory decay
+### Sample price paths and the inventory cliff
 
-Twenty sampled GBM trajectories (grey, first path highlighted orange).
-Dashed green rule at $\tau T$: the time inventory is exhausted.
-Left of the rule the intermediary draws from inventory; right of the
-rule it buys at spot. The custom book's randomness lives in the
-right-of-rule region (plus $S_T$ if over-hedged). At $\tau = 100\%$
-the rule sits at or past $T$; at $\tau = 0$, at $t = 0$. Paths fan
-out like $\sigma\sqrt{t}$ — the visual signature of GBM.
+Twenty sampled kVCM trajectories (grey, first path highlighted
+orange). The dashed green rule at $\alpha T$ marks inventory
+exhaustion: the intermediary draws from inventory to the left of it
+and buys at spot to the right. The custom book's randomness lives in
+the right-of-rule region (plus a terminal $S_T$ contribution when
+over-hedged). At $\alpha = 100\%$ the rule sits at or past $T$; at
+$\alpha = 0$, at $t = 0$. Paths fan out like $\sigma\sqrt{t}$ — the
+visual signature of GBM.
 
 ```{ojs}
 //| echo: false

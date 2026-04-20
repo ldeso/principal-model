@@ -1,31 +1,37 @@
 ```{=html}
 <aside class="side-panel scorecard-sidebar">
 <details open>
-<summary>Reading the scorecard</summary>
+<summary>Reading the validation plots</summary>
 <dl>
   <dt><code>z = (MC − cf) / stderr</code></dt>
-  <dd><code>|z| ≤ 2</code> is healthy sampling noise;
-  <code>|z| &gt; 3</code> points at a simulator bug.</dd>
+  <dd><code>|z| ≤ 2</code> is sampling noise; <code>|z| &gt; 3</code>
+  points at a simulator bug.</dd>
 
-  <dt><code>±CI<sub>95</sub> = 1.96·SD/√n</code></dt>
+  <dt><code>±CI<sub>95</sub> = 1.96 · SD / √n</code></dt>
   <dd>95% half-width of the MC mean. Shrinks as
-  <code>1/√n<sub>paths</sub></code>.</dd>
+  <code>1 / √n<sub>paths</sub></code>.</dd>
 
   <dt>Variance ratio</dt>
-  <dd><code>Var[Π<sub>b2b</sub>]/Var[R<sub>fee</sub>] = (P/f)²</code>.
-  Algebraic — not subject to MC noise.</dd>
+  <dd>Fee and back-to-back satisfy
+  <code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P / f)²</code>
+  — algebraic, not statistical. Any MC disagreement is a bug.</dd>
 
-  <dt>VaR<sub>95</sub> / CVaR<sub>95</sub></dt>
-  <dd>5% loss threshold / tail mean. On the fee book: "low end of
-  revenue" (revenue ≥ 0 by construction).</dd>
+  <dt>Partial / syndicated SD scaling</dt>
+  <dd><code>SD[Π<sub>α,β</sub>] = (1 − α)(1 − β) · SD[Π<sub>b2b</sub>]</code>.
+  The expected signature of every sweep plot on the page.</dd>
 
-  <dt>Horizon total</dt>
-  <dd>P&amp;L is total USD over <code>[0, T]</code>. Divide by
-  <code>N = λT</code> for a per-tonne figure.</dd>
+  <dt>VaR / CVaR on the fee book</dt>
+  <dd>Read as "low end of revenue", not loss — fee revenue is
+  <code>≥ 0</code> by construction.</dd>
 
   <dt>Merton row</dt>
-  <dd>Expect <code>|z| ≲ 2</code> vs. GBM closed form and
-  <strong>SD(merton) &gt; SD(gbm)</strong>. Flat SD = overlay inert.</dd>
+  <dd>Expect <code>|z| ≲ 2</code> against the GBM closed form
+  (compensation is firing) and SD (merton) strictly above SD (gbm).
+  Flat SD means the overlay is inert.</dd>
+
+  <dt>Switching row</dt>
+  <dd>Closed-form columns are <code>NaN</code> — no closed-form
+  density. Compare MC tails directly to the no-switch anchor.</dd>
 </dl>
 </details>
 </aside>

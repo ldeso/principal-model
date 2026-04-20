@@ -3,25 +3,47 @@
 <details open>
 <summary>Glossary</summary>
 <dl>
-  <dt><code>S<sub>t</sub></code>, <code>P</code></dt>
-  <dd>Token spot (USD/kVCM) and protocol constant (kVCM/tonne).
-  Carbon price: <code>π<sub>t</sub> = P·S<sub>t</sub></code>.</dd>
+  <dt>Fee book</dt>
+  <dd>Quote <code>(1 + f) · P · S<sub>t</sub></code>, remit the
+  protocol price, keep the markup <code>f · P · S<sub>t</sub></code>.
+  Revenue <code>≥ 0</code> by construction; no inventory.</dd>
 
-  <dt><code>I<sub>T</sub> = ∫₀<sup>T</sup> S<sub>t</sub> dt</code></dt>
-  <dd>Shared random kernel. Fee revenue enters with +, principal books with −.</dd>
+  <dt>Principal book</dt>
+  <dd>Quote a fixed <code>Q</code> up front, source the tokens at
+  spot or pre-buy. Five variants below.</dd>
 
-  <dt>Coverage <code>τ</code></dt>
-  <dd>Fraction of the horizon pre-bought inventory lasts,
-  <code>min(1, k/(N·P))</code>. Model calls this <code>α</code>.</dd>
+  <dt>Matched</dt>
+  <dd>Pre-buy all inventory at <code>t = 0</code>. Terminal P&amp;L
+  deterministic.</dd>
 
-  <dt>VaR<sub>95</sub> / CVaR<sub>95</sub></dt>
-  <dd>5% loss threshold / mean loss inside that tail.
-  On the fee book: "low end of revenue", not loss.</dd>
+  <dt>Back-to-back</dt>
+  <dd>Source every tonne at spot. Short kVCM beta over
+  <code>[0, T]</code>; upside capped, downside unbounded.</dd>
 
-  <dt>Fee / principal book</dt>
-  <dd>Fee: markup <code>f·π<sub>t</sub></code>, no inventory.
-  Principal: fixed quote <code>Q</code>, five variants (matched,
-  back-to-back, partial, syndicated, switching).</dd>
+  <dt>Partial</dt>
+  <dd>Pre-buy a fraction <code>α</code> of inventory at
+  <code>t = 0</code>; the rest back-to-back. Mean interpolates
+  linearly, SD collapses as <code>(1 − α)</code>.</dd>
+
+  <dt>Syndicated</dt>
+  <dd>Cede a fraction <code>β</code> of the stochastic leg to a
+  counterparty against an up-front premium. Variance collapses as
+  <code>(1 − α)²(1 − β)²</code>.</dd>
+
+  <dt>Switching</dt>
+  <dd>Flip pricing from <code>Q</code> to a fee book when
+  <code>S<sub>t</sub></code> first crosses an upper barrier
+  <code>h · S<sub>0</sub></code>. Truncates the loss tail rather
+  than rescaling it.</dd>
+
+  <dt>Coverage α</dt>
+  <dd>Fraction of horizon served from pre-bought inventory. The
+  linear dial on tail risk for the principal book.</dd>
+
+  <dt><code>Q*</code></dt>
+  <dd>The fixed quote at which the fee and back-to-back books share
+  expected revenue. Matching means does <em>not</em> match
+  distributions.</dd>
 </dl>
 </details>
 </aside>

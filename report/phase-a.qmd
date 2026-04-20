@@ -11,7 +11,6 @@ format:
 
 ::: {.side-panel-right .side-panel-stack}
 {{< include _identities.qmd >}}
-{{< include _glossary.qmd >}}
 :::
 
 {{< include ../research-note.md >}}

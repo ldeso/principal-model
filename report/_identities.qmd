@@ -1,32 +1,39 @@
 ```{=html}
 <aside class="side-panel identities-sidebar">
 <details open>
-<summary>Key identities</summary>
+<summary>Closed-form identities</summary>
 <dl>
+  <dt>Shared kernel</dt>
+  <dd><code>I<sub>T</sub> = ∫₀<sup>T</sup> S<sub>t</sub> dt</code>.
+  Every stochastic book is linear or affine in it; Dufresne (2001)
+  gives the first two moments in closed form.</dd>
+
+  <dt>Fee ↔ back-to-back variance</dt>
+  <dd><code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P / f)²</code>
+  — shared kernel, opposite signs, identical shape up to scale.</dd>
+
   <dt>Break-even quote</dt>
-  <dd><code>Q* = (1+f)·P·S<sub>0</sub>·(e<sup>μT</sup>−1)/(μT)</code>.
-  Equalises <code>E[Π]</code> of fee and back-to-back.</dd>
+  <dd><code>Q* = (1 + f) · P · S<sub>0</sub> · (e<sup>μT</sup> − 1) / (μT)</code>.
+  Equalises <code>E[·]</code> of fee and back-to-back, not their
+  distributions.</dd>
 
-  <dt>Variance ratio</dt>
-  <dd><code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P/f)²</code>.
-  Algebraic — any MC disagreement is a bug.</dd>
+  <dt>Partial scaling</dt>
+  <dd>SD and tail quantiles collapse as <code>(1 − α)</code>; at
+  <code>α = 1</code> the book is deterministic.</dd>
 
-  <dt>Partial (coverage α)</dt>
-  <dd>SD and CVaR scale by <code>(1−α)</code>. At <code>α = 1</code>
-  the book is deterministic.</dd>
+  <dt>Syndicated scaling</dt>
+  <dd><code>Var[Π<sub>ret</sub>] = (1 − α)²(1 − β)² · Var[Π<sub>b2b</sub>]</code>.
+  At the fair premium (<code>θ = 0</code>), cession preserves mean.</dd>
 
-  <dt>Syndication (cession β)</dt>
-  <dd>Retained variance collapses as <code>(1−β)²</code> on top of the
-  <code>(1−α)²</code> coverage collapse.</dd>
-
-  <dt>Switching (barrier <code>h·S<sub>0</sub></code>)</dt>
-  <dd>Flip to fee at <code>τ = inf{t: S<sub>t</sub> ≥ h·S<sub>0</sub>}</code>.
-  Truncates the principal tail — no clean closed form for moments.</dd>
+  <dt>Switching</dt>
+  <dd>Flip at <code>τ = inf{t : S<sub>t</sub> ≥ h · S<sub>0</sub>}</code>.
+  No closed-form density; truncates rather than rescales the loss tail.</dd>
 
   <dt>Merton compensation</dt>
-  <dd>Drift absorbs <code>−λ<sub>J</sub>·κ</code> so
-  <code>E[S<sub>t</sub>] = S<sub>0</sub>·e<sup>μt</sup></code>.
-  Means survive jumps; variances don't.</dd>
+  <dd>Drift absorbs <code>−λ<sub>J</sub> · κ</code> with
+  <code>κ = e<sup>μ<sub>J</sub> + σ<sub>J</sub>²/2</sup> − 1</code>,
+  so <code>E[S<sub>t</sub>] = S<sub>0</sub> · e<sup>μt</sup></code>.
+  Means survive jumps; variances do not.</dd>
 </dl>
 </details>
 </aside>
