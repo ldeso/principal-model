@@ -36,15 +36,15 @@ nav#TOC {
 }
 
 .side-panel > h3 {
-  font-size: 0.68rem;
-  margin: 0.5rem 0 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: #333;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 0.1rem;
+  margin: 0.5rem 0 0;
+  padding: 0.1rem 0;
 }
-.side-panel > h3:first-child { margin-top: 0.05rem; }
+.side-panel > h3:first-child { margin-top: 0; }
 
 .side-panel details > summary {
   cursor: pointer;
