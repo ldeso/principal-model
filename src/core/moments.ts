@@ -71,6 +71,41 @@ export function gbmMoments(
   };
 }
 
+// E[S_T] under GBM (and under compensated Merton — the compensation
+// identity preserves the mean of the price process). Used by the
+// treasury closed form whenever k_pre > N·P (over-hedged leftover marked
+// at S_T).
+export function expectedST(S0: number, mu: number, T: number): number {
+  return S0 * Math.exp(mu * T);
+}
+
+// Var[S_T] under pure GBM. expm1 keeps precision for small σ²T.
+export function varianceST(
+  S0: number,
+  mu: number,
+  sigma: number,
+  T: number,
+): number {
+  return S0 * S0 * Math.exp(2 * mu * T) * Math.expm1(sigma * sigma * T);
+}
+
+// Cov[I_T, S_T] under pure GBM. Derived from E[S_t·S_T] = S_0²·exp(μ(t+T) + σ²·t)
+// for t ≤ T, integrated over [0, T]:
+//   E[I_T · S_T] = ∫₀ᵀ S_0²·e^{μ(t+T)}·e^{σ²t} dt = S_0²·e^{μT} · ∫₀ᵀ e^{(μ+σ²)t} dt
+// so Cov = S_0²·e^{μT} · T · (expm1OverX((μ+σ²)T) − expm1OverX(μT)).
+export function covarITST(
+  S0: number,
+  mu: number,
+  sigma: number,
+  T: number,
+): number {
+  const s2 = sigma * sigma;
+  return (
+    S0 * S0 * Math.exp(mu * T) * T *
+    (expm1OverX((mu + s2) * T) - expm1OverX(mu * T))
+  );
+}
+
 // Abramowitz-Stegun 7.1.26 rational approximation of erf; |error| < 1.5e-7.
 // Good enough for the switching-variant first-passage anchor (tests use 4·stderr tolerance
 // which dominates for nPaths ≤ 100k).

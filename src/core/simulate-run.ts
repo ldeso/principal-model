@@ -1,8 +1,8 @@
-// Custom-principal Monte Carlo runner. Shares the Merton path core with
-// src/core/gbm.ts; adds the fee / b2b / custom-principal accumulators that
-// used to be hand-ported inline in report/lib/ojs-helpers.js. Both the OJS
-// cells and the CLI can call this so the browser and the offline report run
-// the same code.
+// Operating-book + treasury Monte Carlo runner. Shares the Merton path core
+// with src/core/gbm.ts; emits the fee, b2b, retained (syndicated-on-b2b)
+// operating samples plus the active-treasury samples parameterised by
+// (kPre, cBasis). Desk totals for concrete strategies are `operating + treasury`
+// evaluated sample-wise by the consumer.
 
 import { samplePath } from "./gbm.js";
 import { mulberry32 } from "./rng.js";
@@ -25,7 +25,7 @@ export interface SimulateRunInputs {
   kPre: number;
   /** Sunk cost basis of the pre-purchase. */
   cBasis: number;
-  /** Syndicated-variant external cession fraction of the residual stochastic leg. Default 0. */
+  /** Syndicated-variant external cession fraction of the b2b book. Default 0. */
   beta?: number;
   /** Syndicated-variant counterparty risk-load multiplier θ ≥ 0. Default 0 ⇒ fair premium. */
   premiumLoad?: number;
@@ -45,20 +45,23 @@ export interface SimulateRunInputs {
 }
 
 export interface SimulateRunResult {
+  /** Fee operating book: f · P · λ · I_T. */
   feeSamples: Float64Array;
-  principalSamples: Float64Array;
+  /** Back-to-back operating book: Q · N − P · λ · I_T. */
   b2bSamples: Float64Array;
-  /** Syndicated-variant retained P&L after quota-share syndication of the residual leg. */
+  /** Syndicated-on-b2b operating book: (1 − β) · b2b + premium. */
   retainedSamples: Float64Array;
-  /** Syndicated-variant loaded premium applied to `retainedSamples` (MC-moment derived). */
+  /** Active treasury at (kPre, cBasis):
+   *  P · λ · I_{[0, min(T, kPre/(P·λ))]} + max(0, kPre − N·P) · S_T − cBasis. */
+  treasurySamples: Float64Array;
+  /** Loaded syndication premium applied to `retainedSamples` (MC-moment derived). */
   premium: number;
   ITSamples: Float64Array;
   terminalS: Float64Array;
   sampledPaths: Float64Array[];
   /** Coverage fraction τ_cov of the horizon that the pre-purchased inventory
-   *  funds, clamped to [0, 1]. Distinct from the switching variant's stopping time τ (see
-   *  `./simulate-switching.ts`); the two quantities share a letter in the
-   *  research note but never in code. */
+   *  funds, clamped to [0, 1]. Distinct from the switching variant's stopping
+   *  time τ (see `./simulate-switching.ts`). */
   tauFrac: number;
   tokensUsedInternal: number;
   tokensLeftover: number;
@@ -66,7 +69,7 @@ export interface SimulateRunResult {
   N: number;
 }
 
-// Syndicated-variant Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
+// Gaussian CVaR95 factor = φ(Φ^{-1}(0.95))/0.05; proxy used in `"cvar"` mode.
 const GAUSSIAN_CVAR95_FACTOR = 2.062713055949736;
 
 export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
@@ -86,15 +89,15 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     : 1;
   const tokensUsedInternal = Math.min(kPre, lambda * T * P);
   const tokensLeftover = Math.max(0, kPre - lambda * T * P);
-  // Snap tauFrac (τ_cov) onto the integration grid and treat "only the endpoint
-  // falls in [τ_cov·T, T]" as an empty range — otherwise the trapezoid rule adds
+  // Snap tauFrac onto the integration grid and treat "only the endpoint falls
+  // in [τ_cov·T, T]" as an empty range — otherwise the trapezoid rule adds
   // 0.5·S_T·dt for a zero-length interval.
   const tailStartRaw = Math.ceil(tauFrac * nSteps);
   const tailStartStep = tailStartRaw >= nSteps ? nSteps + 1 : tailStartRaw;
 
   const feeSamples = new Float64Array(nPaths);
-  const principalSamples = new Float64Array(nPaths);
   const b2bSamples = new Float64Array(nPaths);
+  const treasurySamples = new Float64Array(nPaths);
   const ITSamples = new Float64Array(nPaths);
   const terminalS = new Float64Array(nPaths);
   const keep = Math.min(keepPaths, nPaths);
@@ -108,60 +111,53 @@ export function simulateRun(inputs: SimulateRunInputs): SimulateRunResult {
     const IT = path.IT;
     const ST = S[nSteps] as number;
 
-    // Uncovered-tail integral ∫_{τ_cov·T}^{T} S_t dt, trapezoid on the same grid
-    // so the same realisation drives fee, b2b and custom-principal books.
+    // Uncovered-tail integral ∫_{τ_cov·T}^{T} S_t dt on the same grid so the
+    // same realisation drives every book.
     let tailInt = 0;
     for (let k = tailStartStep; k <= nSteps; k++) {
       const w = (k === tailStartStep || k === nSteps) ? 0.5 : 1;
       tailInt += w * (S[k] as number);
     }
     tailInt *= dt;
+    const consumptionInt = IT - tailInt;
 
     terminalS[i] = ST;
     ITSamples[i] = IT;
     feeSamples[i] = fee * P * lambda * IT;
     b2bSamples[i] = Q * N - P * lambda * IT;
-    principalSamples[i] =
-      Q * N - cBasis - P * lambda * tailInt + tokensLeftover * ST;
+    treasurySamples[i] =
+      P * lambda * consumptionInt + tokensLeftover * ST - cBasis;
 
     if (i < keep) sampledPaths.push(S);
   }
 
-  // Syndicated-variant quota-share on the residual stochastic leg. The Validation page
-  // uses a closed-form premium because Π_α is linear in I_T; the custom
-  // inventory has no clean closed-form counterpart (the matched slice mixes
-  // τ_cov with a sunk basis), so we price the cession from this run's own
-  // MC sample moments. With nPaths ≥ 5000 the estimator is tight enough for
-  // the slider feedback loop. `cBasis` is the deterministic translation of
-  // the principal book, so the stochastic residual is principal − (Q·N − cBasis).
-  const detShift = Q * N - cBasis;
-  let stochMean = 0;
+  // Syndicated premium — closed-form in principle (β · E[Π_b2b]), but we derive
+  // it from this run's b2b sample moments so the OJS slider feedback loop
+  // matches the MC cross-check path-by-path (premium is applied as a scalar).
+  let b2bMean = 0;
+  for (let i = 0; i < nPaths; i++) b2bMean += b2bSamples[i] as number;
+  b2bMean /= nPaths;
+  let b2bSse = 0;
   for (let i = 0; i < nPaths; i++) {
-    stochMean += (principalSamples[i] as number) - detShift;
+    const d = (b2bSamples[i] as number) - b2bMean;
+    b2bSse += d * d;
   }
-  stochMean /= nPaths;
-  let stochVar = 0;
-  for (let i = 0; i < nPaths; i++) {
-    const d = (principalSamples[i] as number) - detShift - stochMean;
-    stochVar += d * d;
-  }
-  stochVar = nPaths > 1 ? stochVar / (nPaths - 1) : 0;
-  const stochSd = Math.sqrt(stochVar);
+  const b2bVar = nPaths > 1 ? b2bSse / (nPaths - 1) : 0;
+  const b2bSd = Math.sqrt(b2bVar);
   const loadFactor = premiumMode === "cvar" ? GAUSSIAN_CVAR95_FACTOR : 1;
-  const piFair = beta * stochMean;
-  const premium = piFair - beta * premiumLoad * loadFactor * stochSd;
+  const piFair = beta * b2bMean;
+  const premium = piFair - beta * premiumLoad * loadFactor * b2bSd;
 
   const retainedSamples = new Float64Array(nPaths);
   for (let i = 0; i < nPaths; i++) {
-    retainedSamples[i] =
-      detShift + (1 - beta) * ((principalSamples[i] as number) - detShift) + premium;
+    retainedSamples[i] = (1 - beta) * (b2bSamples[i] as number) + premium;
   }
 
   return {
     feeSamples,
-    principalSamples,
     b2bSamples,
     retainedSamples,
+    treasurySamples,
     premium,
     ITSamples,
     terminalS,

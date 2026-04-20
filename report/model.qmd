@@ -17,25 +17,28 @@ format:
 <dl>
   <dt>Shared kernel</dt>
   <dd><code>I<sub>T</sub> = ∫₀<sup>T</sup> S<sub>t</sub> dt</code>.
-  Every stochastic book is linear or affine in it; Dufresne (2001)
+  Every operating book is linear or affine in it; Dufresne (2001)
   gives the first two moments in closed form.</dd>
 
-  <dt>Fee ↔ back-to-back variance</dt>
+  <dt>Fee ↔ b2b variance</dt>
   <dd><code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P / f)²</code>
   — shared kernel, opposite signs, identical shape up to scale.</dd>
 
   <dt>Break-even quote</dt>
   <dd><code>Q* = (1 + f) · P · S<sub>0</sub> · (e<sup>μT</sup> − 1) / (μT)</code>.
-  Equalises <code>E[·]</code> of fee and back-to-back, not their
+  Equalises <code>E[·]</code> of fee and b2b, not their
   distributions.</dd>
 
-  <dt>Partial scaling</dt>
-  <dd>SD and tail quantiles collapse as <code>(1 − α)</code>; at
-  <code>α = 1</code> the book is deterministic.</dd>
+  <dt>Matched desk identity</dt>
+  <dd><code>b2b + treasury(N·P, N·P·S<sub>0</sub>) = N(Q − P·S<sub>0</sub>)</code>
+  path-by-path — <code>I<sub>T</sub></code> cancels between
+  b2b's <em>−P·λ·I<sub>T</sub></em> and the treasury's
+  <em>+P·λ·I<sub>T</sub></em> consumption term.</dd>
 
   <dt>Syndicated scaling</dt>
-  <dd><code>Var[Π<sub>ret</sub>] = (1 − α)²(1 − β)² · Var[Π<sub>b2b</sub>]</code>.
-  At the fair premium (<code>θ = 0</code>), cession preserves mean.</dd>
+  <dd><code>Var[Π<sub>ret</sub>] = (1 − β)² · Var[Π<sub>b2b</sub>]</code>
+  at the operating layer. At the fair premium (<code>θ = 0</code>),
+  cession preserves mean.</dd>
 
   <dt>Switching</dt>
   <dd>Flip at <code>τ = inf{t : S<sub>t</sub> ≥ h · S<sub>0</sub>}</code>.
@@ -45,7 +48,8 @@ format:
   <dd>Drift absorbs <code>−λ<sub>J</sub> · κ</code> with
   <code>κ = e<sup>μ<sub>J</sub> + σ<sub>J</sub>²/2</sup> − 1</code>,
   so <code>E[S<sub>t</sub>] = S<sub>0</sub> · e<sup>μt</sup></code>.
-  Means survive jumps; variances do not.</dd>
+  Means survive jumps (including <code>E[Π<sub>trea</sub>]</code>);
+  variances do not.</dd>
 </dl>
 </details>
 </aside>
