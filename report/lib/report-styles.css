@@ -35,7 +35,7 @@ nav#TOC {
   color: #222;
 }
 
-.side-panel > h3 {
+.side-panel h3 {
   font-size: 0.7rem;
   font-weight: 600;
   color: #333;
@@ -44,7 +44,8 @@ nav#TOC {
   margin: 0.5rem 0 0;
   padding: 0.1rem 0;
 }
-.side-panel > h3:first-child { margin-top: 0; }
+.side-panel > h3:first-child,
+.side-panel section:first-child > h3 { margin-top: 0; }
 
 .side-panel details > summary {
   cursor: pointer;
@@ -164,7 +165,7 @@ nav#TOC > ul { font-size: 0.78rem; }
   #quarto-sidebar {
     position: fixed !important;
     top: var(--side-top);
-    left: var(--side-offset);
+    right: var(--side-offset);
     width: var(--side-w);
     max-height: calc(100vh - var(--side-top) - 1rem);
     overflow-y: auto;
