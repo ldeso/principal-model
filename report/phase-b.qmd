@@ -21,6 +21,7 @@ format:
 ```
 
 ::: {.side-panel-right .side-panel-stack}
+{{< include _scorecard.qmd >}}
 {{< include _glossary.qmd >}}
 :::
 

@@ -1,0 +1,18 @@
+```{=html}
+<aside class="side-panel findings-sidebar">
+<details open>
+<summary>Findings at a glance</summary>
+<ol>
+  <li><strong>Matching means ≠ matching distributions.</strong> At
+  Q = Q*, fee and back-to-back share E[Π] but are near-mirror images;
+  the principal book gets a left-skewed loss tail.</li>
+  <li><strong>Hedging is a linear dial.</strong> Pre-buying α of
+  inventory collapses SD and CVaR as (1−α); C<sub>basis</sub>
+  translates mean only, not tails.</li>
+  <li><strong>A switch truncates, doesn't rescale.</strong> Quote
+  up-front, flip to fee at S<sub>t</sub> = h·S<sub>0</sub>: CVaR₉₅
+  collapses ~80× while E[Π] rises. Levers (α, β, h) compose.</li>
+</ol>
+</details>
+</aside>
+```

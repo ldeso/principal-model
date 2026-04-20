@@ -1,0 +1,35 @@
+```{=html}
+<aside class="side-panel stress-presets-sidebar">
+<details>
+<summary>Curve presets</summary>
+<dl>
+  <dt>Flat @ S<sub>0</sub></dt>
+  <dd>Constant path — under μ = 0 the mean path. Books should land
+  near the MC means.</dd>
+
+  <dt>Linear ±50%</dt>
+  <dd>Calibrates how μ acts on each book — monotone path without
+  curvature.</dd>
+
+  <dt>Crash @ ½T</dt>
+  <dd>Mid-year collapse. Informative at coverage just under 100%: the
+  crash may land inside the uncovered window.</dd>
+
+  <dt>Spike @ ⅓T</dt>
+  <dd>Brief rally the back-to-back book has to buy through.</dd>
+
+  <dt>Random walk</dt>
+  <dd>Hand-drawn GBM approximation — typical realisation, not a
+  substitute for the MC.</dd>
+
+  <dt>Historical</dt>
+  <dd>Real kVCM series. Disabled when
+  <code>data/kvcm-historical.json</code> is missing (regenerate via
+  <code>npm run fetch:prices</code>).</dd>
+</dl>
+<p>Raise <em>noise σ²</em> to layer a seeded log-normal shock on top
+of the drawn path and test how robust a narrative is to day-to-day
+jitter.</p>
+</details>
+</aside>
+```

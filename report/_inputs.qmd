@@ -1,0 +1,64 @@
+```{=html}
+<aside class="side-panel inputs-sidebar">
+<details>
+<summary>About the inputs</summary>
+
+<p><strong>Price process.</strong> π₀ is the carbon price in USD/tonne; P is
+the same price in kVCM/tonne (protocol constant). Together they imply
+today's spot S<sub>0</sub> = π₀ / P. μ and σ² are the annualised
+log-price drift and variance.</p>
+
+<p><strong>Jumps (Merton).</strong> Optional discrete shocks on top of the
+GBM. λ<sub>J</sub> is the expected jumps per year; each arrival multiplies
+the log-price by N(μ<sub>J</sub>, σ<sub>J</sub>²). The drift is
+<em>compensated</em> (μ absorbs −λ<sub>J</sub>·κ with κ = e<sup>μ<sub>J</sub>+σ<sub>J</sub>²/2</sup> − 1)
+so E[S<sub>t</sub>] = S<sub>0</sub>·e<sup>μt</sup> stays put — jumps widen
+the distribution without relocating it. λ<sub>J</sub> = 0 recovers pure GBM.</p>
+
+<p><strong>Demand &amp; inventory.</strong> Retirement flow λ (tonnes per
+calendar day) plus the raw inventory state (k, C<sub>basis</sub>). Coverage
+τ = min(1, k / (N·P)) controls the custom book. Three regimes, each with
+a different <em>kind</em> of tail:</p>
+<ul>
+  <li><strong>Under-hedged (τ &lt; 1).</strong> Inventory runs out at τT;
+  randomness lives in J<sub>τ</sub>. Loss tail unbounded but softened by
+  log-normal averaging.</li>
+  <li><strong>Matched (τ = 1, k = N·P).</strong> Custom P&amp;L is
+  Q·N − C<sub>basis</sub> — deterministic (§3a).</li>
+  <li><strong>Over-hedged (τ = 1, k &gt; N·P).</strong> Leftover
+  k<sub>left</sub> tokens mark to spot at S<sub>T</sub>. Loss tail bounded;
+  the heavy mass sits on the gain side.</li>
+</ul>
+<p>Raising C<sub>basis</sub> translates the distribution leftward by the
+same amount without touching SD, VaR, or CVaR — basis is a sunk cost.</p>
+
+<p><strong>Custom inventory vs. α.</strong> The Validation page's §3c uses a
+single hedge ratio α and assumes inventory was bought today at S<sub>0</sub>.
+This page replaces that with (k, C<sub>basis</sub>), recovering the α-case
+at k = α·N·P, C<sub>basis</sub> = α·N·P·S<sub>0</sub>. Syndication (β)
+likewise applies to the residual stochastic part — the uncovered J<sub>τ</sub>
+and, when over-hedged, k<sub>left</sub>·S<sub>T</sub> — and is priced from
+this run's MC moments rather than a closed-form shortcut (no clean closed
+form exists in the over-hedged regime).</p>
+
+<p><strong>Contract.</strong> Horizon (calendar days in the UI, years
+internally), fixed USD quote Q of the principal book, fee rate f of the fee
+book. Doubling f doubles both the fee book's mean and its SD, leaving
+Sharpe invariant; f does not touch the principal books.</p>
+
+<p><strong>Syndication (§3d).</strong> Quota-share cession of the custom
+book's stochastic residual. β is the fraction ceded; θ the counterparty's
+risk-load (0 = actuarially fair). Premium mode selects the risk measure θ
+multiplies — <code>sharpe</code>: θ·SD; <code>cvar</code>:
+θ·SD·φ(Φ<sup>−1</sup>(0.95))/0.05 ≈ 2.063·θ·SD. Retained variance
+collapses as (1−β)² on top of the (1−τ)² collapse from coverage.</p>
+
+<p><strong>Switching (§3e).</strong> Flip from the fixed-quote principal
+book to the fee book the first time S<sub>t</sub> crosses H = h·S<sub>0</sub>.
+h = ∞ disables the switch (§3d baseline); h = 1 starts in fee mode.
+f<sub>post</sub> defaults to f but can be raised independently to compensate
+for lost upside once the barrier breaches.</p>
+
+</details>
+</aside>
+```

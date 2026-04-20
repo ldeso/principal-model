@@ -6,6 +6,7 @@ subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
 ::: {.side-panel-right .side-panel-stack}
 {{< include _glossary.qmd >}}
 {{< include _notation.qmd >}}
+{{< include _inputs.qmd >}}
 :::
 
 Every slider on this page kicks off a fresh Monte Carlo in your

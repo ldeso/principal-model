@@ -36,24 +36,24 @@ nav#TOC {
 }
 
 .side-panel > h3 {
-  font-size: 0.8rem;
-  margin: 0.85rem 0 0.35rem;
+  font-size: 0.68rem;
+  margin: 0.5rem 0 0.15rem;
   color: #333;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0.1rem;
 }
-.side-panel > h3:first-child { margin-top: 0.1rem; }
+.side-panel > h3:first-child { margin-top: 0.05rem; }
 
 .side-panel details > summary {
   cursor: pointer;
   font-weight: 600;
   color: #333;
-  font-size: 0.82rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0.15rem 0;
+  padding: 0.1rem 0;
   list-style: none;
 }
 .side-panel details > summary::-webkit-details-marker { display: none; }
@@ -81,17 +81,18 @@ nav#TOC {
   font-size: 0.78rem;
 }
 .side-panel h4 {
-  font-size: 0.78rem;
+  font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #333;
-  margin: 0.9rem 0 0.3rem;
+  margin: 0.55rem 0 0.2rem;
   border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 0.15rem;
+  padding-bottom: 0.1rem;
 }
-.side-panel h4:first-of-type { margin-top: 0.4rem; }
+.side-panel h4:first-of-type { margin-top: 0.3rem; }
 .side-panel p { margin: 0.35rem 0; color: #333; }
-.side-panel ul { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
+.side-panel ul,
+.side-panel ol { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
 .side-panel li { margin: 0.15rem 0; }
 
 /* Quarto TOC heading (rendered as <h2 id="toc-title">) matched to the
@@ -99,13 +100,13 @@ nav#TOC {
 nav#TOC > #toc-title,
 nav#TOC > .toc-title {
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #333;
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.3rem;
 }
-nav#TOC > ul { font-size: 0.82rem; }
+nav#TOC > ul { font-size: 0.78rem; }
 
 /* --- Floating behaviour -------------------------------------------------- */
 
@@ -218,14 +219,15 @@ nav#TOC > ul { font-size: 0.82rem; }
 
 .pc-controls form[class*="oi-"] { align-items: center; }
 .pc-controls form[class*="oi-"] > label {
-  width: 8rem !important;
-  min-width: 8rem !important;
-  max-width: 8rem !important;
+  width: 7.5rem !important;
+  min-width: 7.5rem !important;
+  max-width: 7.5rem !important;
   white-space: normal !important;
-  line-height: 1.2;
-  font-size: 0.78rem;
+  line-height: 1.15;
+  font-size: 0.72rem;
   flex-shrink: 0;
 }
+.pc-controls form[class*="oi-"] { margin-block: 0.1rem; }
 .pc-controls form[class*="oi-"] input[type="number"],
 .pc-controls form[class*="oi-"] select { min-width: 4rem; }
 .pc-controls form[class*="oi-"] input[type="range"] {
@@ -234,19 +236,19 @@ nav#TOC > ul { font-size: 0.82rem; }
 }
 
 .pc-reset {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
   border-top: 1px solid #e0e0e0;
 }
 .pc-reset button {
   width: 100%;
-  padding: 0.4rem 0.7rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid #888;
   background: #fff;
   color: #111;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .pc-reset button:hover { background: #eef; border-color: #555; }

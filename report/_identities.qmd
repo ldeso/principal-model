@@ -1,0 +1,44 @@
+```{=html}
+<aside class="side-panel identities-sidebar">
+<details>
+<summary>Key identities</summary>
+<dl>
+  <dt>Break-even quote</dt>
+  <dd><code>Q* = (1+f)·P·S<sub>0</sub>·(e<sup>μT</sup> − 1)/(μT)</code>
+  equalises E[Π] of the fee and back-to-back books.</dd>
+
+  <dt>Shared kernel</dt>
+  <dd><code>I<sub>T</sub> = ∫₀<sup>T</sup> S<sub>t</sub> dt</code>
+  enters the fee book with +, the principal books with −.
+  <code>E[I<sub>T</sub>] = S<sub>0</sub>·(e<sup>μT</sup> − 1)/μ</code>
+  (Dufresne, 2001).</dd>
+
+  <dt>Variance ratio</dt>
+  <dd><code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P/f)²</code>
+  — algebraic, not statistical. Any disagreement is a bug.</dd>
+
+  <dt>Partial (§3c)</dt>
+  <dd>Pre-buying α of inventory today: SD and CVaR scale by
+  <code>(1−α)</code>; the matched limit α → 1 gives a deterministic
+  book worth <code>Q·N − α·N·P·S<sub>0</sub></code>.</dd>
+
+  <dt>Syndication (§3d)</dt>
+  <dd>Cede β of the stochastic residual for premium π; retained
+  variance collapses as <code>(1−β)²</code> on top of the
+  <code>(1−α)²</code> coverage collapse.</dd>
+
+  <dt>Switching (§3e)</dt>
+  <dd>Flip to the fee book at stopping time
+  <code>τ = inf{t: S<sub>t</sub> ≥ h·S<sub>0</sub>}</code>. Truncates
+  the principal tail rather than rescaling it; no clean closed form
+  for moments.</dd>
+
+  <dt>Merton compensation (§6)</dt>
+  <dd>Drift absorbs <code>−λ<sub>J</sub>·κ</code> with
+  <code>κ = e<sup>μ<sub>J</sub>+σ<sub>J</sub>²/2</sup> − 1</code>, so
+  <code>E[S<sub>t</sub>] = S<sub>0</sub>·e<sup>μt</sup></code>
+  regardless of jump parameters. Means survive; variances don't.</dd>
+</dl>
+</details>
+</aside>
+```

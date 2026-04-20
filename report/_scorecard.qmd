@@ -1,0 +1,37 @@
+```{=html}
+<aside class="side-panel scorecard-sidebar">
+<details open>
+<summary>Reading the scorecard</summary>
+<p>The §4 table is the primary sanity check. Three conventions:</p>
+<dl>
+  <dt><code>z</code></dt>
+  <dd><code>(MC − cf) / stderr</code>. <code>|z| ≤ 2</code> is healthy
+  sampling noise; <code>|z| &gt; 3</code> points at a simulator bug.</dd>
+
+  <dt><code>±CI<sub>95</sub></code></dt>
+  <dd>95% half-width of the MC mean,
+  <code>1.96·SD/√n</code>. Shrinks as <code>1/√n<sub>paths</sub></code>.</dd>
+
+  <dt>Variance ratio</dt>
+  <dd>Fee and back-to-back share <code>I<sub>T</sub></code>, so
+  <code>Var[Π<sub>b2b</sub>]/Var[R<sub>fee</sub>] = (P/f)²</code> exactly.
+  Algebraic, not statistical.</dd>
+
+  <dt>VaR / CVaR</dt>
+  <dd>Loss threshold / mean loss inside that 5% (or 1%) tail. On the
+  fee book these read as "low end of revenue", not loss — revenue
+  ≥ 0 by construction.</dd>
+
+  <dt>Horizon total</dt>
+  <dd>P&amp;L is total USD over <code>[0, T]</code>. Divide by
+  <code>N = λT</code> for a per-tonne figure.</dd>
+
+  <dt>§6 Merton row</dt>
+  <dd>Expect <code>|z| ≲ 2</code> against the GBM closed form and
+  <strong>SD (merton) &gt; SD (gbm-cf)</strong>. Flat SD means the
+  overlay is inert; persistent large <code>|z|</code> means broken
+  compensation.</dd>
+</dl>
+</details>
+</aside>
+```

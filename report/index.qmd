@@ -16,7 +16,9 @@ subtitle: "Revenue and risk for a carbon-retirement intermediary"
 ```
 
 ::: {.side-panel-right .side-panel-stack}
+{{< include _findings.qmd >}}
 {{< include _glossary.qmd >}}
+{{< include _stress-presets.qmd >}}
 :::
 
 A carbon-retirement intermediary buys carbon tokens (kVCM) on the open
