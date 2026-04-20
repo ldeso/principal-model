@@ -1,6 +1,11 @@
 ---
 title: "Klima Protocol — Fee vs. Principal"
 subtitle: "Revenue and risk for a carbon-retirement intermediary"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: right
 ---
 
 ```{=html}

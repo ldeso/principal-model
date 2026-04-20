@@ -1,6 +1,11 @@
 ---
 title: "Simulator"
 subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: right
 ---
 
 Every slider on this page kicks off a fresh Monte Carlo in your
