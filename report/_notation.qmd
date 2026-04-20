@@ -1,27 +1,25 @@
 ```{=html}
 <aside class="side-panel notation-sidebar">
-<details>
-<summary>Notation</summary>
-<p><a href="phase-a.qmd#setup-and-notation">The model's setup and notation section</a> covers the
-shared symbols. Simulator-specific additions:</p>
+<details open>
+<summary>Simulator notation</summary>
+<p>Shared symbols on the
+<a href="phase-a.qmd#setup-and-notation">Model page</a>.
+Simulator-only additions:</p>
 <dl>
-  <dt><code>k</code></dt>
-  <dd>Pre-purchased inventory (kVCM).</dd>
+  <dt><code>k</code>, <code>C<sub>basis</sub></code></dt>
+  <dd>Pre-purchased inventory (kVCM) and its sunk USD cost.</dd>
 
-  <dt><code>C<sub>basis</sub></code></dt>
-  <dd>Sunk cost of that inventory (USD).</dd>
-
-  <dt><code>τ = min(1, k / (N·P))</code></dt>
+  <dt><code>τ = min(1, k/(N·P))</code></dt>
   <dd>Fraction of horizon the inventory covers.</dd>
 
   <dt><code>k<sub>left</sub> = max(0, k − N·P)</code></dt>
-  <dd>Leftover tokens at horizon when over-hedged (kVCM).</dd>
+  <dd>Leftover tokens at <code>T</code> when over-hedged.</dd>
 
   <dt><code>J<sub>τ</sub> = ∫<sub>τT</sub><sup>T</sup> S<sub>t</sub> dt</code></dt>
-  <dd>Tail integral over the uncovered window ((USD/kVCM)·year).</dd>
+  <dd>Tail integral over the uncovered window.</dd>
 
-  <dt><code>Π<sub>cust</sub> = Q·N − C<sub>basis</sub> − P·λ·J<sub>τ</sub> + k<sub>left</sub>·S<sub>T</sub></code></dt>
-  <dd>Custom-inventory principal P&amp;L (USD).</dd>
+  <dt><code>Π<sub>cust</sub></code></dt>
+  <dd><code>Q·N − C<sub>basis</sub> − P·λ·J<sub>τ</sub> + k<sub>left</sub>·S<sub>T</sub></code></dd>
 </dl>
 </details>
 </aside>
