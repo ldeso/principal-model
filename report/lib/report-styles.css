@@ -1,7 +1,6 @@
 /* Report-wide layout.
-   One card style for every floating panel (simulator inputs, glossary,
-   notation, Quarto TOC), plus CSS-only responsive fixed positioning on
-   each viewport side. No runtime JS. */
+   One card style for every floating panel (simulator inputs, Quarto
+   TOC), plus CSS-only responsive fixed positioning. No runtime JS. */
 
 :root {
   /* Content column stays at --content-w on every page. Sidebars take
@@ -18,7 +17,6 @@
     calc((100vw - var(--content-w)) / 2 - var(--side-offset) - var(--side-inside-gap))
   );
   --side-top: 5rem;
-  --side-gap: 0.6rem;
 }
 
 /* --- Shared card chrome -------------------------------------------------- */
@@ -47,59 +45,11 @@ nav#TOC {
 .side-panel > h3:first-child,
 .side-panel section:first-child > h3 { margin-top: 0; }
 
-.side-panel details > summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: #333;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.1rem 0;
-  list-style: none;
-}
-.side-panel details > summary::-webkit-details-marker { display: none; }
-.side-panel details > summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: 0.35rem;
-  transition: transform 0.12s ease-out;
-}
-.side-panel details[open] > summary::before { transform: rotate(90deg); }
-
-.side-panel dl { margin: 0.4rem 0 0; }
-.side-panel dt {
-  font-family: ui-monospace, monospace;
-  font-size: 0.78rem;
-  color: #1a3a6b;
-  margin-top: 0.55rem;
-}
-.side-panel dt:first-child { margin-top: 0; }
-.side-panel dd { margin: 0.15rem 0 0; color: #333; }
-.side-panel code {
-  background: rgba(0, 0, 0, 0.04);
-  padding: 0 0.18rem;
-  border-radius: 3px;
-  font-size: 0.78rem;
-}
-.side-panel h4 {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #333;
-  margin: 0.55rem 0 0.2rem;
-  border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 0.1rem;
-}
-.side-panel h4:first-of-type { margin-top: 0.3rem; }
 .side-panel p { margin: 0.35rem 0; color: #333; }
-.side-panel ul,
-.side-panel ol { margin: 0.3rem 0 0.5rem 1.1rem; padding: 0; }
-.side-panel li { margin: 0.15rem 0; }
 
 /* Quarto TOC heading (rendered as <h2 id="toc-title">) matched to the
-   side-panel summary weight. */
-nav#TOC > #toc-title,
-nav#TOC > .toc-title {
+   side-panel h3 weight. */
+nav#TOC > #toc-title {
   font-weight: 600;
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -117,15 +67,13 @@ nav#TOC > ul { font-size: 0.78rem; }
    at specificity 0,4,1 — higher than any realistic class-based selector
    we can add here. !important is the cleanest way to reclaim control of
    display / grid / position for our own wrappers. */
-.side-panel-left,
-.side-panel-right {
+.side-panel-left {
   display: block !important;
   grid-column: body-content-start / body-content-end !important;
   grid-template-columns: none !important;
   overflow: visible;
 }
-.side-panel-left > *,
-.side-panel-right > * {
+.side-panel-left > * {
   grid-column: auto !important;
 }
 
@@ -147,17 +95,16 @@ nav#TOC > ul { font-size: 0.78rem; }
    so the centred main column is the same width on every page — whether it
    carries a .side-panel-left, Quarto's TOC sidebar, or nothing at all. */
 @media (min-width: 1400px) {
-  .side-panel-left,
-  .side-panel-right {
+  .side-panel-left {
     position: sticky !important;
     top: var(--side-top);
     width: var(--side-w);
     max-height: calc(100vh - var(--side-top) - 1rem);
     overflow-y: auto;
     z-index: 500;
+    float: left;
+    margin-left: calc(var(--side-offset) - 50vw + 50%);
   }
-  .side-panel-left  { float: left;  margin-left:  calc(var(--side-offset) - 50vw + 50%); }
-  .side-panel-right { float: right; margin-right: calc(var(--side-offset) - 50vw + 50%); }
 
   /* Quarto's own TOC sidebar is not declared inline in markdown — it's
      rendered outside main.content — so it can't use sticky-from-flow and
@@ -170,13 +117,6 @@ nav#TOC > ul { font-size: 0.78rem; }
     max-height: calc(100vh - var(--side-top) - 1rem);
     overflow-y: auto;
     z-index: 500;
-  }
-
-  /* Stack wrapper: multiple cards share one pinned column. */
-  .side-panel-stack {
-    display: flex !important;
-    flex-direction: column;
-    gap: var(--side-gap);
   }
 
   #quarto-content {
@@ -206,14 +146,12 @@ nav#TOC > ul { font-size: 0.78rem; }
   }
 }
 
-/* Narrow viewports: drop the fix and let panels render inline above the
-   main content. Cards stack as normal block flow. */
+/* Narrow viewports: drop the fix and let the panel render inline above
+   the main content. */
 @media (max-width: 1399px) {
-  .side-panel-left,
-  .side-panel-right {
+  .side-panel-left {
     margin: 0 0 1rem;
   }
-  .side-panel-stack > .side-panel + .side-panel { margin-top: 0.6rem; }
 }
 
 /* --- Simulator / Findings input panel (slider rows) --------------------- */
