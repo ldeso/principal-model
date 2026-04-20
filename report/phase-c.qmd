@@ -468,21 +468,32 @@ $\Pi = 0$.
   terminal-$S_T$ exposure.
 - **Principal (back-to-back).** Mirror of the fee panel. The custom
   panel collapses onto this one at $k = C_{\mathrm{basis}} = 0$.
+- **Principal (switching).** Present when the barrier slider $h < 3$.
+  Paths that breach $H = h \cdot S_0$ have their post-$\tau$ exposure
+  replaced by the non-negative fee book, truncating the back-to-back
+  left tail; paths that never breach look identical to back-to-back.
+
+```{ojs}
+//| echo: false
+switchingLabel = `principal (switching, h=${barrierRatio.toFixed(2)})`
+```
 
 ```{ojs}
 //| echo: false
 pnlRecords = {
   const rows = [];
-  const push = (label, arr) => {
-    for (let i = 0; i < arr.length; i++) rows.push({ book: label, pnl: arr[i] });
-  };
   // Subsample for plotting responsiveness.
   const stride = Math.max(1, Math.floor(run.feeSamples.length / 2500));
+  const showSwitching = isFinite(barrierRatio) && barrierRatio < 3;
+  const switchingSamples = showSwitching ? switchRun.pnlSamples : null;
   for (let i = 0; i < run.feeSamples.length; i += stride) {
     rows.push({ book: "fee", pnl: run.feeSamples[i] });
     rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
     rows.push({ book: "principal (retained, syndicated)", pnl: run.retainedSamples[i] });
     rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
+    if (switchingSamples && i < switchingSamples.length) {
+      rows.push({ book: switchingLabel, pnl: switchingSamples[i] });
+    }
   }
   return rows;
 }
@@ -490,9 +501,17 @@ pnlRecords = {
 
 ```{ojs}
 //| echo: false
+pnlDomain = {
+  const base = ["fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)"];
+  return (isFinite(barrierRatio) && barrierRatio < 3) ? [...base, switchingLabel] : base;
+}
+```
+
+```{ojs}
+//| echo: false
 Plot.plot({
   width: 900,
-  height: 560,
+  height: (isFinite(barrierRatio) && barrierRatio < 3) ? 700 : 560,
   marginLeft: 80,
   marginRight: 30,
   marginBottom: 50,
@@ -500,7 +519,7 @@ Plot.plot({
   x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
   y: { label: "empirical density" },
   fy: { label: "book" },
-  color: { legend: true, domain: ["fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)"] },
+  color: { legend: true, domain: pnlDomain },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -510,6 +529,9 @@ Plot.plot({
       { book: "principal (custom)", x: run.principal.mean },
       { book: "principal (retained, syndicated)", x: run.retained.mean },
       { book: "principal (back-to-back)", x: run.b2b.mean },
+      ...((isFinite(barrierRatio) && barrierRatio < 3)
+        ? [{ book: switchingLabel, x: switchRun.summary.mean }]
+        : []),
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
 })
@@ -519,7 +541,10 @@ _Solid black: MC-estimated $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$. The
 custom-principal panel collapses toward a spike as coverage approaches
 100% — that's the matched book limit. The retained panel sits on
 top of the custom panel at $\beta = 0$ and collapses to a spike as
-$\beta \to 1$ — that is the syndication limit._
+$\beta \to 1$ — that is the syndication limit. The switching panel
+appears when the barrier slider $h < 3$ and, as $h$ tightens, mass
+migrates from the back-to-back left tail toward zero — the visible
+signature of the flip-to-fee rule._
 
 ### Sample price paths and inventory decay
 

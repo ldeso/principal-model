@@ -68,7 +68,7 @@ export const defaultParams: Params = {
   premiumLoad: 0,
   premiumMode: "sharpe",
 
-  barrierRatio: Infinity,
+  barrierRatio: 1.25,
   feePost: null,
 
   lambdaJ: 20,

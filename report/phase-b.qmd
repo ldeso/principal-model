@@ -217,21 +217,41 @@ $\mathbb{P}[\Pi < 0]$ in the table above.
 - **Partial** at $\alpha = 0.5$. Same shape as back-to-back but narrower
   by $(1-\alpha) = 0.5$ on the SD scale — the visible signature of
   pre-buying inventory.
+- **Syndicated retained** at the run's $\beta$. Affine rescaling of the
+  partial book by $(1-\beta)$ around $\mathbb{E}[\Pi_\alpha]$ plus the
+  received premium; at $\beta = 0$ it sits on top of the partial panel.
+- **Switching** at the run's barrier $h$ (panel present when a barrier
+  is set). The post-barrier fee leg truncates the back-to-back left
+  tail on paths that crossed the barrier; the solid rule is the MC
+  mean since no closed form exists for $\Pi_{\mathrm{sw}}$ (dashed
+  stroke distinguishes it from the closed-form rules on the other
+  panels).
 
 ```{ojs}
 //| echo: false
 pnlData = [
   ...run.sampleTraces.fee.map(v => ({model: "fee", pnl: v})),
   ...run.sampleTraces.b2b.map(v => ({model: "principal_3b", pnl: v})),
-  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v}))
+  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v})),
+  ...run.sampleTraces.retained.map(v => ({model: "principal_3d", pnl: v})),
+  ...(run.sampleTraces.switching
+    ? run.sampleTraces.switching.map(v => ({model: "principal_3e", pnl: v}))
+    : [])
 ]
+```
+
+```{ojs}
+//| echo: false
+pnlDomain = run.sampleTraces.switching
+  ? ["fee","principal_3b","principal_3c","principal_3d","principal_3e"]
+  : ["fee","principal_3b","principal_3c","principal_3d"]
 ```
 
 ```{ojs}
 //| echo: false
 Plot.plot({
   width: 900,
-  height: 420,
+  height: 560,
   marginLeft: 70,
   marginRight: 30,
   marginBottom: 50,
@@ -239,19 +259,24 @@ Plot.plot({
   x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
   y: { label: "empirical density", labelAnchor: "center" },
   fy: { label: "model" },
-  color: { legend: true, domain: ["fee","principal_3b","principal_3c"], label: "model" },
+  color: { legend: true, domain: pnlDomain, label: "model" },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
     Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "model", fy: "model", thresholds: 60 })),
-    Plot.ruleX(run.rows.filter(r => ["fee","principal_3b","principal_3c"].includes(r.name)),
-      { x: "closedFormMean", fy: "name", stroke: "black", strokeWidth: 2 })
+    // Closed-form means — principal_3e has no closed form, so it's handled
+    // separately below as an MC mean.
+    Plot.ruleX(run.rows.filter(r => ["fee","principal_3b","principal_3c","principal_3d"].includes(r.name)),
+      { x: "closedFormMean", fy: "name", stroke: "black", strokeWidth: 2 }),
+    Plot.ruleX(run.rows.filter(r => r.name === "principal_3e"),
+      { x: "mcMean", fy: "name", stroke: "black", strokeWidth: 2, strokeDasharray: "4 3" })
   ]
 })
 ```
 
-_Solid black rule on each panel: closed-form $\mathbb{E}[\Pi]$. Dashed grey rule:
-break-even $\Pi = 0$._
+_Solid black rule on each panel: closed-form $\mathbb{E}[\Pi]$. Dashed
+black rule on the switching panel: MC-estimated $\mathbb{E}[\Pi]$ (no
+closed form). Dashed grey rule: break-even $\Pi = 0$._
 
 ### $I_T$ histogram vs. Dufresne closed-form moments
 
