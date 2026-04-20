@@ -973,6 +973,237 @@ $\sigma^2_{\mathrm{noise}} > 0$): the noisy realised path fed into the
 integrals, overlaid. Cycle the PRNG seed slider for different noise
 realisations on the same base._
 
+### Carbon price on the drawn path
+
+The same drawn/realised path rescaled to USD per tonne
+($\pi_t = S_t \cdot P$) — the unit the contract quotes in. Today $P$ is
+a constant slider, so the curve shape matches the canvas; the cell is
+written as $S_t \cdot P(t)$ so a future variable-$P$ conversion drops in
+without changing the chart.
+
+```{ojs}
+//| echo: false
+carbonPriceRecords = {
+  const { values, realised, nPoints } = customCurve;
+  const sigmaN = Math.sqrt(curveVar);
+  const hasNoise = sigmaN > 0;
+  const hasCloud = (lambdaJ > 0) || (derived.sigma > 0);
+  const dtDays = Tdays / (nPoints - 1);
+  // Local conversion. Today P is a constant slider, so price-per-tonne
+  // is a straight rescale of S_t. Written as a helper so a future
+  // time-varying P_k drops in without touching the plot.
+  const toTonne = (s) => s * P;
+
+  const baseRows = new Array(nPoints);
+  const realisedRows = hasNoise ? new Array(nPoints) : [];
+  for (let i = 0; i < nPoints; i++) {
+    baseRows[i] = { tDays: i * dtDays, price: toTonne(values[i]), id: "base" };
+    if (hasNoise) {
+      realisedRows[i] = { tDays: i * dtDays, price: toTonne(realised[i]), id: "realised" };
+    }
+  }
+
+  // Rebuild the 20-path cloud the same way as the canvas cell
+  // (viewof customCurve, above) so the chart's grey cloud is bit-identical
+  // to the canvas overlay under the same (seed, μ, σ, λ_J, μ_J, σ_J).
+  const cloudRows = [];
+  if (hasCloud) {
+    const N_CLOUD = 20;
+    const cloudRng = mulberry32(seed);
+    for (let j = 0; j < N_CLOUD; j++) {
+      const { S } = samplePath(cloudRng, {
+        S0: derived.S0,
+        mu,
+        sigma: derived.sigma,
+        T: derived.T,
+        nSteps: nPoints - 1,
+        lambdaJ, muJ, sigmaJ,
+      });
+      const id = "cloud-" + j;
+      for (let i = 0; i < nPoints; i++) {
+        cloudRows.push({ tDays: i * dtDays, price: toTonne(S[i]), id });
+      }
+    }
+  }
+
+  return { baseRows, realisedRows, cloudRows, hasNoise, hasCloud };
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 820,
+  height: 320,
+  marginLeft: 70,
+  marginBottom: 50,
+  grid: true,
+  x: {
+    label: "date",
+    domain: [0, Tdays],
+    ticks: xTicksAnchoredRight(Tdays),
+    tickFormat: d => formatTickDate(
+      new Date(buildDate.getTime() - (Tdays - d) * 86400000), Tdays),
+  },
+  y: { label: "carbon price (USD / tonne)", zero: true, tickFormat: "$~s" },
+  marks: [
+    Plot.ruleY([0]),
+    ...(carbonPriceRecords.hasCloud
+      ? [Plot.line(carbonPriceRecords.cloudRows,
+          { x: "tDays", y: "price", z: "id", stroke: "#888", strokeOpacity: 0.25 })]
+      : []),
+    Plot.line(carbonPriceRecords.baseRows,
+      { x: "tDays", y: "price", stroke: "#c94", strokeWidth: 2 }),
+    ...(carbonPriceRecords.hasNoise
+      ? [Plot.line(carbonPriceRecords.realisedRows,
+          { x: "tDays", y: "price", stroke: "#36c", strokeWidth: 1.5, strokeOpacity: 0.9 })]
+      : []),
+    Plot.ruleX([run.tauFrac * Tdays],
+      { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+  ],
+})
+```
+
+_Orange: drawn base rescaled by $P$. Blue: noise-realised path (when
+$\sigma^2_{\mathrm{noise}} > 0$). Grey: twenty sampled GBM trajectories
+(when $\sigma > 0$ or $\lambda_J > 0$). Green dashed rule:
+inventory-exhaustion time $\alpha T$._
+
+### P&L over time on the drawn path
+
+Each book's deterministic P&L accrued up to time $t$ along the
+drawn/realised path. The rightmost point of each series reconciles with
+the `P&L on drawn curve` column of the table below. The custom book
+shows the characteristic kink at $\alpha T$ (inventory exhaustion); the
+switching book (when $h < 3$) shows a second kink at $\tau$, the moment
+the barrier is first crossed.
+
+```{ojs}
+//| echo: false
+pnlOverTime = {
+  const { realised, nPoints } = customCurve;
+  const T = derived.T;
+  const lam = derived.lambda;
+  const dt = T / (nPoints - 1);
+  const dtDays = Tdays / (nPoints - 1);
+
+  // Keep the αT breakpoint identical to customScenario (index.qmd:910-917)
+  // so the terminal partial matches the table's `cust` to FP noise.
+  const tauFrac = (lam > 0 && P > 0)
+    ? Math.min(1, kPre / (lam * P * T))
+    : 1;
+  const tailStartRaw = Math.ceil(tauFrac * (nPoints - 1));
+  const tailStartIdx = tailStartRaw >= nPoints - 1 ? nPoints : tailStartRaw;
+
+  // Switching barrier walk — mirrors customScenario lines 934-952
+  // step-for-step, recording cumulative ITau/JTau and partial τ so each k
+  // yields a valid partial switching P&L.
+  const H = barrierRatio * derived.S0;
+  const includeSwitch = isFinite(barrierRatio) && barrierRatio < 3;
+  const switchLabel = `principal (switching, h=${barrierRatio.toFixed(2)})`;
+  const fPost = feePost ?? fee;
+
+  // Cumulative state updated in lockstep with k.
+  let I = 0;
+  let ITau = 0;
+  let JTau = 0;
+  let switched = barrierRatio <= 1;
+  let tauTime = switched ? 0 : T;
+
+  const rows = [];
+  for (let k = 0; k < nPoints; k++) {
+    if (k > 0) {
+      const piece = 0.5 * (realised[k - 1] + realised[k]) * dt;
+      I += piece;
+      if (!switched && realised[k] >= H) {
+        tauTime = k * dt;
+        switched = true;
+        ITau += piece;
+      } else if (!switched) {
+        ITau += piece;
+      } else {
+        JTau += piece;
+      }
+    }
+
+    // Edge-weighted tail integral on [tailStartIdx, k], recomputed per k
+    // so the terminal value (k = nPoints - 1) matches customScenario.tailInt
+    // exactly — same rule at index.qmd:912-917. Zero-width (k === tailStartIdx)
+    // collapses to 0. O(nPoints²) overall but nPoints ≤ 1096, so fine.
+    let tailIk = 0;
+    if (k > tailStartIdx && tailStartIdx < nPoints) {
+      for (let j = tailStartIdx; j <= k; j++) {
+        const w = (j === tailStartIdx || j === k) ? 0.5 : 1;
+        tailIk += w * realised[j];
+      }
+      tailIk *= dt;
+    }
+
+    const tK = k * dt;
+    const heldTokens = Math.max(0, kPre - lam * P * tK);
+    const feePnl = fee * P * lam * I;
+    const b2bPnl = Q * lam * tK - P * lam * I;
+    const custPnl = Q * lam * tK - cBasis - P * lam * tailIk + heldTokens * realised[k];
+    const detShift = Q * lam * tK - cBasis;
+    const retainedPnl = detShift + (1 - beta) * (custPnl - detShift) + run.premium * (tK / T);
+
+    const tDays = k * dtDays;
+    rows.push({ tDays, book: "fee", pnl: feePnl });
+    rows.push({ tDays, book: "principal (custom)", pnl: custPnl });
+    rows.push({ tDays, book: "principal (retained, syndicated)", pnl: retainedPnl });
+    rows.push({ tDays, book: "principal (back-to-back)", pnl: b2bPnl });
+    if (includeSwitch) {
+      const switchPnl = switched
+        ? Q * lam * tauTime - P * lam * ITau + fPost * P * lam * JTau
+        : Q * lam * tK - P * lam * I;
+      rows.push({ tDays, book: switchLabel, pnl: switchPnl });
+    }
+  }
+
+  return { rows, includeSwitch, switchLabel };
+}
+```
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  width: 820,
+  height: 360,
+  marginLeft: 80,
+  marginBottom: 50,
+  grid: true,
+  x: {
+    label: "date",
+    domain: [0, Tdays],
+    ticks: xTicksAnchoredRight(Tdays),
+    tickFormat: d => formatTickDate(
+      new Date(buildDate.getTime() - (Tdays - d) * 86400000), Tdays),
+  },
+  y: { label: "partial P&L (USD)", tickFormat: "$~s" },
+  color: {
+    legend: true,
+    domain: [
+      "fee",
+      "principal (custom)",
+      "principal (retained, syndicated)",
+      "principal (back-to-back)",
+      ...(pnlOverTime.includeSwitch ? [pnlOverTime.switchLabel] : []),
+    ],
+  },
+  marks: [
+    Plot.ruleY([0]),
+    Plot.ruleX([run.tauFrac * Tdays],
+      { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+    Plot.line(pnlOverTime.rows,
+      { x: "tDays", y: "pnl", stroke: "book", z: "book", strokeWidth: 1.75 }),
+  ],
+})
+```
+
+_Each line traces one book's deterministic cumulative P&L along the drawn
+(or noise-realised) path. Green dashed rule: inventory-exhaustion time
+$\alpha T$. The switching series appears only when the barrier $h < 3$._
+
 ### Deterministic P&L on the drawn path
 
 The cards below report one-point statistics of the realised curve
