@@ -395,7 +395,7 @@ findingsResetButton = {
 ```{ojs}
 //| echo: false
 import {
-  mulberry32, xTicksAnchoredRight, formatTickDate,
+  mulberry32, xTicksAnchoredRight, formatTickDate, formatTickCurrency,
   simulate, simulateSwitching, summarise, samplePath,
 } from "./lib/compiled/src/core/index.js"
 ```
@@ -1045,7 +1045,7 @@ Plot.plot({
     tickFormat: d => formatTickDate(
       new Date(buildDate.getTime() - (Tdays - d) * 86400000), Tdays),
   },
-  y: { label: "carbon price (USD / tonne)", zero: true, tickFormat: "$~s" },
+  y: { label: "carbon price (USD / tonne)", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     ...(carbonPriceRecords.hasCloud
@@ -1179,7 +1179,7 @@ Plot.plot({
     tickFormat: d => formatTickDate(
       new Date(buildDate.getTime() - (Tdays - d) * 86400000), Tdays),
   },
-  y: { label: "partial P&L (USD)", tickFormat: "$~s" },
+  y: { label: "partial P&L (USD)", tickFormat: formatTickCurrency },
   color: {
     legend: true,
     domain: [

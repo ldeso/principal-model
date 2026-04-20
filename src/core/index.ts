@@ -26,6 +26,7 @@ export type {
   SwitchingResult,
 } from "./simulate-switching.js";
 export {
+  formatTickCurrency,
   formatTickDate,
   tickStep,
   xTicksAnchoredRight,

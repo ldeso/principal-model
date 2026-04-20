@@ -272,6 +272,7 @@ without touching its shape.
 //| echo: false
 import {
   expm1OverX, xTicksForHorizon, simulate, summarise, simulateSwitching,
+  formatTickCurrency,
 } from "./lib/compiled/src/core/index.js"
 ```
 
@@ -504,7 +505,7 @@ Plot.plot({
   marginRight: 30,
   marginBottom: 50,
   grid: true,
-  x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
+  x: { label: "terminal P&L (USD)", tickFormat: formatTickCurrency },
   y: { label: "empirical density" },
   fy: { label: "book" },
   color: { legend: true, domain: [
@@ -572,7 +573,7 @@ Plot.plot({
   marginBottom: 50,
   grid: true,
   x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
-  y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: "$~s" },
+  y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(pathRecords, { x: "tDays", y: "S", z: "id", stroke: "#888", strokeOpacity: 0.35 }),

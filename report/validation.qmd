@@ -91,6 +91,11 @@ Data is loaded from `data/run-42.json`.
 run = FileAttachment("data/run-42.json").json()
 ```
 
+```{ojs}
+//| echo: false
+import { formatTickCurrency } from "./lib/compiled/src/core/index.js"
+```
+
 ### Run parameters
 
 $(\mu, \sigma, T)$ set the price process, $\lambda$ the throughput,
@@ -271,7 +276,7 @@ Plot.plot({
   marginRight: 30,
   marginBottom: 50,
   grid: true,
-  x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
+  x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: formatTickCurrency },
   y: { label: "empirical density", labelAnchor: "center" },
   fy: { label: "model" },
   color: { legend: true, domain: pnlModels, label: "model" },
@@ -368,7 +373,7 @@ Plot.plot({
   marginBottom: 50,
   grid: true,
   x: { label: "normalised time  t / T", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "V_t  =  N·P·(1−t/T)·S_t    (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  y: { label: "V_t  =  N·P·(1−t/T)·S_t    (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(pathRecords, { x: "t", y: "V", z: "id", stroke: "#888", strokeOpacity: 0.3 }),
@@ -403,7 +408,7 @@ Plot.plot({
   marginLeft: 70,
   marginBottom: 50,
   grid: true,
-  x: { label: "max_t [N·P·(1−t/T)·(S_0−S_t)]₊   (USD shortfall)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
+  x: { label: "max_t [N·P·(1−t/T)·(S_0−S_t)]₊   (USD shortfall)", labelAnchor: "center", labelOffset: 36, tickFormat: formatTickCurrency },
   y: { label: "number of paths", labelAnchor: "center" },
   marks: [
     Plot.rectY(run.sampleTraces.navDrawdown, Plot.binX({y:"count"}, {x: d => d, fill:"#e45", fillOpacity: 0.8})),
@@ -460,7 +465,7 @@ Plot.plot({
   marginBottom: 55,
   grid: true,
   x: { label: "volatility σ   (annualised)", labelAnchor: "center", labelOffset: 36, type: "linear" },
-  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, stroke: "#c53", strokeWidth: 2 }),
@@ -495,7 +500,7 @@ Plot.plot({
   grid: true,
   caption: "Coverage α vs tail risk on the partial book. σ fixed at the second grid value. At α = 1 the book is deterministic so CVaR95 collapses to the sign of the matched P&L.",
   x: { label: "hedge ratio α   (0 = back-to-back, 1 = fully matched)", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(byAlpha, { x: "alpha", y: d => d.partial.cvar95, stroke: "#35a", strokeWidth: 2 }),
@@ -595,7 +600,7 @@ Plot.plot({
   grid: true,
   caption: "Retained CVaR₉₅ at the selected (μ, σ, θ). Each line is one α from the sweep grid; β sweeps 0→1. The collapse is linear in (1-β) for every α, and θ > 0 shifts curves upward (more tail loss) because the intermediary pays away mean.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "CVaR95 of Π_ret   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  y: { label: "CVaR95 of Π_ret   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   color: { legend: true, label: "hedge ratio α", domain: sweep.grid.alphas, scheme: "viridis", type: "ordinal" },
   marks: [
     Plot.ruleY([0]),
@@ -642,7 +647,7 @@ Plot.plot({
   grid: true,
   caption: "Premium paid to the intermediary as a function of β, for a handful of θ values. θ = 0 is the actuarially fair premium (the straight blue line). Larger θ carves the curve down — the intermediary surrenders expected P&L to tighten the retained tail.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "premium π   (USD)", labelAnchor: "center", zero: true, tickFormat: "$~s" },
+  y: { label: "premium π   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   color: { legend: true, label: "load θ" },
   marks: [
     Plot.ruleY([0]),
@@ -687,7 +692,7 @@ Plot.plot({
   grid: true,
   caption: "Expected-P&L cost of syndication as a function of β, at α = 0. The θ = 0 curve is the flat no-free-lunch line at zero; larger θ carves linearly downward.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "E[Π_ret] − E[Π_α]   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  y: { label: "E[Π_ret] − E[Π_α]   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   color: { legend: true, label: "load θ" },
   marks: [
     Plot.ruleY([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -754,7 +759,7 @@ Plot.plot({
   grid: true,
   caption: "Switching book — CVaR₉₅ (USD loss, lower is better) as a function of barrier h. Finite h on a log scale; the dashed horizontal is the no-switch syndicated anchor. Lower h truncates more of the loss tail but also caps more of the upside by handing flow to the fee book earlier.",
   x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
-  y: { label: "CVaR95 of Π (switching)   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  y: { label: "CVaR95 of Π (switching)   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "#c33", strokeWidth: 2 }),
@@ -776,7 +781,7 @@ Plot.plot({
   grid: true,
   caption: "Expected P&L across barriers. Tighter h shifts mean upward because the fee book's positive-revenue payoff replaces the back-to-back book's mean-zero-but-fat-tailed payoff on switched paths.",
   x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
-  y: { label: "E[Π] (switching)   (USD)", labelAnchor: "center", tickFormat: "$~s" },
+  y: { label: "E[Π] (switching)   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "#2a7", strokeWidth: 2 }),

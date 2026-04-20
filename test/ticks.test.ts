@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatTickCurrency,
   formatTickDate,
   tickStep,
   xTicksAnchoredRight,
@@ -80,5 +81,59 @@ describe("formatTickDate", () => {
 
   it("renders the 4-digit year for multi-year horizons", () => {
     expect(formatTickDate(d, 2000)).toBe("2026");
+  });
+});
+
+describe("formatTickCurrency", () => {
+  it("renders zero as a plain sigil", () => {
+    expect(formatTickCurrency(0)).toBe("$0");
+  });
+
+  it("uses decimal notation for |v| < 1 (never the milli prefix)", () => {
+    expect(formatTickCurrency(0.1)).toBe("$0.1");
+    expect(formatTickCurrency(0.2)).toBe("$0.2");
+    expect(formatTickCurrency(0.25)).toBe("$0.25");
+    expect(formatTickCurrency(0.999)).toBe("$0.999");
+  });
+
+  it("leaves 1-999 without an SI suffix", () => {
+    expect(formatTickCurrency(1)).toBe("$1");
+    expect(formatTickCurrency(250)).toBe("$250");
+    expect(formatTickCurrency(999)).toBe("$999");
+  });
+
+  it("uses lowercase k for thousands", () => {
+    expect(formatTickCurrency(1000)).toBe("$1k");
+    expect(formatTickCurrency(1500)).toBe("$1.5k");
+    expect(formatTickCurrency(12345)).toBe("$12.3k");
+  });
+
+  it("uses uppercase M for millions", () => {
+    expect(formatTickCurrency(1e6)).toBe("$1M");
+    expect(formatTickCurrency(2.5e6)).toBe("$2.5M");
+    expect(formatTickCurrency(1.23e8)).toBe("$123M");
+  });
+
+  it("uses B and T for billions and trillions", () => {
+    expect(formatTickCurrency(1e9)).toBe("$1B");
+    expect(formatTickCurrency(2.5e9)).toBe("$2.5B");
+    expect(formatTickCurrency(1e12)).toBe("$1T");
+  });
+
+  it("preserves the sign on negatives", () => {
+    expect(formatTickCurrency(-0.1)).toBe("-$0.1");
+    expect(formatTickCurrency(-1500)).toBe("-$1.5k");
+    expect(formatTickCurrency(-1e6)).toBe("-$1M");
+  });
+
+  it("trims trailing zeros from round values", () => {
+    expect(formatTickCurrency(100)).toBe("$100");
+    expect(formatTickCurrency(1e8)).toBe("$100M");
+  });
+
+  it("returns the empty string for non-finite inputs", () => {
+    expect(formatTickCurrency(Number.NaN)).toBe("");
+    expect(formatTickCurrency(Number.POSITIVE_INFINITY)).toBe("");
+    expect(formatTickCurrency(Number.NEGATIVE_INFINITY)).toBe("");
   });
 });

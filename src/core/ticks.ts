@@ -33,3 +33,27 @@ export function formatTickDate(date: Date, tdays: number): string {
   }
   return date.toLocaleString("en-US", { year: "numeric" });
 }
+
+// Currency tick formatter. Mirrors d3-format "$~s" for |v| >= 1000 (k/M/B/T
+// with trimmed trailing zeros) but avoids the milli-prefix footgun for |v| < 1:
+// 0.1 renders as "$0.1", not d3's ambiguous "$100m".
+export function formatTickCurrency(v: number): string {
+  if (!Number.isFinite(v)) return "";
+  if (v === 0) return "$0";
+  const sign = v < 0 ? "-" : "";
+  const x = Math.abs(v);
+  const suffixes = ["", "k", "M", "B", "T"] as const;
+  let tier = Math.min(
+    suffixes.length - 1,
+    Math.max(0, Math.floor(Math.log10(x) / 3)),
+  );
+  let scaled = x / Math.pow(1000, tier);
+  // Rounding can spill across a boundary (e.g. 999.9 -> "1.00e+3"), so bump
+  // the tier to avoid emitting "$1000" instead of "$1k".
+  if (scaled >= 999.5 && tier < suffixes.length - 1) {
+    tier += 1;
+    scaled = x / Math.pow(1000, tier);
+  }
+  const body = Number.parseFloat(scaled.toPrecision(3)).toString();
+  return `${sign}$${body}${suffixes[tier]}`;
+}
