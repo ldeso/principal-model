@@ -127,56 +127,76 @@ nav#TOC > ul { font-size: 0.82rem; }
   grid-column: auto !important;
 }
 
-/* Wide viewports: pin each side-panel column to the edge of the window.
-   Reserve equal padding on both sides of #quarto-content, unconditionally,
-   so the centred main column is the same width on every page — whether it
-   carries a .side-panel-left, Quarto's TOC sidebar, or nothing at all. */
+/* Wide viewports: lay main.content out as a 3-column grid — left gutter,
+   centred body column at --content-w, right gutter. Side panels drop into
+   the gutters via grid-column, and use position: sticky (not fixed) so each
+   panel starts at its natural DOM position — horizontally aligned with the
+   content block that follows it — and only pins to the top of the viewport
+   once the reader has scrolled past. grid-row: span 999 widens each panel's
+   grid area so the sticky containing block covers the whole document;
+   without it, sticky would release at the end of the single auto-placed
+   row. align-self: start keeps the grid from stretching the panel to its
+   area's full height, which would disable sticky entirely. Keeping the
+   panels inside the same grid as the main content means the centred body
+   column is always --content-w wide regardless of which sidebars a given
+   page carries. */
 @media (min-width: 1400px) {
-  .side-panel-left,
-  .side-panel-right,
-  #quarto-sidebar {
-    position: fixed !important;
+  main.content {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--side-min), 1fr)
+      minmax(0, var(--content-w))
+      minmax(var(--side-min), 1fr);
+    column-gap: var(--side-inside-gap);
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: var(--side-offset);
+    padding-right: var(--side-offset);
+  }
+
+  /* Every main.content child defaults to the centre column and drops the
+     inner page-columns grid Quarto auto-wrapped it in, so descendants fill
+     the centred column as plain block flow. */
+  main.content > * {
+    grid-column: 2 !important;
+    grid-template-columns: none !important;
+  }
+  main.content > * > * {
+    grid-column: auto !important;
+  }
+
+  main.content > .side-panel-left,
+  main.content > .side-panel-right {
+    grid-row: span 999 !important;
+    position: sticky;
     top: var(--side-top);
-    width: var(--side-w);
+    align-self: start;
     max-height: calc(100vh - var(--side-top) - 1rem);
     overflow-y: auto;
     z-index: 500;
   }
-  .side-panel-left,
-  #quarto-sidebar { left:  var(--side-offset); }
-  .side-panel-right { right: var(--side-offset); }
+  main.content > .side-panel-left  { grid-column: 1 !important; }
+  main.content > .side-panel-right { grid-column: 3 !important; }
 
-  /* Stack wrapper: multiple cards share one pinned column. */
+  /* Stack wrapper: multiple cards share one sticky column. */
   .side-panel-stack {
     display: flex !important;
     flex-direction: column;
     gap: var(--side-gap);
   }
 
-  #quarto-content {
-    padding-left: calc(var(--side-w) + var(--side-offset) + var(--side-inside-gap));
-    padding-right: calc(var(--side-w) + var(--side-offset) + var(--side-inside-gap));
-  }
-
-  /* Pin the centred body column to --content-w regardless of which grid
-     template Quarto picked for this page (toc-left, fullcontent, etc.).
-     main.content normally sits in the narrow `body-content` track, which
-     differs between article and toc-left templates; span every track so
-     max-width and auto margins determine width and position instead. */
-  main.content {
-    grid-column: 1 / -1 !important;
-    max-width: var(--content-w) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-  /* main.content keeps its own inner page-columns grid; neutralise that
-     too so descendant paragraphs fill the full centred column. */
-  main.content {
-    display: block !important;
-    grid-template-columns: none !important;
-  }
-  main.content > * {
-    grid-column: auto !important;
+  /* Quarto's optional native sidebar (TOC / nav) sits outside main.content,
+     so pin it in the left gutter with position: fixed as before. */
+  #quarto-sidebar {
+    position: fixed !important;
+    top: var(--side-top);
+    left: var(--side-offset);
+    width: var(--side-w);
+    max-height: calc(100vh - var(--side-top) - 1rem);
+    overflow-y: auto;
+    z-index: 500;
   }
 }
 
