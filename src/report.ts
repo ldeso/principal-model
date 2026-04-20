@@ -1,7 +1,12 @@
-// Assembles the P&L moments scorecard and break-even table / JSON artifact from a simulation run.
+// Assembles the P&L moments scorecard and break-even table / JSON artifact from
+// a simulation run. Scorecard rows track the four zero-capital **operating
+// books** (fee, b2b, retained, switching) and the **active treasury**; desk
+// totals for concrete strategies (matched, partial, syndicated-matched,
+// switching-matched, custom) are composed at display time from
+// `operating + treasury` sample sums.
 
 import type { ClosedForm, McResult } from "./core/models.js";
-import { closedForm, simulate } from "./core/models.js";
+import { closedForm, partialDeskClosedForm, simulate } from "./core/models.js";
 import { expectedHittingTime, firstPassageProb } from "./core/moments.js";
 import { simulateSwitching } from "./core/simulate-switching.js";
 import type { SwitchingResult } from "./core/simulate-switching.js";
@@ -34,7 +39,17 @@ export interface ModelRow {
 export interface Report {
   params: Params;
   closed: ClosedForm;
+  /** Operating books + treasury. Switching row only when `barrierRatio !== Infinity`. */
   rows: ModelRow[];
+  /** Closed-form + MC-composed desk totals (operating + treasury at the
+   *  strategy's (k_pre, C_basis)). `matched` is deterministic. Switching-desk
+   *  rows only when the barrier is active. */
+  desks: {
+    matched: { closedFormMean: number; closedFormSd: number };
+    partial: ModelRow;
+    syndicatedMatched: ModelRow;
+    switchingMatched?: ModelRow;
+  };
   drawdown: {
     mean: number;
     sd: number;
@@ -48,8 +63,10 @@ export interface Report {
   sampleTraces: {
     fee: number[];
     b2b: number[];
-    partial: number[];
     retained: number[];
+    treasury: number[];
+    /** Composed `b2b + treasury` at the run's (α·N·P, α·N·P·S_0). */
+    partialDesk: number[];
     navDrawdown: number[];
     /** Present only when `params.barrierRatio !== Infinity`. */
     switching?: number[];
@@ -71,12 +88,10 @@ export interface Report {
     expectedTau: { mc: number; closedForm: number | null; zScore: number | null };
     /** Share of horizon operated in fee mode: E[(T − τ)/T]. */
     meanFracInFeeMode: number;
-    /** CVaR₉₅ of Π_{3e} conditional on τ = T (paths that never switched). */
+    /** CVaR₉₅ of switching_op conditional on τ = T (paths that never switched). */
     cvar95GivenNoSwitch: number | null;
-    /** CVaR₉₅ of Π_{3e} conditional on τ < T (paths that switched). */
+    /** CVaR₉₅ of switching_op conditional on τ < T (paths that switched). */
     cvar95GivenSwitch: number | null;
-    premiumFair: number;
-    premiumLoaded: number;
   };
 }
 
@@ -84,7 +99,7 @@ export function makeRow(
   name: string,
   closedMean: number,
   closedSd: number,
-  samples: Float64Array,
+  samples: ArrayLike<number>,
 ): ModelRow {
   const stats = summarize(samples);
   const sharpe = stats.sd > 0 ? stats.mean / stats.sd : null;
@@ -133,7 +148,7 @@ export function histogram(
   return { edges, counts };
 }
 
-export function subsample(samples: Float64Array, n: number): number[] {
+export function subsample(samples: ArrayLike<number>, n: number): number[] {
   const step = Math.max(1, Math.floor(samples.length / n));
   const out: number[] = [];
   for (let i = 0; i < samples.length && out.length < n; i += step) {
@@ -152,12 +167,13 @@ export function buildReport(
 
   const closed = closedForm(params);
   const mc: McResult = simulate(params, { keepPaths });
+
   // Switching-variant run — shares seed with `simulate(params)` so path-reuse
   // invariance holds (tested explicitly in simulate-switching.test.ts). We
   // always run it even when the barrier is disabled: the wrapper short-
-  // circuits expensive-looking work to a no-op when h = Infinity (the inner
-  // loop still runs but the switching bucket never fires). Skipping the run
-  // entirely would desynchronise the RNG tapes between shared-seed runs.
+  // circuits expensive-looking work to a no-op when h = Infinity. Skipping
+  // the run entirely would desynchronise the RNG tapes between shared-seed
+  // runs.
   const switchingRun = simulateSwitching({
     S0: params.S0,
     mu: params.mu,
@@ -167,10 +183,6 @@ export function buildReport(
     T: params.T,
     Q: params.Q,
     fee: params.f,
-    alpha: params.alpha,
-    beta: params.beta,
-    premiumLoad: params.premiumLoad,
-    premiumMode: params.premiumMode,
     barrierRatio: params.barrierRatio,
     feePost: params.feePost,
     lambdaJ: params.lambdaJ,
@@ -184,31 +196,52 @@ export function buildReport(
 
   const rows: ModelRow[] = [
     makeRow("fee", closed.fee.mean, closed.fee.sd, mc.fee),
-    makeRow("principal_3b", closed.b2b.mean, closed.b2b.sd, mc.b2b),
-    makeRow("principal_3c", closed.partial.mean, closed.partial.sd, mc.partial),
-    makeRow("principal_3d", closed.retained.mean, closed.retained.sd, mc.retained),
+    makeRow("b2b", closed.b2b.mean, closed.b2b.sd, mc.b2b),
+    makeRow("retained", closed.retained.mean, closed.retained.sd, mc.retained),
+    makeRow("treasury", closed.treasury.mean, closed.treasury.sd, mc.treasury),
   ];
   if (isFinite(params.barrierRatio)) {
-    // The switching variant has no closed-form moments; NaNs flag this in downstream tables
-    // rather than feeding a nonsense z-score to the scorecard.
+    // The switching operating book has no closed-form moments; NaN-flag those
+    // so the scorecard doesn't feed a nonsense z-score.
     rows.push(makeSwitchingRow(switchingRun.pnlSamples));
   }
-  // 3a is deterministic: closed-form with zero variance, no MC row.
-  rows.unshift({
-    name: "principal_3a",
-    closedFormMean: closed.matched.mean,
-    closedFormSd: 0,
-    mcMean: closed.matched.mean,
-    mcSd: 0,
-    mcCi95: 0,
-    zScore: 0,
-    var95: -closed.matched.mean,
-    var99: -closed.matched.mean,
-    cvar95: -closed.matched.mean,
-    cvar99: -closed.matched.mean,
-    probLoss: closed.matched.mean < 0 ? 1 : 0,
-    sharpe: null,
-  });
+
+  // Desk compositions. `matched` is deterministic (I_T cancels between b2b
+  // operating and treasury consumption at α = 1); `partial` is the horizon-
+  // based composition at params.alpha; syndicated-matched and switching-matched
+  // are the operating-layer counterparts composed with the fully-matched
+  // treasury.
+  const N = closed.N;
+  const matchedDeskMean = N * (params.Q - params.P * params.S0);
+  const partialDeskSamples = sumSamples(mc.b2b, mc.treasury);
+  const matchedTreasury = matchedTreasurySamples(mc, params);
+  const syndMatchedSamples = sumSamples(mc.retained, matchedTreasury);
+  // At α = 1 the syndicated-matched desk has the matched-deterministic shift
+  // plus the syndication cash flow (premium_loaded − β · E[Π_b2b] cancels at
+  // θ = 0, is negative otherwise).
+  const syndMatchedClosedMean =
+    matchedDeskMean + closed.premium.loaded - params.beta * closed.b2b.mean;
+  const partialCf = partialDeskClosedForm(params);
+  const desks: Report["desks"] = {
+    matched: { closedFormMean: matchedDeskMean, closedFormSd: 0 },
+    partial: makeRow("partial_desk", partialCf.mean, partialCf.sd, partialDeskSamples),
+    syndicatedMatched: makeRow(
+      "syndicated_matched_desk",
+      syndMatchedClosedMean,
+      0,
+      syndMatchedSamples,
+    ),
+    ...(isFinite(params.barrierRatio)
+      ? {
+          switchingMatched: makeRow(
+            "switching_matched_desk",
+            NaN,
+            NaN,
+            sumSamples(switchingRun.pnlSamples, matchedTreasury),
+          ),
+        }
+      : {}),
+  };
 
   const ddStats = summarize(mc.navDrawdowns);
   let ddMax = -Infinity;
@@ -229,6 +262,7 @@ export function buildReport(
     params,
     closed,
     rows,
+    desks,
     drawdown: {
       mean: ddStats.mean,
       sd: ddStats.sd,
@@ -242,8 +276,9 @@ export function buildReport(
     sampleTraces: {
       fee: subsample(mc.fee, traceSize),
       b2b: subsample(mc.b2b, traceSize),
-      partial: subsample(mc.partial, traceSize),
       retained: subsample(mc.retained, traceSize),
+      treasury: subsample(mc.treasury, traceSize),
+      partialDesk: subsample(partialDeskSamples, traceSize),
       navDrawdown: subsample(mc.navDrawdowns, traceSize),
       ...(switching
         ? { switching: subsample(switchingRun.pnlSamples, traceSize) }
@@ -260,14 +295,36 @@ export function buildReport(
   };
 }
 
-// Switching-variant scorecard row: MC-only, no closed-form mean/sd (so NaN-flag those and
-// zero out the z-score). VaR/CVaR/probLoss/Sharpe come from the standard
-// path-sample closure, identical to every other row.
+// Path-by-path `b2b_op + treasury_α` → composed partial-desk samples.
+function sumSamples(a: Float64Array, b: Float64Array): Float64Array {
+  const n = Math.min(a.length, b.length);
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) out[i] = (a[i] as number) + (b[i] as number);
+  return out;
+}
+
+// Synthetic matched-treasury samples: treasury(k_pre = N·P, C_basis = N·P·S_0)
+// = P · λ · I_T − N · P · S_0 (k_left = 0, consumption window = [0, T]).
+// Bitwise recovered from the shared I_T tape so I_T cancels path-by-path
+// against b2b's − P·λ·I_T term, yielding the matched identity.
+function matchedTreasurySamples(mc: McResult, params: Params): Float64Array {
+  const N = params.lambda * params.T;
+  const shift = N * params.P * params.S0;
+  const out = new Float64Array(mc.IT.length);
+  for (let i = 0; i < mc.IT.length; i++) {
+    out[i] = params.P * params.lambda * (mc.IT[i] as number) - shift;
+  }
+  return out;
+}
+
+// Switching-variant scorecard row: MC-only, no closed-form mean/sd (so NaN-flag
+// those and zero out the z-score). VaR/CVaR/probLoss/Sharpe come from the
+// standard path-sample closure.
 export function makeSwitchingRow(samples: Float64Array): ModelRow {
   const stats = summarize(samples);
   const sharpe = stats.sd > 0 ? stats.mean / stats.sd : null;
   return {
-    name: "principal_3e",
+    name: "switching",
     closedFormMean: NaN,
     closedFormSd: NaN,
     mcMean: stats.mean,
@@ -355,7 +412,5 @@ function buildSwitchingBlock(
     meanFracInFeeMode,
     cvar95GivenNoSwitch,
     cvar95GivenSwitch,
-    premiumFair: run.premiumFair,
-    premiumLoaded: run.premiumLoaded,
   };
 }

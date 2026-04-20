@@ -22,55 +22,65 @@ const base: SimulateRunInputs = {
   seed: 2026,
 };
 
-describe("simulateRun — custom-principal book", () => {
-  it("kPre = 0 collapses principal onto b2b − cBasis", () => {
-    // No pre-purchased inventory ⇒ tauFrac = 0 ⇒ tailInt = I_T ⇒
-    // principal = Q·N − C_basis − P·λ·I_T = b2b − C_basis.
-    const cBasis = 12;
-    const r = simulateRun({ ...base, kPre: 0, cBasis });
+describe("simulateRun — active treasury book", () => {
+  it("kPre = 0, cBasis = 0 ⇒ treasury is zero path-by-path", () => {
+    const r = simulateRun({ ...base, kPre: 0, cBasis: 0 });
     expect(r.tauFrac).toBe(0);
     expect(r.tokensLeftover).toBe(0);
-    for (let i = 0; i < r.principalSamples.length; i++) {
-      expect(r.principalSamples[i]).toBeCloseTo(
-        (r.b2bSamples[i] as number) - cBasis,
-        10,
-      );
+    for (let i = 0; i < r.treasurySamples.length; i++) {
+      expect(r.treasurySamples[i]).toBe(0);
     }
   });
 
-  it("kPre = λ·P·T (exact coverage) makes the principal book deterministic", () => {
-    // Enough inventory to cover the whole horizon ⇒ tauFrac = 1 ⇒ tailInt = 0
-    // ⇒ principal = Q·N − C_basis for every path.
+  it("kPre = 0, cBasis > 0 ⇒ treasury = −cBasis path-by-path", () => {
+    const cBasis = 12;
+    const r = simulateRun({ ...base, kPre: 0, cBasis });
+    for (let i = 0; i < r.treasurySamples.length; i++) {
+      expect(r.treasurySamples[i]).toBe(-cBasis);
+    }
+  });
+
+  it("kPre = λ·P·T (exact coverage) ⇒ treasury = P·λ·I_T − cBasis path-by-path", () => {
     const p = { ...base, kPre: base.lambda * base.P * base.T, cBasis: 40 };
     const r = simulateRun(p);
     expect(r.tauFrac).toBe(1);
     expect(r.tokensLeftover).toBe(0);
     expect(r.tokensUsedInternal).toBe(p.kPre);
-    const expected = p.Q * r.N - p.cBasis;
-    for (let i = 0; i < r.principalSamples.length; i++) {
-      expect(r.principalSamples[i]).toBe(expected);
+    for (let i = 0; i < r.treasurySamples.length; i++) {
+      const expected = p.P * p.lambda * (r.ITSamples[i] as number) - p.cBasis;
+      expect(r.treasurySamples[i]).toBeCloseTo(expected, 8);
     }
   });
 
-  it("kPre > λ·P·T marks leftover tokens to spot at horizon", () => {
-    // Double the needed inventory ⇒ half is retired, half survives to T and
-    // is marked at S_T: principal = Q·N − C_basis + leftover·S_T.
+  it("kPre > λ·P·T ⇒ treasury marks leftover to S_T", () => {
+    // Double the needed inventory ⇒ half retired, half survives to T.
     const covered = base.lambda * base.P * base.T;
     const p = { ...base, kPre: 2 * covered, cBasis: 77 };
     const r = simulateRun(p);
     expect(r.tauFrac).toBe(1);
     expect(r.tokensLeftover).toBe(covered);
     expect(r.tokensUsedInternal).toBe(covered);
-    for (let i = 0; i < r.principalSamples.length; i++) {
-      const residual = (r.principalSamples[i] as number) -
-        r.tokensLeftover * (r.terminalS[i] as number);
-      expect(residual).toBeCloseTo(p.Q * r.N - p.cBasis, 8);
+    for (let i = 0; i < r.treasurySamples.length; i++) {
+      const expected =
+        p.P * p.lambda * (r.ITSamples[i] as number) +
+        r.tokensLeftover * (r.terminalS[i] as number) -
+        p.cBasis;
+      expect(r.treasurySamples[i]).toBeCloseTo(expected, 8);
+    }
+  });
+
+  it("matched desk: b2b + treasury(N·P, N·P·S_0) is deterministic N·(Q − P·S_0)", () => {
+    const covered = base.lambda * base.P * base.T;
+    const p = { ...base, kPre: covered, cBasis: covered * base.S0 };
+    const r = simulateRun(p);
+    const expected = p.lambda * p.T * (p.Q - p.P * p.S0);
+    for (let i = 0; i < r.b2bSamples.length; i++) {
+      const desk = (r.b2bSamples[i] as number) + (r.treasurySamples[i] as number);
+      expect(desk).toBeCloseTo(expected, 8);
     }
   });
 
   it("mean fee revenue matches the closed-form GBM anchor", () => {
-    // Under pure GBM (λ_J = 0) E[I_T] = S_0·T·(e^{μT}−1)/(μT), so
-    // E[R_fee] = f·P·λ·E[I_T]. Hold the MC mean to within 4 stderr.
     const p = { ...base, nPaths: 20_000, nSteps: 100 };
     const r = simulateRun(p);
     const eIT = expectedIt(p.S0, p.mu, p.T);
@@ -80,8 +90,6 @@ describe("simulateRun — custom-principal book", () => {
   });
 
   it("shares the Merton kernel with samplePath (bit-for-bit under a common seed)", () => {
-    // Same RNG stream, same path opts ⇒ simulateRun's I_T and S_T per path
-    // must match an independent samplePath loop exactly.
     const p = { ...base, nPaths: 16, nSteps: 32 };
     const r = simulateRun(p);
     const rng = mulberry32(p.seed);
@@ -95,41 +103,35 @@ describe("simulateRun — custom-principal book", () => {
   });
 
   it("tauFrac = 1 when λ or P is zero (degenerate-demand guard)", () => {
-    // If there's no demand, any pre-purchase covers the whole (zero) horizon
-    // of retirements, so we never buy on the tail.
     const rZero = simulateRun({ ...base, lambda: 0, kPre: 0, cBasis: 0 });
     expect(rZero.tauFrac).toBe(1);
     expect(rZero.tokensUsedInternal).toBe(0);
     expect(rZero.tokensLeftover).toBe(0);
   });
+});
 
-  it("β = 0 collapses retained to principal and emits zero premium", () => {
+describe("simulateRun — syndicated-on-b2b operating book", () => {
+  it("β = 0 ⇒ retained = b2b path-by-path, premium = 0", () => {
     const r = simulateRun({ ...base, kPre: 50_000, cBasis: 4_000, beta: 0 });
     expect(r.premium).toBe(0);
-    for (let i = 0; i < r.principalSamples.length; i++) {
-      expect(r.retainedSamples[i]).toBeCloseTo(r.principalSamples[i] as number, 12);
+    for (let i = 0; i < r.b2bSamples.length; i++) {
+      expect(r.retainedSamples[i]).toBeCloseTo(r.b2bSamples[i] as number, 12);
     }
   });
 
-  it("β = 1 at θ = 0 freezes retained at (det-shift + fair premium)", () => {
-    // Ceding the full stochastic residual at the fair price collapses
-    // variance; mean equals Q·N − C_basis + β·E[stochastic residual].
-    const p = { ...base, nPaths: 5_000, kPre: 80_000, cBasis: 6_000, beta: 1 };
+  it("β = 1 at θ = 0 freezes retained at the fair premium (zero variance)", () => {
+    const p = { ...base, nPaths: 5_000, beta: 1 };
     const r = simulateRun(p);
     const s = summarize(r.retainedSamples);
     expect(s.variance).toBeLessThan(1e-12);
-    // stochMean is the MC mean of (principal − (Q·N − cBasis)); at β = 1 the
-    // retained sample equals (Q·N − cBasis) + stochMean, which is exactly
-    // the sample mean of principalSamples.
-    const principalMean = summarize(r.principalSamples).mean;
-    expect(s.mean).toBeCloseTo(principalMean, 6);
+    // Fair premium at β = 1 equals the b2b sample mean.
+    const b2bMean = summarize(r.b2bSamples).mean;
+    expect(s.mean).toBeCloseTo(b2bMean, 6);
   });
 
   it("CVaR-mode premium differs from Sharpe-mode by the Gaussian factor at θ > 0", () => {
-    // Same seed/params ⇒ same MC tape ⇒ same stochastic moments; only the
-    // load factor (1 vs. GAUSS) differs between modes.
     const GAUSS = 2.062713055949736;
-    const shared = { ...base, nPaths: 4_000, seed: 777, kPre: 60_000, cBasis: 3_000 };
+    const shared = { ...base, nPaths: 4_000, seed: 777 };
     const rFair = simulateRun({ ...shared, beta: 0.4, premiumLoad: 0 });
     const rSharpe = simulateRun({
       ...shared, beta: 0.4, premiumLoad: 0.6, premiumMode: "sharpe",

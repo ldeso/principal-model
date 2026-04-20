@@ -3,9 +3,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildReport } from "./report.js";
-import { closedForm } from "./core/models.js";
+import {
+  closedForm,
+  partialDeskClosedForm,
+  simulate,
+} from "./core/models.js";
 import type { Params } from "./params.js";
 import { defaultParams, withOverrides } from "./params.js";
+import { conditionalVaR, probLoss, summarize, valueAtRisk } from "./core/risk.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(HERE, "..", "report", "data");
@@ -88,9 +93,9 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\nP&L moments, closed-form vs MC`);
+  console.log(`\nOperating books + treasury — closed form vs MC`);
   console.log(
-    "  model          E[Π] (cf)     E[Π] (mc)     ±CI95          SD (cf)       SD (mc)       z",
+    "  book           E[Π] (cf)     E[Π] (mc)     ±CI95          SD (cf)       SD (mc)       z",
   );
   for (const r of report.rows) {
     console.log(
@@ -104,9 +109,9 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\nTail risk (Monte Carlo)`);
+  console.log(`\nTail risk (Monte Carlo) — operating books + treasury`);
   console.log(
-    "  model          VaR95         VaR99         CVaR95        CVaR99        P[Π<0]    Sharpe",
+    "  book           VaR95         VaR99         CVaR95        CVaR99        P[Π<0]    Sharpe",
   );
   for (const r of report.rows) {
     console.log(
@@ -120,8 +125,32 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
+  console.log(`\nDesks (operating + treasury) — closed form vs MC`);
   console.log(
-    `\nMatched book — NAV drawdown  mean=${fmt(report.drawdown.mean)}` +
+    `  matched          E[Π] = ${fmt(report.desks.matched.closedFormMean)}` +
+      `  SD = 0 (deterministic, I_T cancels at α = 1)`,
+  );
+  const pdk = report.desks.partial;
+  console.log(
+    `  partial (α=${params.alpha})  E[Π] cf=${fmt(pdk.closedFormMean)}` +
+      `  mc=${fmt(pdk.mcMean)}  ±CI95=${fmt(pdk.mcCi95)}` +
+      `  SD cf=${fmt(pdk.closedFormSd)}  mc=${fmt(pdk.mcSd)}  z=${fmt(pdk.zScore, 2)}`,
+  );
+  const sdk = report.desks.syndicatedMatched;
+  console.log(
+    `  syndicated-matched  E[Π] cf=${fmt(sdk.closedFormMean)}` +
+      `  mc=${fmt(sdk.mcMean)}  SD mc=${fmt(sdk.mcSd)}`,
+  );
+  if (report.desks.switchingMatched) {
+    const swk = report.desks.switchingMatched;
+    console.log(
+      `  switching-matched   E[Π] mc=${fmt(swk.mcMean)}  SD mc=${fmt(swk.mcSd)}` +
+        `  CVaR95=${fmt(swk.cvar95)}  (MC only)`,
+    );
+  }
+
+  console.log(
+    `\nMatched-inventory NAV shortfall  mean=${fmt(report.drawdown.mean)}` +
       `  sd=${fmt(report.drawdown.sd)}` +
       `  q95=${fmt(report.drawdown.var95)}` +
       `  q99=${fmt(report.drawdown.var99)}` +
@@ -161,10 +190,6 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
         `  CVaR95|no-switch=${fmtMaybe(sw.cvar95GivenNoSwitch)}` +
         `  CVaR95|switched=${fmtMaybe(sw.cvar95GivenSwitch)}`,
     );
-    console.log(
-      `  π_fair=${fmt(sw.premiumFair)}  π_loaded=${fmt(sw.premiumLoaded)}` +
-        `  (MC-derived; no closed form for Π_sw)`,
-    );
   }
 
   console.log(`\nBreak-even quote  Q* = ${fmt(report.closed.QStar, 4)}`);
@@ -184,10 +209,36 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
   return report;
 }
 
-// Sweep grid driving the Observable report's sliders; fewer paths for speed.
+// Sweep grid driving the Validation page's sliders; fewer paths for speed.
 const SWEEP_ALPHAS = [0, 0.25, 0.5, 0.75, 1];
 const SWEEP_MUS = [-0.1, 0, 0.05, 0.1, 0.2];
 const SWEEP_SIGMAS = [0.2, 0.5, 0.8, 1.2];
+
+interface CellMetrics {
+  mean: number;
+  sd: number;
+  var95: number;
+  var99: number;
+  cvar95: number;
+  cvar99: number;
+  probLoss: number;
+  sharpe: number | null;
+}
+
+function metricsFromSamples(samples: Float64Array): CellMetrics {
+  const s = summarize(samples);
+  const sharpe = s.sd > 0 ? s.mean / s.sd : null;
+  return {
+    mean: s.mean,
+    sd: s.sd,
+    var95: valueAtRisk(samples, 0.95),
+    var99: valueAtRisk(samples, 0.99),
+    cvar95: conditionalVaR(samples, 0.95),
+    cvar99: conditionalVaR(samples, 0.99),
+    probLoss: probLoss(samples),
+    sharpe,
+  };
+}
 
 function runSweep(baseParams: Params): unknown {
   const sweepParams = withOverrides(baseParams, { nPaths: 20_000, nSteps: 100 });
@@ -196,17 +247,30 @@ function runSweep(baseParams: Params): unknown {
     for (const mu of SWEEP_MUS) {
       for (const sigma of SWEEP_SIGMAS) {
         const p = withOverrides(sweepParams, { alpha, mu, sigma });
-        const r = buildReport(p, { keepPaths: 0, traceSize: 0, histBins: 40 });
+        const cf = closedForm(p);
+        const mc = simulate(p);
+        const N = p.lambda * p.T;
+        const partialDesk = new Float64Array(mc.b2b.length);
+        for (let i = 0; i < partialDesk.length; i++) {
+          partialDesk[i] = (mc.b2b[i] as number) + (mc.treasury[i] as number);
+        }
+        const partialDeskCf = partialDeskClosedForm(p);
+        const matchedDeskMean = N * (p.Q - p.P * p.S0);
         cells.push({
           alpha,
           mu,
           sigma,
-          fee: extractRowMetrics(r.rows, "fee"),
-          b2b: extractRowMetrics(r.rows, "principal_3b"),
-          matched: extractRowMetrics(r.rows, "principal_3a"),
-          partial: extractRowMetrics(r.rows, "principal_3c"),
-          drawdown: r.drawdown,
-          QStar: r.closed.QStar,
+          fee: metricsFromSamples(mc.fee),
+          b2b: metricsFromSamples(mc.b2b),
+          retained: metricsFromSamples(mc.retained),
+          treasury: metricsFromSamples(mc.treasury),
+          partialDesk: metricsFromSamples(partialDesk),
+          partialDeskClosed: {
+            mean: partialDeskCf.mean,
+            sd: partialDeskCf.sd,
+          },
+          matchedDesk: { mean: matchedDeskMean, sd: 0 },
+          QStar: cf.QStar,
         });
       }
     }
@@ -218,28 +282,11 @@ function runSweep(baseParams: Params): unknown {
   };
 }
 
-function extractRowMetrics(
-  rows: ReturnType<typeof buildReport>["rows"],
-  name: string,
-): unknown {
-  const r = rows.find((x) => x.name === name);
-  if (!r) return null;
-  return {
-    mean: r.mcMean,
-    sd: r.mcSd,
-    var95: r.var95,
-    var99: r.var99,
-    cvar95: r.cvar95,
-    cvar99: r.cvar99,
-    probLoss: r.probLoss,
-    sharpe: r.sharpe,
-  };
-}
-
-// Switching-variant barrier sweep: the operator-decision chart (CVaR₉₅ and E[Π] vs h) is
-// derived from these cells. Infinity = "switch disabled", which anchors the
-// curve to the syndicated retained book. Kept separate from SWEEP_ALPHAS/MUS/SIGMAS
-// so we don't blow up the (α, μ, σ) grid into a 4-dim product.
+// Switching-variant barrier sweep: the operator-decision chart (CVaR₉₅ and
+// E[Π] vs h) is derived from these cells. Infinity = "switch disabled",
+// which anchors the curve to the operating-retained reference. Kept separate
+// from SWEEP_ALPHAS/MUS/SIGMAS so we don't blow up the (α, μ, σ) grid into a
+// 4-dim product.
 const SWEEP_BARRIERS = [1.0, 1.1, 1.25, 1.5, 2.0, Infinity];
 
 function runSwitchingSweep(baseParams: Params): unknown {
@@ -248,17 +295,31 @@ function runSwitchingSweep(baseParams: Params): unknown {
   for (const h of SWEEP_BARRIERS) {
     const p = withOverrides(p0, { barrierRatio: h });
     const r = buildReport(p, { keepPaths: 0, traceSize: 0, histBins: 0 });
-    const switchingRow =
-      r.rows.find((x) => x.name === "principal_3e") ?? null;
+    const cellMetrics = (name: string): CellMetrics | null => {
+      const row = r.rows.find((x) => x.name === name);
+      if (!row) return null;
+      return {
+        mean: row.mcMean,
+        sd: row.mcSd,
+        var95: row.var95,
+        var99: row.var99,
+        cvar95: row.cvar95,
+        cvar99: row.cvar99,
+        probLoss: row.probLoss,
+        sharpe: row.sharpe,
+      };
+    };
     cells.push({
       h,
       switching: r.switching ?? null,
-      row: switchingRow
-        ? extractRowMetrics(r.rows, "principal_3e")
-        : extractRowMetrics(r.rows, "principal_3d"),
-      retained: extractRowMetrics(r.rows, "principal_3d"),
-      b2b: extractRowMetrics(r.rows, "principal_3b"),
-      fee: extractRowMetrics(r.rows, "fee"),
+      // `row` is the switching operating book when the barrier is active; on
+      // h = Infinity we anchor to the retained operating book so the sweep
+      // plot still has a comparable "no-switch" reference.
+      row: cellMetrics("switching") ?? cellMetrics("retained"),
+      retained: cellMetrics("retained"),
+      b2b: cellMetrics("b2b"),
+      fee: cellMetrics("fee"),
+      treasury: cellMetrics("treasury"),
     });
   }
   return { grid: { barriers: SWEEP_BARRIERS }, base: p0, cells };
@@ -267,11 +328,11 @@ function runSwitchingSweep(baseParams: Params): unknown {
 const QSTAR_MUS = [-0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];
 const QSTAR_TS = [0.25, 0.5, 1, 2, 3];
 
-// Canonical Merton overlay used to verify the compensated Merton section of research-note.md:
-// the compensated
-// drift keeps every closed-form *mean* identical to the GBM anchor even with
-// fat, negatively-biased jumps. Fixed parameters so the Validation-page
-// verification table is stable across reruns.
+// Canonical Merton overlay used to verify the compensated-Merton section of
+// research-note.md: the compensated drift keeps every closed-form *mean*
+// identical to the GBM anchor even with fat, negatively-biased jumps. Fixed
+// parameters so the Validation-page verification table is stable across
+// reruns.
 const JUMP_CHECK: { lambdaJ: number; muJ: number; sigmaJ: number } = {
   lambdaJ: 3,
   muJ: -0.1,
@@ -332,7 +393,7 @@ function printJumpCheck(check: unknown): void {
     "  means still match the GBM closed form; SD inflates; see the compensated Merton section of research-note.md",
   );
   console.log(
-    "  model          E[Π] gbm-cf   E[Π] merton   ±CI95          SD gbm-cf    SD merton     z",
+    "  book           E[Π] gbm-cf   E[Π] merton   ±CI95          SD gbm-cf    SD merton     z",
   );
   for (const r of c.rows) {
     console.log(

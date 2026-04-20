@@ -21,32 +21,25 @@ subtitle: "Revenue and risk for a carbon-retirement intermediary"
 <details open>
 <summary>Glossary</summary>
 <dl>
-  <dt>Fee book</dt>
+  <dt>Operating book</dt>
+  <dd>A zero-capital book: P&amp;L(0) = 0, every tonne sourced at
+  spot. Four flavours — fee, b2b, retained (syndicated-on-b2b),
+  switching.</dd>
+
+  <dt>Fee</dt>
   <dd>Quote <code>(1 + f) · P · S<sub>t</sub></code>, remit the
   protocol price, keep the markup <code>f · P · S<sub>t</sub></code>.
-  Revenue <code>≥ 0</code> by construction; no inventory.</dd>
+  Revenue <code>≥ 0</code> by construction.</dd>
 
-  <dt>Principal book</dt>
-  <dd>Quote a fixed <code>Q</code> up front, source the tokens at
-  spot or pre-buy. Five variants below.</dd>
+  <dt>b2b (back-to-back)</dt>
+  <dd>Quote a fixed <code>Q</code>, source each tonne at spot. Short
+  kVCM beta over <code>[0, T]</code>; upside capped, downside
+  unbounded.</dd>
 
-  <dt>Matched</dt>
-  <dd>Pre-buy all inventory at <code>t = 0</code>. Terminal P&amp;L
-  deterministic.</dd>
-
-  <dt>Back-to-back</dt>
-  <dd>Source every tonne at spot. Short kVCM beta over
-  <code>[0, T]</code>; upside capped, downside unbounded.</dd>
-
-  <dt>Partial</dt>
-  <dd>Pre-buy a fraction <code>α</code> of inventory at
-  <code>t = 0</code>; the rest back-to-back. Mean interpolates
-  linearly, SD collapses as <code>(1 − α)</code>.</dd>
-
-  <dt>Syndicated</dt>
-  <dd>Cede a fraction <code>β</code> of the stochastic leg to a
-  counterparty against an up-front premium. Variance collapses as
-  <code>(1 − α)²(1 − β)²</code>.</dd>
+  <dt>Retained (syndicated)</dt>
+  <dd>Cede a fraction <code>β</code> of b2b to a counterparty
+  against an up-front premium. Variance collapses as
+  <code>(1 − β)²</code>.</dd>
 
   <dt>Switching</dt>
   <dd>Flip pricing from <code>Q</code> to a fee book when
@@ -54,14 +47,23 @@ subtitle: "Revenue and risk for a carbon-retirement intermediary"
   <code>h · S<sub>0</sub></code>. Truncates the loss tail rather
   than rescaling it.</dd>
 
-  <dt>Coverage α</dt>
-  <dd>Fraction of horizon served from pre-bought inventory. The
-  linear dial on tail risk for the principal book.</dd>
+  <dt>Treasury</dt>
+  <dd>Active consuming inventory, parameterised by pre-purchased
+  tokens <code>k</code> and sunk basis <code>C<sub>basis</sub></code>.
+  Feeds retirement at spot over <code>[0, min(T, k/(P·λ))]</code>;
+  leftover tokens are marked at <code>S<sub>T</sub></code>. Opens at
+  MTM <code>k · S<sub>0</sub> − C<sub>basis</sub></code>.</dd>
+
+  <dt>Desk total</dt>
+  <dd>Any strategy = operating book + treasury. Matched desk =
+  <code>b2b + treasury(N·P, N·P·S<sub>0</sub>)</code> is
+  deterministic <code>N(Q − P·S<sub>0</sub>)</code>: <code>I<sub>T</sub></code>
+  cancels between b2b's stochastic leg and the treasury's
+  consumption.</dd>
 
   <dt><code>Q*</code></dt>
-  <dd>The fixed quote at which the fee and back-to-back books share
-  expected revenue. Matching means does <em>not</em> match
-  distributions.</dd>
+  <dd>The fixed quote at which fee and b2b share expected revenue.
+  Matching means does <em>not</em> match distributions.</dd>
 </dl>
 </details>
 </aside>
@@ -82,28 +84,31 @@ design decision.
 The [Model](model.qmd) page derives each claim in full; what follows
 is the shape-of-the-answer.
 
-### The fee and back-to-back books share a kernel but not a sign
+### Fee and b2b share a kernel but not a sign
 
-Fix $Q$ at the break-even level $Q^*$ and the fee and back-to-back
+Fix $Q$ at the break-even level $Q^*$ and the fee and b2b operating
 books have identical expected P&L. Their distributions are near
 mirror images, though: both are linear in the shared random kernel
-$I_T = \int_0^T S_t \, dt$, but the fee book enters with a plus
-(revenue, bounded below by zero) and the back-to-back book with a
-minus (upside capped at $Q N$, downside unbounded). Matching means
-does not match distributions — at $Q^*$ the principal book has paid
-for a loss tail the fee book does not carry.
+$I_T = \int_0^T S_t \, dt$, but fee enters with a plus (revenue,
+bounded below by zero) and b2b with a minus (upside capped at $Q
+N$, downside unbounded). Matching means does not match distributions
+— at $Q^*$ the b2b book has paid for a loss tail the fee book does
+not carry.
 
-### Coverage is a linear dial; basis is a translation
+### The treasury cancels b2b's $I_T$ term when fully matched
 
-Pre-buying a fraction $\alpha$ of inventory collapses the principal
-book's SD and tail quantiles by $(1 - \alpha)$ — doubling coverage
-roughly halves CVaR₉₅. Quota-share syndication is a second such dial,
-multiplying on top as $(1 - \beta)$: at the fair premium ($\theta =
-0$), cession preserves expected P&L while cutting variance as
-$(1 - \alpha)^2 (1 - \beta)^2$. Crucially, the *cost basis* of held
-inventory translates the distribution without touching its spread, so
-risk managers should track coverage, not the unrealised P&L on held
-tokens.
+Buying the full $N P$ tokens at $t = 0$ gives a treasury whose
+consumption integral contributes $+ P \lambda I_T$ to desk P&L —
+exactly opposite to b2b's $- P \lambda I_T$. The sum collapses to
+the deterministic $N(Q - P S_0)$. Partial pre-purchase
+$(k, C_{\mathrm{basis}})$ leaves a tail $J_\alpha = \int_{\alpha T}^T
+S_t \, dt$ uncancelled; the desk SD shrinks with the length of the
+covered window, and $C_{\mathrm{basis}}$ translates the distribution
+without changing its shape. Quota-share syndication of the b2b
+operating book is a second, multiplicative dial: variance collapses
+as $(1 - \beta)^2$, and at the fair premium ($\theta = 0$) cession
+preserves expected P&L. Risk managers should track coverage and
+cession separately from the unrealised P&L on held tokens.
 
 ### A barrier truncates the tail rather than rescaling it
 
@@ -113,9 +118,10 @@ S_0$ caps every post-barrier retirement at non-negative fee revenue,
 so the tail is bounded rather than scaled. Under the default
 calibration, $h = 1.25$ collapses CVaR₉₅ from ≈ \$3,900 to ≈ \$49
 ($\approx 80\times$) while *raising* expected P&L. The three levers
-— capital ($\alpha$), counterparty credit ($\beta$), market timing
-($h$) — compose multiplicatively and consume distinct resources;
-together they close the asymmetry the first finding identifies.
+— capital (via the treasury), counterparty credit (β), market
+timing ($h$) — compose multiplicatively and consume distinct
+resources; together they close the asymmetry the first finding
+identifies.
 
 ---
 
@@ -427,13 +433,19 @@ run = {
     nPaths: 5000, nSteps: 100, seed,
   };
   const raw = simulate(inputs);
+  const customDeskSamples = new Float64Array(raw.b2bSamples.length);
+  for (let i = 0; i < customDeskSamples.length; i++) {
+    customDeskSamples[i] = raw.b2bSamples[i] + raw.treasurySamples[i];
+  }
   return {
     inputs,
     ...raw,
+    customDeskSamples,
     fee: summarise(raw.feeSamples),
-    principal: summarise(raw.principalSamples),
     retained: summarise(raw.retainedSamples),
     b2b: summarise(raw.b2bSamples),
+    treasury: summarise(raw.treasurySamples),
+    customDesk: summarise(customDeskSamples),
   };
 }
 ```
@@ -441,15 +453,13 @@ run = {
 ```{ojs}
 //| echo: false
 // Switching-book MC sibling. Shares `seed` with `run` so the GBM path draws
-// coincide bit-for-bit (see src/core/simulate-switching.ts:10-13). α = 0 and
-// β = 0 here — the partial lever is already expressed via kPre/cBasis, and
-// composing with β would double-count the cession applied by the retained
-// row above.
+// coincide bit-for-bit. The switching book is a pure operating book —
+// matched-desk composition (switching + treasury) is deferred to Validation.
 switchRun = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
-    Q, fee, alpha: 0, beta: 0, premiumLoad: 0, premiumMode,
+    Q, fee,
     barrierRatio, feePost,
     lambdaJ, muJ, sigmaJ,
     nPaths: 5000, nSteps: 100, seed,
@@ -915,22 +925,22 @@ customScenario = {
     tailInt += w * realised[k];
   }
   tailInt *= dt;
+  const consumptionInt = IT - tailInt;
 
   const ST = realised[nPoints - 1];
   const tokensLeftover = Math.max(0, kPre - lam * T * P);
   const feeRev = fee * P * lam * IT;
-  const b2b = Q * N - P * lam * IT;
-  const cust = Q * N - cBasis - P * lam * tailInt + tokensLeftover * ST;
+  const b2bOp = Q * N - P * lam * IT;
+  const treasury = P * lam * consumptionInt + tokensLeftover * ST - cBasis;
+  const customDesk = b2bOp + treasury;
 
-  // Retained (syndicated) — same closure as src/core/simulate-run.ts:137,154-158
-  // applied to the drawn-curve custom P&L. The premium scalar comes from the
-  // MC run (run.premium), identical to the pattern the MC row uses.
-  const detShift = Q * N - cBasis;
-  const retainedDet = detShift + (1 - beta) * (cust - detShift) + run.premium;
+  // Retained operating book: (1 − β) · b2b + premium. The premium scalar comes
+  // from the MC run (run.premium) — derived from the run's b2b sample moments.
+  const retainedOp = (1 - beta) * b2bOp + run.premium;
 
   // Switching — walk the realised path, bucket trapezoid pieces into I_τ / J_τ.
-  // Barrier convention matches src/core/simulate-switching.ts:169-179: the step
-  // that completes the crossing belongs to I_τ, τ = k·dt; h ≤ 1 fires at t=0.
+  // Barrier convention matches src/core/simulate-switching.ts: the step that
+  // completes the crossing belongs to I_τ, τ = k·dt; h ≤ 1 fires at t=0.
   const H = barrierRatio * derived.S0;
   let switched = barrierRatio <= 1;
   let tauTime = switched ? 0 : T;
@@ -951,7 +961,7 @@ customScenario = {
     }
   }
   const fPost = feePost ?? fee;
-  const switchingDet = Q * lam * tauTime - P * lam * ITau + fPost * P * lam * JTau;
+  const switchingOp = Q * lam * tauTime - P * lam * ITau + fPost * P * lam * JTau;
 
   let maxS = -Infinity, minS = Infinity;
   for (let k = 0; k < nPoints; k++) {
@@ -962,7 +972,8 @@ customScenario = {
 
   return {
     base, realised, nPoints, IT, tailInt, ST, tauFrac, tokensLeftover,
-    feeRev, b2b, cust, retainedDet, switchingDet, crossed, tauTime,
+    feeRev, b2bOp, treasury, customDesk, retainedOp, switchingOp,
+    crossed, tauTime,
     maxS, minS, meanS,
   };
 }
@@ -1086,21 +1097,19 @@ pnlOverTime = {
   const lam = derived.lambda;
   const dt = T / (nPoints - 1);
   const dtDays = Tdays / (nPoints - 1);
+  const N = derived.N;
 
-  // Keep the αT breakpoint identical to customScenario (index.qmd:910-917)
-  // so the terminal partial matches the table's `cust` to FP noise.
+  // Keep the αT breakpoint identical to customScenario so the terminal custom
+  // desk matches the table's `customDesk` to FP noise.
   const tauFrac = (lam > 0 && P > 0)
     ? Math.min(1, kPre / (lam * P * T))
     : 1;
   const tailStartRaw = Math.ceil(tauFrac * (nPoints - 1));
   const tailStartIdx = tailStartRaw >= nPoints - 1 ? nPoints : tailStartRaw;
 
-  // Switching barrier walk — mirrors customScenario lines 934-952
-  // step-for-step, recording cumulative ITau/JTau and partial τ so each k
-  // yields a valid partial switching P&L.
   const H = barrierRatio * derived.S0;
   const includeSwitch = isFinite(barrierRatio) && barrierRatio < 3;
-  const switchLabel = `principal (switching, h=${barrierRatio.toFixed(2)})`;
+  const switchLabel = `switching (h=${barrierRatio.toFixed(2)})`;
   const fPost = feePost ?? fee;
 
   // Cumulative state updated in lockstep with k.
@@ -1109,6 +1118,9 @@ pnlOverTime = {
   let JTau = 0;
   let switched = barrierRatio <= 1;
   let tauTime = switched ? 0 : T;
+
+  // Treasury opens at MTM at t = 0; operating books all start at 0.
+  const treasuryOpen = kPre * derived.S0 - cBasis;
 
   const rows = [];
   for (let k = 0; k < nPoints; k++) {
@@ -1126,10 +1138,9 @@ pnlOverTime = {
       }
     }
 
-    // Edge-weighted tail integral on [tailStartIdx, k], recomputed per k
-    // so the terminal value (k = nPoints - 1) matches customScenario.tailInt
-    // exactly — same rule at index.qmd:912-917. Zero-width (k === tailStartIdx)
-    // collapses to 0. O(nPoints²) overall but nPoints ≤ 1096, so fine.
+    // Edge-weighted tail integral on [tailStartIdx, k]. Zero-width
+    // (k === tailStartIdx) collapses to 0. O(nPoints²) overall but
+    // nPoints ≤ 1096, so fine.
     let tailIk = 0;
     if (k > tailStartIdx && tailStartIdx < nPoints) {
       for (let j = tailStartIdx; j <= k; j++) {
@@ -1141,17 +1152,19 @@ pnlOverTime = {
 
     const tK = k * dt;
     const heldTokens = Math.max(0, kPre - lam * P * tK);
+    const consumptionIk = I - tailIk;
     const feePnl = fee * P * lam * I;
     const b2bPnl = Q * lam * tK - P * lam * I;
-    const custPnl = Q * lam * tK - cBasis - P * lam * tailIk + heldTokens * realised[k];
-    const detShift = Q * lam * tK - cBasis;
-    const retainedPnl = detShift + (1 - beta) * (custPnl - detShift) + run.premium * (tK / T);
+    const retainedPnl = (1 - beta) * b2bPnl + run.premium * (tK / T);
+    const treasuryPnl = P * lam * consumptionIk + heldTokens * realised[k] - cBasis;
+    const customDeskPnl = b2bPnl + treasuryPnl;
 
     const tDays = k * dtDays;
     rows.push({ tDays, book: "fee", pnl: feePnl });
-    rows.push({ tDays, book: "principal (custom)", pnl: custPnl });
-    rows.push({ tDays, book: "principal (retained, syndicated)", pnl: retainedPnl });
-    rows.push({ tDays, book: "principal (back-to-back)", pnl: b2bPnl });
+    rows.push({ tDays, book: "b2b", pnl: b2bPnl });
+    rows.push({ tDays, book: "retained (syndicated-on-b2b)", pnl: retainedPnl });
+    rows.push({ tDays, book: "treasury", pnl: treasuryPnl });
+    rows.push({ tDays, book: "custom desk = b2b + treasury", pnl: customDeskPnl });
     if (includeSwitch) {
       const switchPnl = switched
         ? Q * lam * tauTime - P * lam * ITau + fPost * P * lam * JTau
@@ -1160,7 +1173,7 @@ pnlOverTime = {
     }
   }
 
-  return { rows, includeSwitch, switchLabel };
+  return { rows, includeSwitch, switchLabel, treasuryOpen };
 }
 ```
 
@@ -1184,9 +1197,10 @@ Plot.plot({
     legend: true,
     domain: [
       "fee",
-      "principal (custom)",
-      "principal (retained, syndicated)",
-      "principal (back-to-back)",
+      "b2b",
+      "retained (syndicated-on-b2b)",
+      "treasury",
+      "custom desk = b2b + treasury",
       ...(pnlOverTime.includeSwitch ? [pnlOverTime.switchLabel] : []),
     ],
   },
@@ -1201,8 +1215,10 @@ Plot.plot({
 ```
 
 _Each line traces one book's deterministic cumulative P&L along the drawn
-(or noise-realised) path. Green dashed rule: inventory-exhaustion time
-$\alpha T$. The switching series appears only when the barrier $h < 3$._
+(or noise-realised) path. Operating books start at 0; the treasury opens at
+its MTM $k \cdot S_0 - C_{\mathrm{basis}}$. Green dashed rule:
+inventory-exhaustion time $\alpha T$. The switching series appears only
+when the barrier $h < 3$._
 
 ### Deterministic P&L on the drawn path
 
@@ -1225,15 +1241,16 @@ html`<div class="derived-stats">
 ```{ojs}
 //| echo: false
 customRows = [
-  { book: "fee",                              pnl: customScenario.feeRev,      mcMean: run.fee.mean,       diff: customScenario.feeRev      - run.fee.mean },
-  { book: "principal (custom)",               pnl: customScenario.cust,        mcMean: run.principal.mean, diff: customScenario.cust        - run.principal.mean },
-  { book: "principal (retained, syndicated)", pnl: customScenario.retainedDet, mcMean: run.retained.mean,  diff: customScenario.retainedDet - run.retained.mean },
-  { book: "principal (back-to-back)",         pnl: customScenario.b2b,         mcMean: run.b2b.mean,       diff: customScenario.b2b         - run.b2b.mean },
-  // Switching row only when the barrier is active, matching simulator.qmd:424.
+  { book: "fee",                          pnl: customScenario.feeRev,     mcMean: run.fee.mean,        diff: customScenario.feeRev     - run.fee.mean },
+  { book: "b2b",                          pnl: customScenario.b2bOp,      mcMean: run.b2b.mean,        diff: customScenario.b2bOp      - run.b2b.mean },
+  { book: "retained (syndicated-on-b2b)", pnl: customScenario.retainedOp, mcMean: run.retained.mean,   diff: customScenario.retainedOp - run.retained.mean },
+  { book: "treasury",                     pnl: customScenario.treasury,   mcMean: run.treasury.mean,   diff: customScenario.treasury   - run.treasury.mean },
+  { book: "custom desk = b2b + treasury", pnl: customScenario.customDesk, mcMean: run.customDesk.mean, diff: customScenario.customDesk - run.customDesk.mean },
+  // Switching row only when the barrier is active, matching simulator.qmd.
   ...(isFinite(barrierRatio) && barrierRatio < 3
-    ? [{ book: `principal (switching, h=${barrierRatio.toFixed(2)})`,
-         pnl: customScenario.switchingDet, mcMean: switchRun.summary.mean,
-         diff: customScenario.switchingDet - switchRun.summary.mean }]
+    ? [{ book: `switching (h=${barrierRatio.toFixed(2)})`,
+         pnl: customScenario.switchingOp, mcMean: switchRun.summary.mean,
+         diff: customScenario.switchingOp - switchRun.summary.mean }]
     : []),
 ]
 ```
@@ -1262,13 +1279,14 @@ fixed defaults ($\mu = 0.05$, $\sigma^2 = 0.25$, no jumps, 5,000
 paths). **diff** = drawn − MC mean: how this scenario deviates from
 the average GBM future._
 
-**Reading the diff column.** A negative diff on `principal (custom)`
-is the stress-test signal — the token was pricier over the
-uncovered window $[\alpha T, T]$ than GBM expects on average. Diffs
-near zero mean the drawn curve is a typical GBM path, and at
-$\alpha = 1$ the custom book is deterministic and insensitive to the
-curve by construction. The retained row applies the $(1 - \beta)$
-cession dial to the custom-row deviation and adds the MC-priced
+**Reading the diff column.** A negative diff on `custom desk` is the
+stress-test signal — the token was pricier over the uncovered
+window $[\alpha T, T]$ than GBM expects on average. Diffs near zero
+mean the drawn curve is a typical GBM path, and at full coverage
+($k = NP$, $C_{\mathrm{basis}} = NP \cdot S_0$) the custom desk
+collapses to the deterministic matched total and is insensitive to
+the curve by construction. The retained row applies the $(1 - \beta)$
+cession dial to the b2b operating book and adds the MC-priced
 premium; the switching row is only meaningful when the drawn path
 crosses $H = h \cdot S_0$ before $T$ and is hidden above $h = 3$.
 

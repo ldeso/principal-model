@@ -97,7 +97,7 @@ describe("makeRow / makeSwitchingRow", () => {
   it("makeSwitchingRow tags closed-form fields with NaN and zeros z-score", () => {
     const xs = Float64Array.from([0.1, 0.2, 0.3, 0.4]);
     const row = makeSwitchingRow(xs);
-    expect(row.name).toBe("principal_3e");
+    expect(row.name).toBe("switching");
     expect(Number.isNaN(row.closedFormMean)).toBe(true);
     expect(Number.isNaN(row.closedFormSd)).toBe(true);
     expect(row.zScore).toBe(0);

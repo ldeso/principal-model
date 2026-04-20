@@ -10,24 +10,32 @@ subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
 <summary>Simulator notation</summary>
 <p>Symbols introduced on the
 <a href="model.qmd#setup-and-notation">Model page</a>. The Simulator
-admits raw inventory state instead of a scalar coverage:</p>
+admits raw inventory state and splits the desk into operating books
+and an active treasury:</p>
 <dl>
   <dt><code>k</code>, <code>C<sub>basis</sub></code></dt>
-  <dd>Pre-purchased inventory (kVCM) and its sunk USD cost.</dd>
+  <dd>Pre-purchased inventory (kVCM) and its sunk USD cost — the
+  treasury's two parameters.</dd>
 
-  <dt><code>α = min(1, k / (N · P))</code></dt>
-  <dd>Coverage — fraction of the horizon the inventory lasts.</dd>
+  <dt><code>τ = min(T, k / (P·λ))</code></dt>
+  <dd>Inventory-exhaustion time; the treasury feeds retirement at
+  spot over <code>[0, τ]</code>.</dd>
 
   <dt><code>k<sub>left</sub> = max(0, k − N · P)</code></dt>
-  <dd>Leftover tokens at <code>T</code> when over-hedged.</dd>
+  <dd>Over-hedge tokens; marked at <code>S<sub>T</sub></code>.</dd>
 
-  <dt><code>J<sub>α</sub> = ∫<sub>αT</sub><sup>T</sup> S<sub>t</sub> dt</code></dt>
-  <dd>Integral over the uncovered window.</dd>
+  <dt>Treasury P&amp;L</dt>
+  <dd><code>P·λ·∫₀<sup>τ</sup> S<sub>t</sub> dt + k<sub>left</sub>·S<sub>T</sub> − C<sub>basis</sub></code>.
+  Opens at MTM <code>k·S₀ − C<sub>basis</sub></code>.</dd>
 
-  <dt><code>Π<sub>cust</sub></code></dt>
-  <dd><code>Q·N − C<sub>basis</sub> − P·λ·J<sub>α</sub> + k<sub>left</sub>·S<sub>T</sub></code>.
-  Reduces to matched at <code>α = 1</code>, back-to-back at
-  <code>k = C<sub>basis</sub> = 0</code>.</dd>
+  <dt>Operating books</dt>
+  <dd>All start at <code>P&amp;L(0) = 0</code>, all source tonnes at
+  spot: fee, b2b, retained (syndicated-on-b2b), switching.</dd>
+
+  <dt>Desk totals</dt>
+  <dd>Any strategy = one operating book + treasury, sample-wise.
+  The <em>custom desk</em> is <code>b2b + treasury</code> at the
+  slider's <code>(k, C<sub>basis</sub>)</code>.</dd>
 
   <dt>Jump sliders</dt>
   <dd>Set <code>λ<sub>J</sub> = 0</code> for pure GBM; otherwise the
@@ -41,13 +49,16 @@ admits raw inventory state instead of a scalar coverage:</p>
 
 Every slider on this page kicks off a fresh Monte Carlo in your
 browser; the [Model](model.qmd) page defines the symbols. Two
-things are slightly different here. First, the hedge is specified in
-raw inventory state $(k, C_{\mathrm{basis}})$ — kVCM tokens on hand
-plus their sunk USD cost — so a position already accumulated at a
-different price can be studied directly; coverage is the derived
-quantity $\alpha = \min(1, k / (N P))$. Second, the price process is
-always the compensated Merton jump-diffusion; set the three jump
-sliders $(\lambda_J, \mu_J, \sigma_J)$ to zero for pure GBM.
+things are slightly different here. First, the desk is split into
+zero-capital **operating books** (fee, b2b, retained, switching —
+each with $P\!\&\!L(0) = 0$, every tonne sourced at spot) and an
+**active treasury** parameterised by raw inventory state $(k,
+C_{\mathrm{basis}})$ — kVCM tokens on hand plus their sunk USD cost.
+Any strategy's desk P&L is `operating + treasury` evaluated
+sample-wise; the custom-desk histogram below shows $b2b + \text{treasury}$
+at your slider settings. Second, the price process is always the
+compensated Merton jump-diffusion; set the three jump sliders
+$(\lambda_J, \mu_J, \sigma_J)$ to zero for pure GBM.
 
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Price process
@@ -302,13 +313,20 @@ run = {
   const t0 = performance.now();
   const raw = simulate(inputs);
   const elapsedMs = performance.now() - t0;
+  // Custom-desk samples = b2b + treasury at the slider's (k, C_basis).
+  const customDeskSamples = new Float64Array(raw.b2bSamples.length);
+  for (let i = 0; i < customDeskSamples.length; i++) {
+    customDeskSamples[i] = raw.b2bSamples[i] + raw.treasurySamples[i];
+  }
   return {
     inputs,
     ...raw,
+    customDeskSamples,
     fee: summarise(raw.feeSamples),
-    principal: summarise(raw.principalSamples),
     b2b: summarise(raw.b2bSamples),
     retained: summarise(raw.retainedSamples),
+    treasury: summarise(raw.treasurySamples),
+    customDesk: summarise(customDeskSamples),
     elapsedMs,
   };
 }
@@ -316,16 +334,15 @@ run = {
 
 ```{ojs}
 //| echo: false
-// Sibling run of the switching book. α is implicit in the custom book via
-// (k, C_basis), not as a Params field; drive the switching book with α=0
-// (pure b2b-plus-switch) and β=0 (no syndication) for a clean reading. The
-// barrier composes with β / θ in the core module but this page surfaces the
-// simpler story first — users who want composition should look at Validation.
+// Sibling run of the switching operating book. The switching book is itself
+// zero-capital (starts at P&L(0) = 0 and sources every tonne at spot); the
+// matched-desk variant is `switching + treasury(N·P, N·P·S₀)` sample-wise,
+// which we don't surface on this page — see Validation for composed desks.
 switchRun = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
-    Q, fee, alpha: 0, beta: 0, premiumLoad: 0, premiumMode,
+    Q, fee,
     barrierRatio, feePost,
     lambdaJ, muJ, sigmaJ,
     nPaths, nSteps, seed,
@@ -357,8 +374,8 @@ html`<div class="derived-stats">
   <div class="card"><div class="label">leftover tokens at T</div><div class="value">${run.tokensLeftover.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">cession β</div><div class="value">${(beta * 100).toFixed(0)}%</div></div>
   <div class="card"><div class="label">premium π_syn received</div><div class="value">${(run.premium >= 0 ? "$" : "−$") + Math.abs(run.premium).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
-  <div class="card"><div class="label">retained CVaR₉₅</div><div class="value">${(run.retained.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.retained.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
-  <div class="card"><div class="label">SD reduction vs. principal</div><div class="value">${run.principal.sd > 0 ? (100 * (1 - run.retained.sd / run.principal.sd)).toFixed(1) + "%" : "—"}</div></div>
+  <div class="card"><div class="label">custom desk CVaR₉₅</div><div class="value">${(run.customDesk.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.customDesk.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
+  <div class="card"><div class="label">custom desk SD vs. b2b</div><div class="value">${run.b2b.sd > 0 ? (100 * (1 - run.customDesk.sd / run.b2b.sd)).toFixed(1) + "%" : "—"}</div></div>
 </div>`
 ```
 
@@ -379,16 +396,10 @@ html`${(isFinite(barrierRatio) && barrierRatio < 3)
 
 ### Summary statistics
 
-One row per book. Three of them — fee, retained (syndicated), and
-back-to-back — match the [Model](model.qmd) page's formulae
-directly. The fourth, `principal (custom)`, is the Simulator's own
-book: it admits the raw inventory state $(k, C_{\mathrm{basis}})$
-rather than a scalar $\alpha$, so its P&L is $\Pi_{\mathrm{cust}} = Q
-N - C_{\mathrm{basis}} - P \lambda J_\alpha + k_{\mathrm{left}}
-\cdot S_T$, where $k_{\mathrm{left}} = \max(0, k - N P)$ is any
-over-hedge and $J_\alpha = \int_{\alpha T}^T S_t \, dt$ is the
-integral over the uncovered window. The fifth row — switching —
-appears only when the barrier slider sits below 3.
+One row per **operating book** (fee, b2b, retained, switching) plus
+one row for the **treasury** at the slider's $(k, C_{\mathrm{basis}})$
+and a derived **custom desk** row $= b2b + \text{treasury}$. The
+switching row appears only when the barrier slider sits below 3.
 
 | column | meaning |
 | --- | --- |
@@ -403,27 +414,27 @@ appears only when the barrier slider sits below 3.
 P&L is the USD total over $[0, T]$; divide by $N = \lambda T$ for a
 per-tonne figure. Three things to watch as you sweep:
 
-- **The custom row** responds to every slider — $Q$ moves its mean,
-  $\sigma$ widens its tails, $k$ reshapes through $\alpha$, and
-  $C_{\mathrm{basis}}$ translates the location without changing
-  shape.
-- **The back-to-back row** depends only on $Q$ and the price
-  process. Setting $k = C_{\mathrm{basis}} = 0$ collapses the custom
-  row onto it — a useful sanity check.
-- **$\alpha = 100\%$** drives the custom row's SD and CVaR toward
-  zero, the matched limit.
+- **The treasury row** opens at MTM $k \cdot S_0 - C_{\mathrm{basis}}$
+  and drifts as the inventory burns down — sweeping $C_{\mathrm{basis}}$
+  translates the location without touching the shape.
+- **The custom-desk row** collapses to the matched limit at
+  $k = N P$, $C_{\mathrm{basis}} = N P S_0$: $I_T$ cancels
+  between `b2b` and `treasury` consumption and the desk total
+  becomes deterministic $N (Q - P S_0)$.
+- **$k = 0$** zeroes the treasury sample-wise, so the custom desk
+  collapses onto `b2b`.
 
 ```{ojs}
 //| echo: false
 summaryRows = [
   { book: "fee", ...run.fee },
-  { book: "principal (custom)", ...run.principal },
-  { book: "principal (retained, syndicated)", ...run.retained },
-  { book: "principal (back-to-back)", ...run.b2b },
-  // Switching-book row sourced from the sibling run. Isfinite guard keeps
-  // the row out of the table when the barrier is effectively disabled.
+  { book: "b2b", ...run.b2b },
+  { book: "retained (syndicated-on-b2b)", ...run.retained },
+  { book: "treasury (k, C_basis)", ...run.treasury },
+  { book: "custom desk = b2b + treasury", ...run.customDesk },
+  // Switching row only when the barrier is active.
   ...(isFinite(barrierRatio) && barrierRatio < 3
-    ? [{ book: `principal (switching, h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
+    ? [{ book: `switching (h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
     : []),
 ]
 ```
@@ -463,33 +474,32 @@ Inputs.table(summaryRows, {
 One panel per book, terminal P&L on the x-axis. Solid black rule is
 the MC mean; dashed grey rule is $\Pi = 0$. The fee panel is
 non-negative and right-skewed (it inherits $I_T$'s right skew); the
-back-to-back panel is the mirror. The custom panel is the
-responsive one — wide and left-skewed under low coverage, a spike at
-$\alpha = 100\%$ (the matched limit), and a recovered but reshaped
-width under over-hedge (the terminal-$S_T$ exposure kicks in).
+b2b panel is the mirror. The treasury panel shifts linearly with
+$C_{\mathrm{basis}}$ and widens with $k$. The custom-desk panel
+(`b2b + treasury`) collapses to a spike at $k = N P$,
+$C_{\mathrm{basis}} = N P S_0$ — the matched limit, with $I_T$
+cancelling between the two summands.
 
 ```{ojs}
 //| echo: false
 // Switching facet follows the same predicate as the summary table row
 // (see the `summaryRows` cell above) so table and histogram agree in lockstep.
 includeSwitch = isFinite(barrierRatio) && barrierRatio < 3
-switchLabel = includeSwitch ? `principal (switching, h=${barrierRatio.toFixed(2)})` : null
+switchLabel = includeSwitch ? `switching (h=${barrierRatio.toFixed(2)})` : null
 ```
 
 ```{ojs}
 //| echo: false
 pnlRecords = {
   const rows = [];
-  const push = (label, arr) => {
-    for (let i = 0; i < arr.length; i++) rows.push({ book: label, pnl: arr[i] });
-  };
   // Subsample for plotting responsiveness.
   const stride = Math.max(1, Math.floor(run.feeSamples.length / 2500));
   for (let i = 0; i < run.feeSamples.length; i += stride) {
     rows.push({ book: "fee", pnl: run.feeSamples[i] });
-    rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
-    rows.push({ book: "principal (retained, syndicated)", pnl: run.retainedSamples[i] });
-    rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
+    rows.push({ book: "b2b", pnl: run.b2bSamples[i] });
+    rows.push({ book: "retained (syndicated-on-b2b)", pnl: run.retainedSamples[i] });
+    rows.push({ book: "treasury (k, C_basis)", pnl: run.treasurySamples[i] });
+    rows.push({ book: "custom desk = b2b + treasury", pnl: run.customDeskSamples[i] });
     if (includeSwitch) rows.push({ book: switchLabel, pnl: switchRun.pnlSamples[i] });
   }
   return rows;
@@ -500,7 +510,7 @@ pnlRecords = {
 //| echo: false
 Plot.plot({
   width: 900,
-  height: 560,
+  height: 720,
   marginLeft: 80,
   marginRight: 30,
   marginBottom: 50,
@@ -509,7 +519,7 @@ Plot.plot({
   y: { label: "empirical density" },
   fy: { label: "book" },
   color: { legend: true, domain: [
-    "fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)",
+    "fee","b2b","retained (syndicated-on-b2b)","treasury (k, C_basis)","custom desk = b2b + treasury",
     ...(includeSwitch ? [switchLabel] : []),
   ] },
   marks: [
@@ -518,20 +528,22 @@ Plot.plot({
     Plot.rectY(pnlRecords, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "book", fy: "book", thresholds: 50 })),
     Plot.ruleX([
       { book: "fee", x: run.fee.mean },
-      { book: "principal (custom)", x: run.principal.mean },
-      { book: "principal (retained, syndicated)", x: run.retained.mean },
-      { book: "principal (back-to-back)", x: run.b2b.mean },
+      { book: "b2b", x: run.b2b.mean },
+      { book: "retained (syndicated-on-b2b)", x: run.retained.mean },
+      { book: "treasury (k, C_basis)", x: run.treasury.mean },
+      { book: "custom desk = b2b + treasury", x: run.customDesk.mean },
       ...(includeSwitch ? [{ book: switchLabel, x: switchRun.summary.mean }] : []),
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
 })
 ```
 
-_Solid black: MC mean. Dashed grey: $\Pi = 0$. The custom panel
-collapses to a spike as coverage $\alpha$ approaches 100% (matched
-limit); the retained panel sits on top of the custom panel at
-$\beta = 0$ and collapses to a spike as $\beta \to 1$ (syndication
-limit)._
+_Solid black: MC mean. Dashed grey: $\Pi = 0$. The custom-desk
+panel collapses to a spike as $k \to N P$ with
+$C_{\mathrm{basis}} = N P S_0$ (matched limit, $I_T$ cancels between
+b2b and treasury); the retained panel sits on top of the b2b panel
+at $\beta = 0$ and collapses to a spike as $\beta \to 1$
+(syndication limit)._
 
 ### Sample price paths and the inventory cliff
 

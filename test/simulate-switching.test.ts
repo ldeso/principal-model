@@ -13,8 +13,7 @@ import type { SwitchingInputs } from "../src/core/simulate-switching.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 
 // Baseline inputs: pure GBM (λ_J = 0) keeps the first-passage CDF exact;
-// moderate nPaths for fast iteration, seed bumped off the defaults to keep
-// test noise independent of the models.test.ts tape.
+// moderate nPaths for fast iteration.
 const base: SwitchingInputs = {
   S0: 1,
   mu: 0.05,
@@ -24,10 +23,6 @@ const base: SwitchingInputs = {
   T: 1,
   Q: 1.1,
   fee: 0.05,
-  alpha: 0,
-  beta: 0,
-  premiumLoad: 0,
-  premiumMode: "sharpe",
   barrierRatio: Infinity,
   feePost: null,
   nPaths: 2_000,
@@ -35,50 +30,34 @@ const base: SwitchingInputs = {
   seed: 2026,
 };
 
-describe("simulateSwitching — switching-variant barrier-triggered mode switch", () => {
+describe("simulateSwitching — switching operating book", () => {
   it("barrierRatio = Infinity makes every path unswitched (τ = T)", () => {
     const r = simulateSwitching(base);
     for (let i = 0; i < r.switchedMask.length; i++) {
       expect(r.switchedMask[i]).toBe(0);
       expect(r.tauSamples[i]).toBe(base.T);
     }
-    // With no switch, J_τ = 0 and the stochastic leg collapses onto b2b.
-    for (let i = 0; i < r.stochLegSamples.length; i++) {
-      expect(r.stochLegSamples[i]).toBeCloseTo(r.b2bSamples[i] as number, 10);
+    // With no switch, J_τ = 0 and the operating book collapses onto b2b.
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      expect(r.pnlSamples[i]).toBeCloseTo(r.b2bSamples[i] as number, 10);
     }
   });
 
-  it("barrierRatio ≤ 1 fires the switch at t = 0; stoch leg = fee × I_T", () => {
+  it("barrierRatio ≤ 1 fires the switch at t = 0 and the book = fee · P · λ · I_T", () => {
     const r = simulateSwitching({ ...base, barrierRatio: 1 });
     for (let i = 0; i < r.tauSamples.length; i++) {
       expect(r.tauSamples[i]).toBe(0);
       expect(r.switchedMask[i]).toBe(1);
       expect(r.ITauSamples[i]).toBe(0);
     }
-    // stoch leg = f·P·λ·I_T = fee sample (since feePost locks to fee).
-    for (let i = 0; i < r.stochLegSamples.length; i++) {
-      expect(r.stochLegSamples[i]).toBeCloseTo(r.feeSamples[i] as number, 10);
-    }
-  });
-
-  it("α = 1 makes Π_{3e} deterministic regardless of barrier", () => {
-    const p = { ...base, alpha: 1, barrierRatio: 1.25 };
-    const r = simulateSwitching(p);
-    const expected = p.alpha * p.lambda * p.T * (p.Q - p.P * p.S0);
-    // α=1 still enables the cession term on the (1-α)=0 stoch leg, so the
-    // premium contribution is identically 0 and Π_{3e} collapses to α·matched.
     for (let i = 0; i < r.pnlSamples.length; i++) {
-      expect(r.pnlSamples[i]).toBeCloseTo(expected, 6);
+      expect(r.pnlSamples[i]).toBeCloseTo(r.feeSamples[i] as number, 10);
     }
   });
 
-  it("hand-computes Π_sw = Q·λ·τ − P·λ·I_τ + f_post·P·λ·J_τ for a seeded sample", () => {
-    // Use a small run so we can compare index-by-index and catch any
-    // off-by-one in the trapezoid bucket assignment.
+  it("hand-computes switching_op = Q·λ·τ − P·λ·I_τ + f_post·P·λ·J_τ", () => {
     const p = {
       ...base,
-      alpha: 0,
-      beta: 0,
       barrierRatio: 1.2,
       nPaths: 30,
       nSteps: 40,
@@ -86,7 +65,7 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
     };
     const r = simulateSwitching(p);
     const fPost = p.feePost ?? p.fee;
-    for (let i = 0; i < r.stochLegSamples.length; i++) {
+    for (let i = 0; i < r.pnlSamples.length; i++) {
       const tau = r.tauSamples[i] as number;
       const ITau = r.ITauSamples[i] as number;
       const JTau = r.JTauSamples[i] as number;
@@ -94,13 +73,11 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
         p.Q * p.lambda * tau -
         p.P * p.lambda * ITau +
         fPost * p.P * p.lambda * JTau;
-      expect(r.stochLegSamples[i]).toBeCloseTo(expected, 9);
-      // Sanity: I_τ + J_τ = I_T to machine precision.
+      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
       expect(ITau + JTau).toBeCloseTo(r.ITSamples[i] as number, 12);
     }
-    // Same check with an independent feePost knob to exercise that code path.
     const r2 = simulateSwitching({ ...p, feePost: 0.15 });
-    for (let i = 0; i < r2.stochLegSamples.length; i++) {
+    for (let i = 0; i < r2.pnlSamples.length; i++) {
       const tau = r2.tauSamples[i] as number;
       const ITau = r2.ITauSamples[i] as number;
       const JTau = r2.JTauSamples[i] as number;
@@ -108,40 +85,33 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
         p.Q * p.lambda * tau -
         p.P * p.lambda * ITau +
         0.15 * p.P * p.lambda * JTau;
-      expect(r2.stochLegSamples[i]).toBeCloseTo(expected, 9);
+      expect(r2.pnlSamples[i]).toBeCloseTo(expected, 9);
     }
   });
 
-  it("feePost = 0 reduces Π_sw to Q·λ·τ − P·λ·I_τ per path", () => {
-    const p = { ...base, alpha: 0, beta: 0, barrierRatio: 1.2, feePost: 0 };
+  it("feePost = 0 reduces the book to Q·λ·τ − P·λ·I_τ per path", () => {
+    const p = { ...base, barrierRatio: 1.2, feePost: 0 };
     const r = simulateSwitching(p);
-    for (let i = 0; i < r.stochLegSamples.length; i++) {
+    for (let i = 0; i < r.pnlSamples.length; i++) {
       const tau = r.tauSamples[i] as number;
       const ITau = r.ITauSamples[i] as number;
       const expected = p.Q * p.lambda * tau - p.P * p.lambda * ITau;
-      expect(r.stochLegSamples[i]).toBeCloseTo(expected, 9);
+      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
     }
   });
 
   it("feePost = f equals feePost = null path-by-path (lock-to-f)", () => {
-    const shared = { ...base, alpha: 0.2, beta: 0.3, barrierRatio: 1.25 };
+    const shared = { ...base, barrierRatio: 1.25 };
     const rNull = simulateSwitching({ ...shared, feePost: null });
     const rLocked = simulateSwitching({ ...shared, feePost: shared.fee });
     for (let i = 0; i < rNull.pnlSamples.length; i++) {
       expect(rNull.pnlSamples[i]).toBeCloseTo(rLocked.pnlSamples[i] as number, 10);
-      expect(rNull.stochLegSamples[i]).toBeCloseTo(
-        rLocked.stochLegSamples[i] as number,
-        10,
-      );
     }
     expect(rNull.feePostResolved).toBe(shared.fee);
     expect(rLocked.feePostResolved).toBe(shared.fee);
   });
 
   it("shares RNG with models.simulate under shared seed (I_T parity path-by-path)", () => {
-    // Both runners consume the rng stream in the same order (one rng.normal()
-    // per step plus the jump block). Under shared seed the I_T realisation
-    // per path must match bit-for-bit — this guards path-reuse invariance.
     const p = withOverrides(defaultParams, {
       nPaths: 64,
       nSteps: 50,
@@ -154,8 +124,7 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
     const mc = simulate(p);
     const sw = simulateSwitching({
       S0: p.S0, mu: p.mu, sigma: p.sigma, P: p.P, lambda: p.lambda, T: p.T,
-      Q: p.Q, fee: p.f, alpha: p.alpha, beta: p.beta,
-      premiumLoad: p.premiumLoad, premiumMode: p.premiumMode,
+      Q: p.Q, fee: p.f,
       barrierRatio: p.barrierRatio, feePost: p.feePost,
       lambdaJ: 0, muJ: 0, sigmaJ: 0,
       nPaths: p.nPaths, nSteps: p.nSteps, seed: p.seed,
@@ -167,11 +136,6 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
   });
 
   it("shares RNG with samplePath under shared seed (bit-for-bit terminal prices)", () => {
-    // Path-reuse invariance: identical RNG consumption means identical S_t
-    // realisations. Terminal prices agree to machine precision; I_T agrees
-    // to 12 decimals (the two accumulators sum the same values in a slightly
-    // different order — samplePath uses a single running acc, we use per-
-    // step trapezoid pieces — so the last 2-3 ulps can differ).
     const p = {
       ...base,
       barrierRatio: Infinity,
@@ -191,8 +155,6 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
   });
 
   it("MC P[τ ≤ T] matches firstPassageProb under pure GBM within 4·stderr", () => {
-    // Pick (h, μ, σ, T) triples where the barrier probability is non-degenerate;
-    // nSteps = 1000 keeps the discrete-crossing bias below the stderr band.
     const cases = [
       { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.5, mu: 0.0, sigma: 0.5, T: 1 },
@@ -210,8 +172,6 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
       const pMc = hits / r.switchedMask.length;
       const pCf = firstPassageProb(c.mu, c.sigma, c.T, c.h);
       const se = Math.sqrt((pMc * (1 - pMc)) / r.switchedMask.length);
-      // Discrete-crossing bias is O(√Δt); at nSteps=1000 this is well under
-      // the 4σ band for any of these barrier probabilities.
       expect(Math.abs(pMc - pCf)).toBeLessThan(4 * se + 0.01);
     }
   });
@@ -248,16 +208,11 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
       const pMc = hits / r.switchedMask.length;
       biases.push(Math.abs(pMc - pCf));
     }
-    // Strict monotone decrease. Finer discretisation can only add more
-    // crossings (or the same count); under-estimation bias must shrink.
     expect(biases[1]).toBeLessThan(biases[0] as number);
     expect(biases[2]).toBeLessThan(biases[1] as number);
   });
 
   it("compensated Merton jumps strictly raise P[τ ≤ T] at equal σ", () => {
-    // Jumps punch through the barrier in one step; under a fair barrier band
-    // (not deep in-the-money), the empirical P[switch] must exceed the pure-
-    // GBM anchor even though both preserve E[S_t].
     const shared = {
       ...base,
       mu: 0.0, sigma: 0.3, barrierRatio: 1.4,
@@ -272,52 +227,10 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
     expect(pJumps).toBeGreaterThan(pGbm);
   });
 
-  it("composes linearly with α and β: retained scaling matches the formula", () => {
-    // Compare α=0.4, β=0.3, h=1.25 against the recomposition from the raw
-    // stoch leg samples: Π_{3e} = α·N·(Q − P·S0) + (1−α)(1−β)·Π_sw + π_loaded.
-    const p = { ...base, alpha: 0.4, beta: 0.3, barrierRatio: 1.25, premiumLoad: 0.6 };
-    const r = simulateSwitching(p);
-    const N = p.lambda * p.T;
-    const matchedShift = p.alpha * N * (p.Q - p.P * p.S0);
-    const scale = (1 - p.alpha) * (1 - p.beta);
-    for (let i = 0; i < r.pnlSamples.length; i++) {
-      const expected =
-        matchedShift +
-        scale * (r.stochLegSamples[i] as number) +
-        r.premiumLoaded;
-      expect(r.pnlSamples[i]).toBeCloseTo(expected, 10);
-    }
-  });
-
-  it("fair-premium (θ = 0) keeps E[Π_{3e}] invariant in β", () => {
-    const betas = [0, 0.25, 0.5, 0.75, 1];
-    const shared = {
-      ...base,
-      alpha: 0.3, barrierRatio: 1.25, premiumLoad: 0,
-      nPaths: 10_000, nSteps: 300, seed: 77,
-    };
-    const means: number[] = [];
-    const cis: number[] = [];
-    for (const beta of betas) {
-      const r = simulateSwitching({ ...shared, beta });
-      const s = summarize(r.pnlSamples);
-      means.push(s.mean);
-      cis.push(4 * s.stderr);
-    }
-    for (let i = 1; i < betas.length; i++) {
-      const tol = Math.max(cis[0] as number, cis[i] as number);
-      expect(Math.abs((means[i] as number) - (means[0] as number))).toBeLessThan(tol);
-    }
-  });
-
-  it("CVaR decomposition has the right sign/order relative to the switched-mask partition", () => {
-    // Conditional CVaRs must bracket the overall CVaR when the partitioning
-    // is non-trivial (both buckets have mass). Exact partition-linearity does
-    // not hold for CVaR; we only check that the overall CVaR sits between
-    // the two conditional CVaRs (or equals one when the other is tiny).
+  it("CVaR decomposition brackets the overall CVaR by the switched-mask partition", () => {
     const p = {
       ...base,
-      alpha: 0, beta: 0, barrierRatio: 1.25,
+      barrierRatio: 1.25,
       nPaths: 20_000, nSteps: 500, seed: 8888,
     };
     const r = simulateSwitching(p);
@@ -335,7 +248,6 @@ describe("simulateSwitching — switching-variant barrier-triggered mode switch"
     const cSw = conditionalVaR(withSwitch, 0.95);
     const lo = Math.min(cNo, cSw);
     const hi = Math.max(cNo, cSw);
-    // Small slack for sampling jitter on a ~5% tail.
     const slack = 0.02 * Math.max(Math.abs(cNo), Math.abs(cSw), 1);
     expect(overall).toBeGreaterThan(lo - slack);
     expect(overall).toBeLessThan(hi + slack);
@@ -359,10 +271,6 @@ describe("moments.ts — first-passage helpers", () => {
   });
 
   it("standardNormalCdf matches known anchor values", () => {
-    // A&S 7.1.26 bounds the erf approximation at |ε| < 1.5e-7, so the CDF
-    // should hold ~6 digits; assert at that precision instead of the 3-digit
-    // band the test originally used. Anchors are full-precision Φ values
-    // (Φ(1.96) = 0.97500210..., Φ(−2) = 0.02275013...).
     expect(standardNormalCdf(0)).toBeCloseTo(0.5, 7);
     expect(standardNormalCdf(1.96)).toBeCloseTo(0.9750021048517795, 6);
     expect(standardNormalCdf(-2)).toBeCloseTo(0.022750131948179195, 6);

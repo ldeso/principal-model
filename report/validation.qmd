@@ -35,13 +35,19 @@ format:
   <code>1 / √n<sub>paths</sub></code>.</dd>
 
   <dt>Variance ratio</dt>
-  <dd>Fee and back-to-back satisfy
+  <dd>Fee and b2b satisfy
   <code>Var[Π<sub>b2b</sub>] / Var[R<sub>fee</sub>] = (P / f)²</code>
-  — algebraic, not statistical. Any MC disagreement is a bug.</dd>
+  — algebraic, not statistical.</dd>
 
-  <dt>Partial / syndicated SD scaling</dt>
-  <dd><code>SD[Π<sub>α,β</sub>] = (1 − α)(1 − β) · SD[Π<sub>b2b</sub>]</code>.
-  The expected signature of every sweep plot on the page.</dd>
+  <dt>Retained SD scaling</dt>
+  <dd><code>SD[Π<sub>ret</sub>] = (1 − β) · SD[Π<sub>b2b</sub>]</code>
+  at the operating layer. The α scaling moves to the desk
+  composition `retained + treasury`.</dd>
+
+  <dt>Matched desk determinism</dt>
+  <dd><code>b2b + treasury(N·P, N·P·S<sub>0</sub>)</code>
+  = <code>N(Q − P·S<sub>0</sub>)</code> path-by-path. The <em>I<sub>T</sub></em>
+  cancellation is the core identity.</dd>
 
   <dt>VaR / CVaR on the fee book</dt>
   <dd>Read as "low end of revenue", not loss — fee revenue is
@@ -54,7 +60,7 @@ format:
 
   <dt>Switching row</dt>
   <dd>Closed-form columns are <code>NaN</code> — no closed-form
-  density. Compare MC tails directly to the no-switch anchor.</dd>
+  density. Compare MC tails directly to the b2b anchor.</dd>
 </dl>
 </details>
 </aside>
@@ -74,15 +80,15 @@ the JSON this page reads; regenerate with `npm run simulate -- --seed
 The sidebar spells out the scorecard conventions in full; in short,
 the $z$ column is the primary sanity check ($|z| \le 2$ healthy,
 $|z| > 3$ points at a bug), and the variance ratio $(P/f)^2$ between
-back-to-back and fee is algebraic — any disagreement there is a bug,
-not a sampling artifact. P&L is the horizon total in USD; divide by
-$N = \lambda T$ for a per-tonne figure.
+b2b and fee is algebraic — any disagreement there is a bug, not a
+sampling artifact. P&L is the horizon total in USD; divide by $N =
+\lambda T$ for a per-tonne figure.
 
 ## One parameter setting, full distributions
 
 This block fixes all parameters and shows the full P&L distribution
 of every book. The [sweep below](#parameter-sweep) is the
-complementary view — one book, one risk statistic, parameters sweep.
+complementary view — one desk, one risk statistic, parameters sweep.
 Data is loaded from `data/run-42.json`.
 
 
@@ -100,8 +106,8 @@ import { formatTickCurrency } from "./lib/compiled/src/core/index.js"
 
 $(\mu, \sigma, T)$ set the price process, $\lambda$ the throughput,
 $(f, Q, \alpha)$ the business levers. The break-even quote $Q^*$ is
-derived from the others and is the point at which the fee and
-back-to-back means coincide (their distributions still differ — see
+derived from the others and is the point at which fee and b2b share
+expected revenue (their distributions still differ — see
 [direct comparison](model.qmd#direct-comparison)).
 
 ```{ojs}
@@ -115,15 +121,15 @@ html`<div class="metric-grid">
   <div class="card"><div class="label">λ (tonnes/yr)</div><div class="value">${run.params.lambda.toLocaleString()}</div></div>
   <div class="card"><div class="label">f (fee rate)</div><div class="value">${run.params.f}</div></div>
   <div class="card"><div class="label">Q (USD/tonne)</div><div class="value">${"$" + run.params.Q}</div></div>
-  <div class="card"><div class="label">α (hedge ratio)</div><div class="value">${run.params.alpha}</div></div>
+  <div class="card"><div class="label">α (coverage)</div><div class="value">${run.params.alpha}</div></div>
   <div class="card"><div class="label">Q* (break-even)</div><div class="value">${"$" + run.closed.QStar.toFixed(4)}</div></div>
 </div>`
 ```
 
 ### Scorecard: closed form vs Monte Carlo
 
-One row per book — fee, matched, back-to-back, partial, syndicated
-retained, and switching when a barrier is active. Left block:
+One row per operating book — fee, b2b, retained (syndicated-on-b2b),
+switching when a barrier is active — plus the treasury. Left block:
 closed-form moments versus their MC estimates, with the $z$ column
 checking their agreement. Right block: tail metrics that have no
 closed form. The switching row prints `NaN` in the closed-form
@@ -150,7 +156,7 @@ comparable.
 Inputs.table(run.rows, {
   columns: ["name","closedFormMean","mcMean","mcCi95","closedFormSd","mcSd","zScore","var95","var99","cvar95","cvar99","probLoss","sharpe"],
   header: {
-    name: "model",
+    name: "book",
     closedFormMean: "E[Π] (cf)",
     mcMean: "E[Π] (mc)",
     mcCi95: "±CI95",
@@ -181,6 +187,78 @@ Inputs.table(run.rows, {
 })
 ```
 
+### Desk compositions — operating + treasury
+
+`matched` is the deterministic desk total $N(Q - P S_0)$ (the
+treasury's consumption integral cancels b2b's $- P \lambda I_T$
+exactly at $\alpha = 1$). `partial_desk` composes
+$b2b + \text{treasury}$ at `run.params.alpha`; its closed form uses
+the strong-Markov decomposition of $J_\alpha$. `syndicated_matched`
+composes `retained + treasury(N·P, N·P·S₀)` — still deterministic
+up to the syndication premium. `switching_matched` composes
+`switching + treasury(N·P, N·P·S₀)` and has no closed form (τ is a
+stopping time).
+
+```{ojs}
+//| echo: false
+deskRows = [
+  {
+    name: "matched",
+    closedFormMean: run.desks.matched.closedFormMean,
+    closedFormSd: run.desks.matched.closedFormSd,
+    mcMean: run.desks.matched.closedFormMean,
+    mcSd: 0,
+    mcCi95: 0,
+    zScore: 0,
+    var95: -run.desks.matched.closedFormMean,
+    var99: -run.desks.matched.closedFormMean,
+    cvar95: -run.desks.matched.closedFormMean,
+    cvar99: -run.desks.matched.closedFormMean,
+    probLoss: run.desks.matched.closedFormMean < 0 ? 1 : 0,
+    sharpe: null,
+  },
+  run.desks.partial,
+  run.desks.syndicatedMatched,
+  ...(run.desks.switchingMatched ? [run.desks.switchingMatched] : []),
+]
+```
+
+```{ojs}
+//| echo: false
+Inputs.table(deskRows, {
+  columns: ["name","closedFormMean","mcMean","mcCi95","closedFormSd","mcSd","zScore","var95","var99","cvar95","cvar99","probLoss","sharpe"],
+  header: {
+    name: "desk",
+    closedFormMean: "E[Π] (cf)",
+    mcMean: "E[Π] (mc)",
+    mcCi95: "±CI95",
+    closedFormSd: "SD (cf)",
+    mcSd: "SD (mc)",
+    zScore: "z",
+    var95: "VaR95",
+    var99: "VaR99",
+    cvar95: "CVaR95",
+    cvar99: "CVaR99",
+    probLoss: "P[Π<0]",
+    sharpe: "Sharpe"
+  },
+  format: {
+    closedFormMean: x => Number.isFinite(x) ? (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2) : "—",
+    mcMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    mcCi95: x => "±$" + x.toFixed(2),
+    closedFormSd: x => Number.isFinite(x) ? "$" + x.toFixed(2) : "—",
+    mcSd: x => "$" + x.toFixed(2),
+    zScore: x => (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
+    var95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    var99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    cvar95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    cvar99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
+    probLoss: x => x.toFixed(3),
+    sharpe: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
+  }
+})
+```
+
 ### Merton jumps: means invariant, variances inflated
 
 The [compensated Merton overlay](model.qmd#compensated-merton-jump-diffusion)
@@ -190,17 +268,14 @@ compensation $-\lambda_J \kappa$ with $\kappa = e^{\mu_J + \sigma_J^2
 t}$. Variances should not — jumps genuinely fatten the tail. The
 table below checks both at a canonical overlay ($\lambda_J = 3$/yr,
 $\mu_J = -0.1$, $\sigma_J = 0.15$) by comparing the overlay's MC
-moments against the GBM closed form. A healthy row satisfies $|z|
-\lesssim 2$ (means agree) and **SD (merton)** strictly above **SD
-(gbm-cf)** (jumps firing). Persistent large $|z|$ points at broken
-compensation; flat SD points at an inert overlay.
+moments against the GBM closed form.
 
 ```{ojs}
 //| echo: false
 Inputs.table(run.jumpCheck.rows, {
   columns: ["name","gbmClosedMean","mertonMcMean","mertonMcCi95","gbmClosedSd","mertonMcSd","zVsGbmClosed"],
   header: {
-    name: "model",
+    name: "book",
     gbmClosedMean: "E[Π] gbm-cf",
     mertonMcMean: "E[Π] merton-mc",
     mertonMcCi95: "±CI95",
@@ -240,30 +315,39 @@ Terminal P&L on the x-axis; solid black rule is the closed-form mean
 and the dashed grey rule is $\Pi = 0$. Mass to the left of the grey
 rule is the loss probability $\mathbb{P}[\Pi < 0]$ reported in the
 scorecard. The fee panel is non-negative and right-skewed (it
-inherits $I_T$'s right skew). The back-to-back panel is the mirror
-image — same kernel with opposite sign, upside capped at $Q N$,
-downside unbounded. The partial panel at $\alpha = 0.5$ is that same
-mirror narrowed by $(1 - \alpha) = 0.5$ on the SD scale — the visible
-fingerprint of the partial variant's $(1-\alpha)^2$ variance collapse.
+inherits $I_T$'s right skew). The b2b panel is the mirror image —
+same kernel with opposite sign, upside capped at $Q N$, downside
+unbounded. The treasury panel sits around its opening MTM; the
+partial-desk panel is `b2b + treasury` composed sample-wise.
 
 ```{ojs}
 //| echo: false
-// 3a is deterministic (spike at its closed-form mean), so it's omitted from the
-// per-stochastic-book panel. 3e only appears when the fixture was generated
-// with a finite barrier (see src/report.ts:248-250).
-pnlModels = [
-  "fee", "principal_3b", "principal_3c", "principal_3d",
-  ...(run.sampleTraces.switching ? ["principal_3e"] : []),
+// Matched desk is deterministic (spike at N·(Q − P·S_0)), so we omit it
+// from the per-book panel. The switching row appears only when the fixture
+// was generated with a finite barrier.
+pnlBooks = [
+  "fee", "b2b", "retained", "treasury", "partial_desk",
+  ...(run.sampleTraces.switching ? ["switching"] : []),
 ]
 
 pnlData = [
-  ...run.sampleTraces.fee.map(v => ({model: "fee", pnl: v})),
-  ...run.sampleTraces.b2b.map(v => ({model: "principal_3b", pnl: v})),
-  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v})),
-  ...run.sampleTraces.retained.map(v => ({model: "principal_3d", pnl: v})),
+  ...run.sampleTraces.fee.map(v => ({book: "fee", pnl: v})),
+  ...run.sampleTraces.b2b.map(v => ({book: "b2b", pnl: v})),
+  ...run.sampleTraces.retained.map(v => ({book: "retained", pnl: v})),
+  ...run.sampleTraces.treasury.map(v => ({book: "treasury", pnl: v})),
+  ...run.sampleTraces.partialDesk.map(v => ({book: "partial_desk", pnl: v})),
   ...(run.sampleTraces.switching
-    ? run.sampleTraces.switching.map(v => ({model: "principal_3e", pnl: v}))
+    ? run.sampleTraces.switching.map(v => ({book: "switching", pnl: v}))
     : []),
+]
+
+// Mean rules: operating-book rows ship closed-form means in run.rows; the
+// partial-desk row ships its closed-form mean in run.desks.partial.
+meanRuleRows = [
+  ...run.rows
+    .filter(r => pnlBooks.includes(r.name))
+    .map(r => ({ book: r.name, x: Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean })),
+  { book: "partial_desk", x: run.desks.partial.closedFormMean },
 ]
 ```
 
@@ -271,27 +355,20 @@ pnlData = [
 //| echo: false
 Plot.plot({
   width: 900,
-  height: 420,
+  height: 520,
   marginLeft: 70,
   marginRight: 30,
   marginBottom: 50,
   grid: true,
   x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: formatTickCurrency },
   y: { label: "empirical density", labelAnchor: "center" },
-  fy: { label: "model" },
-  color: { legend: true, domain: pnlModels, label: "model" },
+  fy: { label: "book" },
+  color: { legend: true, domain: pnlBooks, label: "book" },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
-    Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "model", fy: "model", thresholds: 60 })),
-    // Switching has no closed-form mean (NaN) — fall back to MC mean so the
-    // overlay is still meaningful on that facet.
-    Plot.ruleX(
-      run.rows
-        .filter(r => pnlModels.includes(r.name))
-        .map(r => ({ name: r.name, x: Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean })),
-      { x: "x", fy: "name", stroke: "black", strokeWidth: 2 }
-    )
+    Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "book", fy: "book", thresholds: 60 })),
+    Plot.ruleX(meanRuleRows, { x: "x", fy: "book", stroke: "black", strokeWidth: 2 })
   ]
 })
 ```
@@ -300,14 +377,13 @@ _Solid black: closed-form $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$._
 
 ### $I_T$ itself — the kernel behind everything
 
-Fee, back-to-back and partial are all linear (or affine) in
-$I_T = \int_0^T S_t \, dt$; any discrepancy between their
-closed-form and MC means in the scorecard traces back to whether
-$I_T$ itself is being sampled correctly. Dufresne (2001) gives mean
-and variance in closed form, plotted as rules on top of the MC
-histogram below. A converged MC puts about 68% of the mass between
-the dashed rules; tail quantiles have no closed form (since $I_T$ is
-not log-normal) and are left to Monte Carlo.
+Fee and b2b are linear in $I_T = \int_0^T S_t \, dt$, and the
+partial-desk variance depends on the strong-Markov decomposition of
+the uncovered tail. Dufresne (2001) gives mean and variance in
+closed form, plotted as rules on top of the MC histogram below. A
+converged MC puts about 68% of the mass between the dashed rules;
+tail quantiles have no closed form (since $I_T$ is not log-normal)
+and are left to Monte Carlo.
 
 ```{ojs}
 //| echo: false
@@ -342,15 +418,15 @@ Plot.plot({
 
 _Solid black: closed-form $\mathbb{E}[I_T]$. Dashed: $\pm \mathrm{SD}[I_T]$._
 
-### The matched book's interim NAV
+### The matched treasury's interim NAV
 
-Terminal P&L on the matched book is deterministic, but mark-to-market
-value is not. $V_t = N P (1 - t/T) \cdot S_t$ — remaining inventory
-times spot — is a scaled GBM that pins to zero at $T$ (the burn
-schedule drains the inventory) but can carve out a material interim
-dip on a mid-horizon crash. The sampled trajectories below (orange
-first path, grey the rest) show the qualitative shape before the
-shortfall plot formalises it.
+The matched desk ($b2b + \text{treasury}(N P, N P S_0)$) has
+deterministic terminal P&L, but the treasury's mark-to-market is not
+deterministic interim. $V_t = N P (1 - t/T) \cdot S_t$ — remaining
+inventory times spot — is a scaled GBM that pins to zero at $T$ (the
+burn schedule drains the inventory) but can carve out a material
+interim dip on a mid-horizon crash. The sampled trajectories below
+show the qualitative shape before the shortfall plot formalises it.
 
 ```{ojs}
 //| echo: false
@@ -385,11 +461,11 @@ Plot.plot({
 _Grey: sampled NAV paths. Orange: the first path, highlighted. $V_T$
 pins to zero regardless of $S_T$._
 
-### Shortfall-against-schedule on the matched book
+### Shortfall-against-schedule on the matched treasury
 
-The operational question on the matched book is not "what is
-terminal P&L" (it's deterministic) but *how far below the flat-price
-schedule did NAV dip at the worst moment*. Formally,
+The operational question on the matched treasury is not "what is
+terminal P&L" (the desk total is deterministic) but *how far below
+the flat-price schedule did NAV dip at the worst moment*. Formally,
 
 $$
 D := \max_{t \le T} \bigl[ N P (1 - t/T) (S_0 - S_t) \bigr]_+
@@ -398,7 +474,7 @@ $$
 — paper gains do not count, only below-schedule excursions. Dashed
 black marks the 95th percentile (≈ 1 year in 20), solid black the
 99th (≈ 1 year in 100). Deterministic terminal P&L does not make the
-matched book risk-free.
+matched treasury risk-free.
 
 ```{ojs}
 //| echo: false
@@ -419,15 +495,15 @@ Plot.plot({
 ```
 
 _Dashed black: 95th-percentile shortfall. Solid black: 99th
-percentile. The natural solvency thresholds even though terminal
-P&L is deterministic._
+percentile. The natural solvency thresholds even though the matched
+desk terminal P&L is deterministic._
 
 ## Parameter sweep {#parameter-sweep}
 
-Inverting the single-run view: fix the book (partial) and the risk
-statistic (CVaR₉₅, larger = worse), and let the business parameters
-$(\alpha, \mu, \sigma)$ sweep. The two plots that follow peel off one
-axis each. Data from `data/sweep.json`; slice with the controls.
+Inverting the single-run view: fix the desk composition
+(partial-desk = b2b + treasury at α) and the risk statistic
+(CVaR₉₅, larger = worse), and let the business parameters
+$(\alpha, \mu, \sigma)$ sweep. Data from `data/sweep.json`.
 
 ```{ojs}
 //| echo: false
@@ -436,7 +512,7 @@ sweep = FileAttachment("data/sweep.json").json()
 
 ```{ojs}
 //| echo: false
-viewof pickAlpha = Inputs.range([0,1], { step: 0.25, value: 0.5, label: "hedge ratio α" })
+viewof pickAlpha = Inputs.range([0,1], { step: 0.25, value: 0.5, label: "coverage α" })
 ```
 
 ```{ojs}
@@ -447,9 +523,9 @@ viewof pickMu = Inputs.select(sweep.grid.mus, { value: 0.05, label: "drift μ (/
 ### Tail risk vs volatility $\sigma$
 
 More volatility widens $\mathrm{Var}[I_T]$ and therefore the
-principal book's loss tail. The curve below should rise monotonically
-in $\sigma$ for every $(\alpha, \mu)$; a flat or non-monotone line is
-a bug.
+partial-desk loss tail. The curve below should rise monotonically
+in $\sigma$ for every $(\alpha, \mu)$; a flat or non-monotone line
+is a bug.
 
 ```{ojs}
 //| echo: false
@@ -465,25 +541,24 @@ Plot.plot({
   marginBottom: 55,
   grid: true,
   x: { label: "volatility σ   (annualised)", labelAnchor: "center", labelOffset: 36, type: "linear" },
-  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
+  y: { label: "CVaR95 of partial desk   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, stroke: "#c53", strokeWidth: 2 }),
-    Plot.dot(filteredBySigma, { x: "sigma", y: d => d.partial.cvar95, fill: "#c53", r: 4 })
+    Plot.line(filteredBySigma, { x: "sigma", y: d => d.partialDesk.cvar95, stroke: "#c53", strokeWidth: 2 }),
+    Plot.dot(filteredBySigma, { x: "sigma", y: d => d.partialDesk.cvar95, fill: "#c53", r: 4 })
   ]
 })
 ```
 
-_Partial-book CVaR₉₅ against $\sigma$ at the selected $(\alpha, \mu)$._
+_Partial-desk CVaR₉₅ against $\sigma$ at the selected $(\alpha, \mu)$._
 
 ### Tail risk vs coverage $\alpha$
 
-Dose-response for pre-buying, at the middle $\sigma$ grid value. The
-partial variant's $(1 - \alpha)$ SD scaling law predicts CVaR
-collapses roughly linearly toward zero as $\alpha$ sweeps from 0
-(back-to-back) to 1 (matched). At $\alpha = 1$ the book is
-deterministic, so CVaR reduces to the sign of the matched-book P&L —
-a single value, not a tail.
+Dose-response for pre-buying, at the middle $\sigma$ grid value.
+Coverage collapses the uncovered-window integral $J_\alpha$; CVaR
+drops non-linearly toward zero as $\alpha \to 1$. At $\alpha = 1$
+the partial desk is deterministic, so CVaR reduces to the sign of
+the matched desk's P&L — a single value, not a tail.
 
 ```{ojs}
 //| echo: false
@@ -498,30 +573,30 @@ Plot.plot({
   marginLeft: 80,
   marginBottom: 55,
   grid: true,
-  caption: "Coverage α vs tail risk on the partial book. σ fixed at the second grid value. At α = 1 the book is deterministic so CVaR95 collapses to the sign of the matched P&L.",
-  x: { label: "hedge ratio α   (0 = back-to-back, 1 = fully matched)", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "CVaR95 of Π (partial)   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
+  caption: "Coverage α vs tail risk on the partial desk. σ fixed at the second grid value. At α = 1 the desk is deterministic so CVaR₉₅ collapses to the sign of the matched P&L.",
+  x: { label: "coverage α   (0 = b2b only, 1 = fully matched)", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
+  y: { label: "CVaR95 of partial desk   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(byAlpha, { x: "alpha", y: d => d.partial.cvar95, stroke: "#35a", strokeWidth: 2 }),
-    Plot.dot(byAlpha, { x: "alpha", y: d => d.partial.cvar95, fill: "#35a", r: 4 })
+    Plot.line(byAlpha, { x: "alpha", y: d => d.partialDesk.cvar95, stroke: "#35a", strokeWidth: 2 }),
+    Plot.dot(byAlpha, { x: "alpha", y: d => d.partialDesk.cvar95, fill: "#35a", r: 4 })
   ]
 })
 ```
 
 ## Syndicated cession and the $(1-\beta)^2$ law
 
-The three plots in this section exercise the syndicated book. See
-[the syndicated book in the model](model.qmd#syndicated-book) for
-the formulae. The key identity: at the fair premium ($\theta = 0$),
-$\Pi_{\mathrm{ret}} = \mathbb{E}[\Pi_\alpha] + (1 - \alpha)(1 -
-\beta) \cdot (\Pi_{\mathrm{b2b}} - \mathbb{E}[\Pi_{\mathrm{b2b}}])$
-— an affine rescaling of $\Pi_{\mathrm{b2b}}$ around
-$\mathbb{E}[\Pi_\alpha]$, slope $(1 - \alpha)(1 - \beta)$. Every
-plot below is derived from the sweep cells' back-to-back statistics;
-the closed-form map means **no new Monte Carlo is needed** to price
-retention. The `cvar`-mode shape factor $\phi(\Phi^{-1}(0.95))/0.05
-\approx 2.063$ keeps `sharpe` and `cvar` loads on a common SD scale.
+The plots in this section exercise the syndicated-on-b2b operating
+book. See [the syndicated book in the model](model.qmd#syndicated-book)
+for the formulae. At the fair premium ($\theta = 0$),
+$\Pi_{\mathrm{ret}}^{\mathrm{op}} = (1 - \beta) \cdot
+(\Pi_{\mathrm{b2b}} - \mathbb{E}[\Pi_{\mathrm{b2b}}]) +
+\mathbb{E}[\Pi_{\mathrm{b2b}}]$ — an affine rescaling around the b2b
+mean, slope $(1 - \beta)$. Every plot below is derived from the
+sweep cells' b2b statistics; the closed-form map means **no new
+Monte Carlo is needed** to price retention. The `cvar`-mode shape
+factor $\phi(\Phi^{-1}(0.95))/0.05 \approx 2.063$ keeps `sharpe` and
+`cvar` loads on a common SD scale.
 
 ```{ojs}
 //| echo: false
@@ -538,17 +613,14 @@ viewof pickTheta = Inputs.range([0, 1], { step: 0.05, value: 0, label: "counterp
 viewof pickMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "premium mode" })
 ```
 
-### Retained CVaR₉₅ across $(\alpha, \beta)$
+### Retained CVaR₉₅ across $\beta$
 
-At the selected $(\mu, \sigma, \theta)$, each curve below is one
-$\alpha$ from the sweep grid as $\beta$ sweeps 0 → 1. The retained
-tail collapses linearly in $(1 - \beta)$ for every $\alpha$; the two
-dials multiply into $(1 - \alpha)(1 - \beta)$ on the SD axis. Top
-curve: $\alpha = 0$ (back-to-back, no internal hedge). Bottom:
-$\alpha = 1$ (matched, deterministic before cession). Raising
-$\theta$ lifts every curve by the counterparty risk premium
-$\beta (1 - \alpha) \rho(\theta)$ — the intermediary pays mean in
-exchange for the tighter tail.
+At the selected $(\mu, \sigma, \theta)$, the curve below sweeps the
+cession $\beta$. The retained tail collapses linearly in $(1 -
+\beta)$. Raising $\theta$ lifts the curve by the counterparty risk
+premium $\beta \cdot \rho(\theta)$ — the intermediary pays mean in
+exchange for the tighter tail. Composing with the treasury (not
+shown here) adds another multiplicative factor tied to coverage.
 
 ```{ojs}
 //| echo: false
@@ -563,28 +635,22 @@ betaGrid = Array.from({ length: 21 }, (_, i) => i / 20)
 ```{ojs}
 //| echo: false
 retainedCvarCurves = {
-  // E[Π_α] = α · matched + (1-α) · E[Π_b2b]; at θ=0 the cession is mean-preserving.
-  // CVaR95(Π_ret) = (1-α)(1-β)·cvar95(b2b) − (1-α)·β·mean(b2b) − α·matched
-  //                 + β(1-α)·loadFactor·sd(b2b)·θ   (θ load is an extra loss to the
-  //                 intermediary and therefore adds to -E[Π_ret]).
+  // Operating-layer retained: Π_ret = (1 − β)·Π_b2b + π_loaded.
+  // CVaR95(Π_ret) = (1 − β)·cvar95(b2b) − β·mean(b2b) + β·θ·loadFactor·sd(b2b)
+  // (the θ term lifts losses because the intermediary surrenders mean to the
+  // counterparty; it adds to −E[Π_ret]).
   const loadFactor = pickMode === "cvar" ? gaussianCvar95 : 1;
   const rows = [];
-  for (const alpha of sweep.grid.alphas) {
-    for (const beta of betaGrid) {
-      const cell = sweep.cells.find(c => c.alpha === alpha && c.mu === pickMu && c.sigma === pickSigma);
-      if (!cell) continue;
-      const b2bMean = cell.b2b.mean;
-      const b2bCvar = cell.b2b.cvar95;
-      const b2bSd = cell.b2b.sd;
-      const matchedMean = cell.matched.mean;
-      // Identity derived from Π_ret = E[Π_α] + (1-α)(1-β)·(Π_b2b − E[Π_b2b]) + (π_loaded − π_fair).
-      // The last term is −β(1-α)·θ·loadFactor·sd(b2b); it translates the distribution.
-      const fairCvar = (1 - alpha) * (1 - beta) * b2bCvar
-                      - (1 - alpha) * beta * b2bMean
-                      - alpha * matchedMean;
-      const loadShift = beta * (1 - alpha) * pickTheta * loadFactor * b2bSd;
-      rows.push({ alpha, beta, cvar: fairCvar + loadShift });
-    }
+  // Pick α = 0 so we read the retained identity on the raw b2b book.
+  const cell = sweep.cells.find(c => c.alpha === 0 && c.mu === pickMu && c.sigma === pickSigma);
+  if (!cell) return rows;
+  const b2bMean = cell.b2b.mean;
+  const b2bCvar = cell.b2b.cvar95;
+  const b2bSd = cell.b2b.sd;
+  for (const beta of betaGrid) {
+    const fairCvar = (1 - beta) * b2bCvar - beta * b2bMean;
+    const loadShift = beta * pickTheta * loadFactor * b2bSd;
+    rows.push({ beta, cvar: fairCvar + loadShift });
   }
   return rows;
 }
@@ -598,24 +664,23 @@ Plot.plot({
   marginLeft: 80,
   marginBottom: 55,
   grid: true,
-  caption: "Retained CVaR₉₅ at the selected (μ, σ, θ). Each line is one α from the sweep grid; β sweeps 0→1. The collapse is linear in (1-β) for every α, and θ > 0 shifts curves upward (more tail loss) because the intermediary pays away mean.",
+  caption: "Retained-operating CVaR₉₅ at the selected (μ, σ, θ). β sweeps 0→1. The collapse is linear in (1 − β); θ > 0 shifts the curve upward (more tail loss) because the intermediary pays away mean.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "CVaR95 of Π_ret   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
-  color: { legend: true, label: "hedge ratio α", domain: sweep.grid.alphas, scheme: "viridis", type: "ordinal" },
+  y: { label: "CVaR95 of retained   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(retainedCvarCurves, { x: "beta", y: "cvar", stroke: "alpha", strokeWidth: 2 }),
+    Plot.line(retainedCvarCurves, { x: "beta", y: "cvar", stroke: "#35a", strokeWidth: 2 }),
   ]
 })
 ```
 
 ### Fair vs loaded premium
 
-At $\alpha = 0$ the fair premium $\pi_{\mathrm{fair}} = \beta \cdot
+The fair premium $\pi_{\mathrm{fair}} = \beta \cdot
 \mathbb{E}[\Pi_{\mathrm{b2b}}]$ is linear in $\beta$ (the blue
 $\theta = 0$ line below). A positive $\theta$ carves the loaded
-premium downward by $\beta \rho(\theta)$; the vertical gap between
-$\theta = 0$ and any other curve is exactly the risk premium the
+premium downward by $\beta \cdot \rho(\theta)$; the vertical gap
+between $\theta = 0$ and any other curve is the risk premium the
 counterparty extracts for absorbing tail risk.
 
 ```{ojs}
@@ -645,7 +710,7 @@ Plot.plot({
   marginLeft: 90,
   marginBottom: 55,
   grid: true,
-  caption: "Premium paid to the intermediary as a function of β, for a handful of θ values. θ = 0 is the actuarially fair premium (the straight blue line). Larger θ carves the curve down — the intermediary surrenders expected P&L to tighten the retained tail.",
+  caption: "Premium paid to the intermediary as a function of β, for a handful of θ values. θ = 0 is the actuarially fair premium; larger θ carves the curve down.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
   y: { label: "premium π   (USD)", labelAnchor: "center", zero: true, tickFormat: formatTickCurrency },
   color: { legend: true, label: "load θ" },
@@ -661,8 +726,8 @@ Plot.plot({
 The flip side of the previous plot. At $\theta = 0$, expected
 retained P&L is independent of $\beta$ — the no-free-lunch
 identity — and the curve below is flat at zero. For $\theta > 0$
-the shortfall from the fair premium shows up directly as a linear
-drag on $\mathbb{E}[\Pi_{\mathrm{ret}}] - \mathbb{E}[\Pi_\alpha]$.
+the shortfall from the fair premium shows up as a linear drag on
+$\mathbb{E}[\Pi_{\mathrm{ret}}] - \mathbb{E}[\Pi_{\mathrm{b2b}}]$.
 
 ```{ojs}
 //| echo: false
@@ -690,9 +755,9 @@ Plot.plot({
   marginLeft: 90,
   marginBottom: 55,
   grid: true,
-  caption: "Expected-P&L cost of syndication as a function of β, at α = 0. The θ = 0 curve is the flat no-free-lunch line at zero; larger θ carves linearly downward.",
+  caption: "Expected-P&L cost of syndication as a function of β. At θ = 0 the curve is flat; larger θ carves linearly downward.",
   x: { label: "cession fraction β", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
-  y: { label: "E[Π_ret] − E[Π_α]   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
+  y: { label: "E[Π_ret] − E[Π_b2b]   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   color: { legend: true, label: "load θ" },
   marks: [
     Plot.ruleY([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -703,14 +768,13 @@ Plot.plot({
 
 ## Switching and tail truncation
 
-Partial and syndicated **rescale** the loss tail by $(1 - \alpha)(1 -
-\beta)$; the switching book **truncates** it, flipping the stochastic
-leg to a fee book at rate $f_{\mathrm{post}}$ the first time $S_t$
-crosses $H = h S_0$ (stopping time $\tau$). See [the switching book
-in the model](model.qmd#switching-book) for the formulae. No
-closed-form density exists — $\tau$ is a stopping time — so Monte
-Carlo is authoritative. Under pure GBM the Harrison (1985)
-first-passage distribution gives $\mathbb{P}[\tau \le T]$ and
+The switching operating book flips the b2b pricing to a fee book at
+rate $f_{\mathrm{post}}$ the first time $S_t$ crosses $H = h \cdot
+S_0$ (stopping time $\tau$). See [the switching book in the
+model](model.qmd#switching-book) for the formulae. No closed-form
+density exists — $\tau$ is a stopping time — so Monte Carlo is
+authoritative. Under pure GBM the Harrison (1985) first-passage
+distribution gives $\mathbb{P}[\tau \le T]$ and
 $\mathbb{E}[\tau \wedge T]$ as test oracles; Merton jumps inflate
 $\mathbb{P}[\tau \le T]$ and shorten $\mathbb{E}[\tau \wedge T]$.
 
@@ -722,7 +786,6 @@ switchingSweep = FileAttachment("data/switching-sweep.json").json()
 ```{ojs}
 //| echo: false
 switchingRows = switchingSweep.cells.map(c => ({
-  // h = Infinity is serialised as null — label it for the x-axis.
   h: c.h === null ? Infinity : c.h,
   hLabel: c.h === null ? "∞ (no switch)" : c.h.toFixed(2),
   mean: c.row.mean,
@@ -741,12 +804,11 @@ switchingRows = switchingSweep.cells.map(c => ({
 
 ### CVaR₉₅ and $\mathbb{E}[\Pi]$ as functions of the barrier
 
-The headline operator-decision chart. Lowering $h$ collapses
-CVaR₉₅ from the syndicated reference (dashed horizontal) toward the
-fee book's lightly negative CVaR and simultaneously lifts
-$\mathbb{E}[\Pi]$ as losses are converted to fee revenue. The knee
-where both curves diverge from the no-switch baseline is the
-operator's natural decision point.
+Lowering $h$ collapses CVaR₉₅ from the b2b reference (dashed
+horizontal) toward the fee book's lightly negative CVaR and
+simultaneously lifts $\mathbb{E}[\Pi]$ as losses are converted to fee
+revenue. The knee where both curves diverge from the no-switch
+baseline is the operator's natural decision point.
 
 ```{ojs}
 //| echo: false
@@ -757,15 +819,15 @@ Plot.plot({
   marginRight: 60,
   marginBottom: 55,
   grid: true,
-  caption: "Switching book — CVaR₉₅ (USD loss, lower is better) as a function of barrier h. Finite h on a log scale; the dashed horizontal is the no-switch syndicated anchor. Lower h truncates more of the loss tail but also caps more of the upside by handing flow to the fee book earlier.",
+  caption: "Switching book — CVaR₉₅ (USD loss, lower is better) as a function of barrier h. Finite h on a log scale; the dashed horizontal is the retained-on-b2b anchor. Lower h truncates more of the loss tail but also caps more of the upside.",
   x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
-  y: { label: "CVaR95 of Π (switching)   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
+  y: { label: "CVaR95 of switching book   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   marks: [
     Plot.ruleY([0]),
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "#c33", strokeWidth: 2 }),
     Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", fill: "#c33", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
-    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "syndicated retained (h=∞)"}],
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
   ]
 })
@@ -779,7 +841,7 @@ Plot.plot({
   marginLeft: 80,
   marginBottom: 55,
   grid: true,
-  caption: "Expected P&L across barriers. Tighter h shifts mean upward because the fee book's positive-revenue payoff replaces the back-to-back book's mean-zero-but-fat-tailed payoff on switched paths.",
+  caption: "Expected P&L across barriers. Tighter h shifts the mean upward because the fee book's positive-revenue payoff replaces b2b's mean-zero-but-fat-tailed payoff on switched paths.",
   x: { label: "barrier h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
   y: { label: "E[Π] (switching)   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
   marks: [
@@ -787,7 +849,7 @@ Plot.plot({
     Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "#2a7", strokeWidth: 2 }),
     Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", fill: "#2a7", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
-    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "syndicated retained (h=∞)"}],
+    Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
   ]
 })
@@ -833,11 +895,11 @@ $$
 \frac{Q^*}{(1 + f) \cdot P \cdot S_0} = \frac{e^{\mu T} - 1}{\mu T},
 $$
 
-gives a dimensionless premium (>1, principal must charge extra to
+gives a dimensionless premium (>1, b2b must charge extra to
 compensate for expected appreciation) or discount (<1, expected
-cheapening lets the principal quote below the fee-book price).
-Dashed rule at 1.0 is the $\mu = 0$ limit; longer horizons push every
-non-zero curve further from that line.
+cheapening lets b2b quote below the fee-book price). Dashed rule at
+1.0 is the $\mu = 0$ limit; longer horizons push every non-zero
+curve further from that line.
 
 ```{ojs}
 //| echo: false
