@@ -195,9 +195,10 @@ buildDate = {
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Inputs
 
-Inventory, contract, and horizon. The comparison Monte Carlo runs at
-fixed drift and variance ($\mu = 0.05$, $\sigma^2 = 0.25$, no jumps);
-vary those on the [Simulator](simulator.qmd).
+Inventory, contract, horizon, and the price process (drift, variance,
+and optional Merton jumps) driving the comparison Monte Carlo. Jumps
+are off by default ($\lambda_J = 0$); see the
+[Simulator](simulator.qmd) for a wider-ranging sweep.
 
 ### Price process
 
@@ -209,6 +210,33 @@ viewof pi0 = Inputs.range([0, 500], { step: 1, value: 125, label: "π₀ (USD / 
 ```{ojs}
 //| echo: false
 viewof P = Inputs.range([100, 25000], { step: 10, value: 1790, label: "P (kVCM / tonne)" })
+```
+
+```{ojs}
+//| echo: false
+viewof mu = Inputs.range([-1, 1], { step: 0.005, value: 0.05, label: "drift μ (annualised)" })
+```
+
+```{ojs}
+//| echo: false
+viewof sigma2 = Inputs.range([0, 3], { step: 0.005, value: 0.25, label: "variance σ² (annualised)" })
+```
+
+### Jumps (Merton)
+
+```{ojs}
+//| echo: false
+viewof lambdaJ = Inputs.range([0, 50], { step: 0.1, value: 0, label: "jump intensity λ_J (/yr)" })
+```
+
+```{ojs}
+//| echo: false
+viewof muJ = Inputs.range([-0.5, 0.5], { step: 0.01, value: -0.05, label: "mean log-jump μ_J" })
+```
+
+```{ojs}
+//| echo: false
+viewof sigmaJ = Inputs.range([0, 1], { step: 0.01, value: 0.35, label: "log-jump SD σ_J" })
 ```
 
 ### Demand & inventory
@@ -326,6 +354,8 @@ findingsResetButton = {
     : 365;
   const defaults = {
     pi0: 125, P: 1790,
+    mu: 0.05, sigma2: 0.25,
+    lambdaJ: 0, muJ: -0.05, sigmaJ: 0.35,
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: defaultTdays, Q: 180, fee: 0.4,
     beta: 0, theta: 0, premiumMode: "sharpe",
@@ -334,6 +364,8 @@ findingsResetButton = {
   };
   const views = {
     pi0: viewof pi0, P: viewof P,
+    mu: viewof mu, sigma2: viewof sigma2,
+    lambdaJ: viewof lambdaJ, muJ: viewof muJ, sigmaJ: viewof sigmaJ,
     lambdaDay: viewof lambdaDay, kPre: viewof kPre, cBasis: viewof cBasis,
     Tdays: viewof Tdays, Q: viewof Q, fee: viewof fee,
     beta: viewof beta, theta: viewof theta, premiumMode: viewof premiumMode,
@@ -364,7 +396,7 @@ findingsResetButton = {
 //| echo: false
 import {
   mulberry32, xTicksAnchoredRight, formatTickDate,
-  simulate, simulateSwitching, summarise,
+  simulate, simulateSwitching, summarise, samplePath,
 } from "./lib/compiled/src/core/index.js"
 ```
 
@@ -375,21 +407,23 @@ derived = {
   const T = Tdays / 365;
   const lambda = lambdaDay * 365;
   const N = lambda * T;
-  return { S0, T, lambda, N };
+  const sigma = Math.sqrt(sigma2);
+  return { S0, T, lambda, N, sigma };
 }
 ```
 
 ```{ojs}
 //| echo: false
-// Self-contained comparison MC for the drawn-curve table. Drift and
-// variance are fixed at the Simulator's defaults; open the Simulator
-// to vary them. nPaths / nSteps are hardcoded at those defaults too.
+// Self-contained comparison MC for the drawn-curve table. Drift,
+// variance, and jump parameters come from the sidebar; nPaths / nSteps
+// stay pinned at the Simulator's defaults.
 run = {
   const inputs = {
-    S0: derived.S0, mu: 0.05, sigma: Math.sqrt(0.25), P,
+    S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
     Q, fee, kPre, cBasis,
     beta, premiumLoad: theta, premiumMode,
+    lambdaJ, muJ, sigmaJ,
     nPaths: 5000, nSteps: 100, seed,
   };
   const raw = simulate(inputs);
@@ -413,10 +447,11 @@ run = {
 // row above.
 switchRun = {
   const inputs = {
-    S0: derived.S0, mu: 0.05, sigma: Math.sqrt(0.25), P,
+    S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
     Q, fee, alpha: 0, beta: 0, premiumLoad: 0, premiumMode,
     barrierRatio, feePost,
+    lambdaJ, muJ, sigmaJ,
     nPaths: 5000, nSteps: 100, seed,
   };
   const raw = simulateSwitching(inputs);
@@ -729,14 +764,17 @@ viewof customCurve = {
       return S0Val + (peak - S0Val) * Math.exp(-80 * d * d);
     });
   });
-  addButton("Random walk", () => {
-    let s = S0Val;
-    const vals = [];
-    for (let i = 0; i < nPoints; i++) {
-      s = Math.max(0, s * (1 + 0.02 * (Math.random() - 0.5)));
-      vals.push(s);
-    }
-    for (let i = 0; i < nPoints; i++) values[i] = vals[i];
+  addButton("Random path", () => {
+    const rng = mulberry32(seed);
+    const { S } = samplePath(rng, {
+      S0: S0Val,
+      mu,
+      sigma: derived.sigma,
+      T: derived.T,
+      nSteps: nPoints - 1,
+      lambdaJ, muJ, sigmaJ,
+    });
+    for (let i = 0; i < nPoints; i++) values[i] = S[i];
     redraw();
     emit();
   });

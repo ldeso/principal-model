@@ -5,6 +5,8 @@
 
 export { mulberry32 } from "./rng.js";
 export type { Rng } from "./rng.js";
+export { samplePath } from "./gbm.js";
+export type { GbmPath, SamplePathOpts } from "./gbm.js";
 export {
   expectedHittingTime,
   expm1OverX,
