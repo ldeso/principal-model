@@ -243,10 +243,22 @@ fingerprint of the partial variant's $(1-\alpha)^2$ variance collapse.
 
 ```{ojs}
 //| echo: false
+// 3a is deterministic (spike at its closed-form mean), so it's omitted from the
+// per-stochastic-book panel. 3e only appears when the fixture was generated
+// with a finite barrier (see src/report.ts:248-250).
+pnlModels = [
+  "fee", "principal_3b", "principal_3c", "principal_3d",
+  ...(run.sampleTraces.switching ? ["principal_3e"] : []),
+]
+
 pnlData = [
   ...run.sampleTraces.fee.map(v => ({model: "fee", pnl: v})),
   ...run.sampleTraces.b2b.map(v => ({model: "principal_3b", pnl: v})),
-  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v}))
+  ...run.sampleTraces.partial.map(v => ({model: "principal_3c", pnl: v})),
+  ...run.sampleTraces.retained.map(v => ({model: "principal_3d", pnl: v})),
+  ...(run.sampleTraces.switching
+    ? run.sampleTraces.switching.map(v => ({model: "principal_3e", pnl: v}))
+    : []),
 ]
 ```
 
@@ -262,13 +274,19 @@ Plot.plot({
   x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: "$~s" },
   y: { label: "empirical density", labelAnchor: "center" },
   fy: { label: "model" },
-  color: { legend: true, domain: ["fee","principal_3b","principal_3c"], label: "model" },
+  color: { legend: true, domain: pnlModels, label: "model" },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
     Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "model", fy: "model", thresholds: 60 })),
-    Plot.ruleX(run.rows.filter(r => ["fee","principal_3b","principal_3c"].includes(r.name)),
-      { x: "closedFormMean", fy: "name", stroke: "black", strokeWidth: 2 })
+    // Switching has no closed-form mean (NaN) — fall back to MC mean so the
+    // overlay is still meaningful on that facet.
+    Plot.ruleX(
+      run.rows
+        .filter(r => pnlModels.includes(r.name))
+        .map(r => ({ name: r.name, x: Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean })),
+      { x: "x", fy: "name", stroke: "black", strokeWidth: 2 }
+    )
   ]
 })
 ```

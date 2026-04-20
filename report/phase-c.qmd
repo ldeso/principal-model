@@ -469,6 +469,14 @@ width under over-hedge (the terminal-$S_T$ exposure kicks in).
 
 ```{ojs}
 //| echo: false
+// Switching facet follows the same predicate as the summary table row
+// (see the `summaryRows` cell above) so table and histogram agree in lockstep.
+includeSwitch = isFinite(barrierRatio) && barrierRatio < 3
+switchLabel = includeSwitch ? `principal (switching, h=${barrierRatio.toFixed(2)})` : null
+```
+
+```{ojs}
+//| echo: false
 pnlRecords = {
   const rows = [];
   const push = (label, arr) => {
@@ -481,6 +489,7 @@ pnlRecords = {
     rows.push({ book: "principal (custom)", pnl: run.principalSamples[i] });
     rows.push({ book: "principal (retained, syndicated)", pnl: run.retainedSamples[i] });
     rows.push({ book: "principal (back-to-back)", pnl: run.b2bSamples[i] });
+    if (includeSwitch) rows.push({ book: switchLabel, pnl: switchRun.pnlSamples[i] });
   }
   return rows;
 }
@@ -498,7 +507,10 @@ Plot.plot({
   x: { label: "terminal P&L (USD)", tickFormat: "$~s" },
   y: { label: "empirical density" },
   fy: { label: "book" },
-  color: { legend: true, domain: ["fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)"] },
+  color: { legend: true, domain: [
+    "fee","principal (custom)","principal (retained, syndicated)","principal (back-to-back)",
+    ...(includeSwitch ? [switchLabel] : []),
+  ] },
   marks: [
     Plot.ruleY([0]),
     Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
@@ -508,6 +520,7 @@ Plot.plot({
       { book: "principal (custom)", x: run.principal.mean },
       { book: "principal (retained, syndicated)", x: run.retained.mean },
       { book: "principal (back-to-back)", x: run.b2b.mean },
+      ...(includeSwitch ? [{ book: switchLabel, x: switchRun.summary.mean }] : []),
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
 })
