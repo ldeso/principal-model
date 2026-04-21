@@ -1,13 +1,16 @@
 # Klima Protocol: Fee-Based vs. Principal Model
 
 A carbon-retirement intermediary buys kVCM tokens and burns them on
-behalf of clients. It can charge either a **fee** (a markup on the
-pass-through token cost, carrying no inventory and no price exposure)
-or a **principal** price (a fixed USD quote per tonne, set at
-inception). This note gives closed-form moments for both books, splits
-the principal book into a zero-capital operating leg and a
-balance-sheet treasury, and studies three ways to reshape the
-principal loss tail: pre-purchased inventory $(k, C_{\mathrm{basis}})$,
+behalf of clients. The intermediary can charge clients in one of two
+ways. A **fee** is a markup on the pass-through token cost; it carries
+no inventory and no price exposure. A **principal** price is a fixed
+USD quote per tonne, set at inception, and the intermediary absorbs
+the spot risk.
+
+This note has three parts. It derives closed-form moments for both
+books. It splits the principal book into a zero-capital operating leg
+and a balance-sheet treasury. It then studies three ways to reshape
+the principal loss tail: pre-purchased inventory $(k, C_{\mathrm{basis}})$,
 syndication at fraction $\beta$, and switching to fee mode above a
 threshold $h$. The companion code checks every identity below.
 
@@ -15,21 +18,22 @@ threshold $h$. The companion code checks every identity below.
 
 The intermediary retires $\lambda$ tonnes per unit time over $[0, T]$.
 Each tonne needs $P$ kVCM, sourced at spot $S_t$. Demand is
-deterministic; the only random driver is $S_t$, modelled as geometric
-Brownian motion,
+deterministic, so the only random driver is the spot price. We model
+$S_t$ as geometric Brownian motion,
 
 $$
 dS_t = \mu S_t \, dt + \sigma S_t \, dW_t,
 \qquad S_0 = \pi_0 / P,
 $$
 
-with $\pi_t := P S_t$ the carbon price per tonne. Write $a \wedge b :=
-\min(a, b)$. Throughout, $\Pi$ denotes a book's terminal P&L in USD
-over $[0, T]$, and $\mathbb{E}$, $\mathbb{P}$, $\mathrm{Var}$,
-$\mathrm{SD}$, $\mathrm{Cov}$ are taken under the GBM law above;
-$\mathbf{1}\{A\}$ is the indicator of event $A$.
+and write $\pi_t := P S_t$ for the carbon price per tonne. Throughout,
+$\Pi$ denotes a book's terminal P&L in USD over $[0, T]$. The
+expectations $\mathbb{E}$, $\mathbb{P}$, $\mathrm{Var}$,
+$\mathrm{SD}$, and $\mathrm{Cov}$ are taken under the GBM law above.
+We write $\mathbf{1}\{A\}$ for the indicator of event $A$ and $a
+\wedge b := \min(a, b)$.
 
-*Price process.*
+The table below lists the price-process symbols.
 
 | Symbol | Meaning |
 | --- | --- |
@@ -41,7 +45,7 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $W_t$ | driving Brownian motion |
 | $\mathcal{F}_t$ | natural filtration |
 
-*Contract and demand.*
+The next table lists the contract and demand symbols.
 
 | Symbol | Meaning |
 | --- | --- |
@@ -52,7 +56,7 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $f$ | fee rate |
 | $Q$ | fixed USD quote per tonne (principal) |
 
-*Treasury.*
+The treasury symbols describe a pre-purchased inventory of tokens.
 
 | Symbol | Meaning |
 | --- | --- |
@@ -61,7 +65,8 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $\alpha = \min(1, k / (N P))$ | coverage fraction |
 | $\tau_{\mathrm{cov}} = \min(T, k / (P \lambda))$ | inventory-exhaustion time |
 
-*Syndication.*
+The syndication symbols describe a quota-share cession of the
+principal book to a counterparty.
 
 | Symbol | Meaning |
 | --- | --- |
@@ -69,7 +74,8 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $\theta \ge 0$ | counterparty risk load |
 | $\pi_{\mathrm{syn}}$ | up-front premium (USD) |
 
-*Switching.*
+The switching symbols describe the rule that flips the book between
+fee mode and principal mode.
 
 | Symbol | Meaning |
 | --- | --- |
@@ -79,7 +85,8 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $\tau := \inf\{t : S_t \ge H\} \wedge T$ | first-passage time |
 | $f_{\mathrm{post}}$ | fee rate in fee mode |
 
-*Jumps (compensated Merton overlay, introduced in §[Adding jumps](#jumps)).*
+The last table lists the compensated Merton jump parameters,
+introduced in §[Adding jumps](#jumps).
 
 | Symbol | Meaning |
 | --- | --- |
@@ -88,10 +95,10 @@ $\mathbf{1}\{A\}$ is the indicator of event $A$.
 | $\sigma_J$ | log-jump SD |
 | $\kappa = e^{\mu_J + \sigma_J^2 / 2} - 1$ | Merton compensation |
 
-P&L figures are totals over $[0, T]$ in USD; divide by $N$ for a
+P&L figures are totals over $[0, T]$ in USD. Divide by $N$ for a
 per-tonne reading.
 
-Risk is reported as value-at-risk and expected shortfall at 95 % and
+We report risk as value-at-risk and expected shortfall at 95 % and
 99 %,
 
 $$
@@ -100,28 +107,28 @@ $$
 \mathrm{CVaR}_p[\Pi] := \mathbb{E}\!\left[ -\Pi \mid \Pi \le -\mathrm{VaR}_p[\Pi] \right],
 $$
 
-plus a horizon-absolute Sharpe ratio $\mathrm{Sharpe}[\Pi] :=
-\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ and, as a Monte Carlo cross-check,
-the z-score against the closed-form mean,
+together with a horizon-absolute Sharpe ratio $\mathrm{Sharpe}[\Pi] :=
+\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$. As a Monte Carlo cross-check, we
+report the z-score of the MC mean against the closed-form mean,
 
 $$
-z := (\mathbb{E}_{\mathrm{mc}}[\Pi] - \mathbb{E}_{\mathrm{cf}}[\Pi]) / \mathrm{stderr},
+z := (\mathbb{E}_{\mathrm{mc}}[\Pi] - \mathbb{E}_{\mathrm{cf}}[\Pi]) / \mathrm{stderr}.
 $$
 
-treated as sampling noise at $|z| \le 2$ and suspect at $|z| > 3$.
+We treat $|z| \le 2$ as sampling noise and $|z| > 3$ as suspect.
 Monte Carlo means carry $\pm \mathrm{CI}_{95} = 1.96 \cdot \mathrm{SD}
-/ \sqrt{n}$. Because $R_{\mathrm{fee}} \ge 0$, the fee book's VaR and
+/ \sqrt{n}$. Fee revenue is non-negative, so the fee book's VaR and
 CVaR read as low-end revenue rather than loss, and its Sharpe does not
 depend on $f$.
 
-Every operating book below reduces, up to sign and scale, to the
+Every operating book below reduces, up to sign and scale, to the spot
 integral
 
 $$
 I_T := \int_0^T S_t \, dt,
 $$
 
-with Dufresne (2001) moments
+for which Dufresne (2001) gives the moments
 
 $$
 \mathbb{E}[I_T] = S_0 \cdot \frac{e^{\mu T} - 1}{\mu}
@@ -142,7 +149,9 @@ $I_T$ is not log-normal, so tail quantiles need Monte Carlo.
 
 ## The fee book {#fee-book}
 
-Quote $(1 + f) \pi_t$, remit $\pi_t$, keep $f \pi_t$ per tonne:
+The intermediary quotes each tonne at $(1 + f) \pi_t$, remits $\pi_t$
+to the spot market, and keeps $f \pi_t$. Total revenue over the
+horizon is therefore the fee rate times the spot integral,
 
 $$
 R_{\mathrm{fee}}
@@ -150,18 +159,23 @@ R_{\mathrm{fee}}
   = f P \lambda \cdot I_T,
 $$
 
+and the first two moments follow from those of $I_T$,
+
 $$
 \mathbb{E}[R_{\mathrm{fee}}] = f P \lambda \cdot \mathbb{E}[I_T],
 \qquad
 \mathrm{Var}[R_{\mathrm{fee}}] = (f P \lambda)^2 \cdot \mathrm{Var}[I_T].
 $$
 
-Revenue is non-negative almost surely, variance is driven by $\sigma$
-alone, and the Sharpe ratio is invariant in $f$.
+Revenue is non-negative almost surely. Variance is driven by $\sigma$
+alone. The Sharpe ratio is invariant in $f$, since $f$ scales the
+mean and the SD by the same factor.
 
 ## The back-to-back book {#b2b-book}
 
-Fix $Q$ at inception and source each tonne at spot:
+The intermediary fixes the quote $Q$ at inception and sources each
+tonne at spot. Terminal P&L is the fixed payout minus the stochastic
+sourcing cost,
 
 $$
 \Pi_{\mathrm{b2b}}
@@ -169,20 +183,22 @@ $$
   = Q N - P \lambda \cdot I_T,
 $$
 
+so the moments are
+
 $$
 \mathbb{E}[\Pi_{\mathrm{b2b}}] = Q N - P \lambda \cdot \mathbb{E}[I_T],
 \qquad
 \mathrm{Var}[\Pi_{\mathrm{b2b}}] = (P \lambda)^2 \cdot \mathrm{Var}[I_T].
 $$
 
-The two books' variances therefore satisfy
-$\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] =
-1 / f^2$ exactly, so one Monte Carlo pass prices both. Upside is
-capped at $Q N$, downside is unbounded. The position is economically
-equivalent to shorting a continuous strip of forwards on kVCM struck
-at $Q / P$.
+The two books share the same random driver, so their variances
+satisfy $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] =
+1 / f^2$ exactly, and one Monte Carlo pass prices both. Upside is
+capped at $Q N$, and downside is unbounded. The position is
+economically equivalent to shorting a continuous strip of forwards on
+kVCM struck at $Q / P$.
 
-By Itô,
+The book's $S_t$-delta follows from Itô,
 
 $$
 \frac{\partial \, \mathbb{E}[\Pi_{\mathrm{b2b}} - \Pi_{\mathrm{b2b}}(t) \mid \mathcal{F}_t]}{\partial S_t}
@@ -192,16 +208,20 @@ $$
 
 The fee book satisfies the same identity with the sign reversed and
 magnitude $f P \lambda (T - t)$. The natural static hedge for the
-b2b book at time $t$ is $P \lambda (T - t)$ tokens of spot kVCM:
-exactly the treasury schedule at $k = N P$.
+b2b book at time $t$ is therefore $P \lambda (T - t)$ tokens of spot
+kVCM, which is exactly the treasury schedule at $k = N P$.
 
 ## The active treasury {#treasury-book}
 
 The treasury opens at $t = 0$ with $k$ tokens at basis
 $C_{\mathrm{basis}}$, feeds retirement at spot, and marks any
-over-hedge leftover at $S_T$. Set
-$\tau_{\mathrm{cov}} := \min(T, k / (P \lambda))$ and
-$k_{\mathrm{left}} := \max(0, k - N P)$. Terminal P&L is
+over-hedge leftover at the terminal spot $S_T$. Two derived quantities
+organise the P&L. The inventory-exhaustion time
+$\tau_{\mathrm{cov}} := \min(T, k / (P \lambda))$ is the date the
+inventory runs out. The leftover stack
+$k_{\mathrm{left}} := \max(0, k - N P)$ is the tokens still in the
+treasury at $T$ when the initial inventory exceeds demand. Terminal
+P&L is
 
 $$
 \Pi_{\mathrm{trea}}
@@ -252,11 +272,15 @@ C_{\mathrm{basis}}$ translates the distribution without reshaping it.
 
 ## Strategies as operating plus treasury {#strategies}
 
-Every desk in this note is an operating book plus a treasury:
+Every desk in this note is an operating book plus a treasury,
 
 $$
 \Pi_{\mathrm{desk}} = \Pi_{\mathrm{op}} + \Pi_{\mathrm{trea}}.
 $$
+
+The table below names the desks and the treasury parameters that
+recover each one. Each row pairs the operating book with the
+$(k, C_{\mathrm{basis}})$ that, summed with it, gives the named desk.
 
 | Strategy | Operating | Treasury $(k, C_{\mathrm{basis}})$ |
 | --- | --- | --- |
@@ -270,17 +294,18 @@ $$
 | Switching | switching | $(0, 0)$ |
 | Switching-matched | switching | $(N P, N P S_0)$ |
 
-At $(k, C_{\mathrm{basis}}) = (N P, N P S_0)$ the kernel cancels path
-by path,
+At $(k, C_{\mathrm{basis}}) = (N P, N P S_0)$ the $I_T$ kernel cancels
+path by path between the b2b operating leg and the treasury
+consumption,
 
 $$
 \Pi_{\mathrm{matched}}
   = (Q N - P \lambda I_T) + (P \lambda I_T - N P S_0)
-  = N (Q - P S_0),
+  = N (Q - P S_0).
 $$
 
-so the matched desk is deterministic. The identity holds to machine
-precision in `test/models.test.ts`.
+The matched desk is therefore deterministic, and the identity holds
+to machine precision in `test/models.test.ts`.
 
 Partial coverage sits between the naked and matched cases. Let
 $J_\alpha := \int_{\alpha T}^T S_t \, dt$. Then
@@ -326,15 +351,18 @@ with $(1-\alpha)^2$.
 
 ## Syndicating the back-to-back book {#syndication}
 
-Cede fraction $\beta$ of the b2b operating book against premium
-$\pi_{\mathrm{syn}}$:
+The intermediary cedes a fraction $\beta$ of the b2b operating book
+against an up-front premium $\pi_{\mathrm{syn}}$. The retained P&L is
+therefore
 
 $$
 \Pi_{\mathrm{ret}}
   = (1 - \beta) \Pi_{\mathrm{b2b}} + \pi_{\mathrm{syn}},
 \qquad
-\Pi_{\mathrm{ret}}(0) = \pi_{\mathrm{syn}}.
+\Pi_{\mathrm{ret}}(0) = \pi_{\mathrm{syn}},
 $$
+
+and the moments scale linearly and quadratically in $(1 - \beta)$,
 
 $$
 \mathbb{E}[\Pi_{\mathrm{ret}}]
@@ -344,10 +372,15 @@ $$
   = (1 - \beta)^2 \mathrm{Var}[\Pi_{\mathrm{b2b}}].
 $$
 
-Cession does not depend on $\alpha$ at the operating layer; $\alpha$
-re-enters at the desk composition.
+Cession acts on the operating layer alone and does not depend on
+$\alpha$. The coverage fraction $\alpha$ re-enters later, when we
+compose the operating book with the treasury into a desk.
 
-The per-unit risk load is
+The premium loads a per-unit risk charge $\rho(\theta)$ onto the
+actuarially fair price. We support two loading modes: `sharpe` scales
+the SD of the b2b book by $\theta$, and `cvar` replaces the SD by a
+95 % tail-scaled SD through the Gaussian surrogate factor
+$\phi(\Phi^{-1}(0.95)) / 0.05 \approx 2.063$,
 
 $$
 \rho(\theta) =
@@ -355,11 +388,12 @@ $$
   \theta \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}]
   & \text{sharpe,} \\
   \theta \cdot \mathrm{SD}[\Pi_{\mathrm{b2b}}] \cdot \phi(\Phi^{-1}(0.95)) / 0.05
-  & \text{cvar,}
+  & \text{cvar.}
 \end{cases}
 $$
 
-with shape factor $\approx 2.063$. The loaded premium is
+The loaded premium is the actuarial value of the ceded slice minus
+this charge,
 
 $$
 \pi_{\mathrm{syn}}(\beta, \theta)
@@ -367,19 +401,20 @@ $$
 $$
 
 At $\theta = 0$ the premium is actuarially fair and
-$\mathbb{E}[\Pi_{\mathrm{ret}}]$ does not depend on $\beta$; for
+$\mathbb{E}[\Pi_{\mathrm{ret}}]$ does not depend on $\beta$. At
 $\theta > 0$ the intermediary gives up expected P&L in exchange for
-tail relief. The `cvar` mode is a Gaussian surrogate; the tail of
+tail relief. The `cvar` mode is a Gaussian surrogate: the tail of
 $I_T$ is heavier than Gaussian, so Monte Carlo remains authoritative.
 Tranched cessions of the form $\max(L - K, 0)$ break the Dufresne
 backbone and are out of scope.
 
 ## Switching to fee above a threshold {#switching}
 
-Treasury and syndication rescale the loss tail; switching cuts it.
-Whenever $S_t$ is above $H = h S_0$ the book quotes at rate
-$f_{\mathrm{post}}$, producing non-negative fee revenue on that
-sub-interval. The mode indicator tracks the spot symmetrically:
+The treasury and syndication rescale the loss tail. Switching cuts
+it. Whenever the spot sits above the threshold $H = h S_0$, the book
+quotes at the fee-mode rate $f_{\mathrm{post}}$ and accrues
+non-negative revenue on that sub-interval. The mode indicator tracks
+the spot symmetrically,
 
 $$
 M_t := \begin{cases}
@@ -390,7 +425,7 @@ M_t := \begin{cases}
 \mathbf{1}^{\mathrm{fee}}_t := \mathbf{1}\{S_t \ge H\}.
 $$
 
-Split the kernel and the occupation times,
+We split the $I_T$ kernel and the occupation times by mode,
 
 $$
 I_{\mathrm{b2b}} := \int_0^T (1 - \mathbf{1}^{\mathrm{fee}}_t) S_t \, dt,
@@ -451,10 +486,11 @@ $$
     \right) dt.
 $$
 
-Both are Simpson-tractable (`expectedTimeAboveBarrier` and
-`expectedIntegralAboveBarrier` in `src/core/moments.ts`). The
-first-passage time $\tau$ is a path property; under pure GBM it
-follows the Harrison / Borodin-Salminen law,
+Both integrals are Simpson-tractable and are implemented as
+`expectedTimeAboveBarrier` and `expectedIntegralAboveBarrier` in
+`src/core/moments.ts`. The first-passage time $\tau$ is a path
+property. Under pure GBM it follows the Harrison / Borodin-Salminen
+law,
 
 $$
 \mathbb{P}[\tau \le T]
@@ -464,11 +500,15 @@ $$
 
 with $\mathbb{E}[\tau \wedge T] = \int_0^T (1 - \mathbb{P}[\tau \le t]) \, dt$.
 In general $T_{\mathrm{fee}} \ne T - \tau$, because the spot can
-re-enter after its first crossing, so $\mathbb{E}[\tau \wedge T]$ and
-$\mathbb{E}[T_{\mathrm{fee}}]$ are independent quantities. The P&L
-density has no closed form; tail quantiles need Monte Carlo.
+re-enter after its first crossing. The two quantities
+$\mathbb{E}[\tau \wedge T]$ and $\mathbb{E}[T_{\mathrm{fee}}]$ are
+therefore independent. The switching P&L density has no closed form,
+so tail quantiles need Monte Carlo.
 
-Partitioning by first passage gives
+We can nonetheless bound the tail. Partitioning by whether the spot
+ever crosses the threshold, we split the paths into the two events
+$\{\tau = T\}$ (no crossing) and $\{\tau < T\}$ (at least one
+crossing),
 
 $$
 \mathrm{CVaR}_{95}[\Pi_{\mathrm{sw}}]
@@ -479,22 +519,27 @@ $$
     \mathrm{CVaR}_{95}^{\{\tau < T\}}[\Pi_{\mathrm{sw}}].
 $$
 
-On $\{\tau = T\}$ the switching book is the b2b book; on $\{\tau < T\}$
-every fee-mode sub-interval contributes $\ge 0$. Lowering $h$ shrinks
-the first term and grows the second. Re-entries temper the cut: paths
-that cross back below $H$ resume b2b exposure. The simulator reports
-`CVaR95|no-switch` and `CVaR95|switched` separately. Sweeping $h$ at
-fixed $(\mu, \sigma, f, f_{\mathrm{post}})$ moves
-$\mathbb{E}[\Pi_{\mathrm{sw}}]$ and $\mathrm{CVaR}_{95}[\Pi_{\mathrm{sw}}]$
-monotonically in opposite directions; choosing $h$ to minimise a given
-risk measure is a control problem and is not addressed here.
+On $\{\tau = T\}$ the switching book coincides with the b2b book. On
+$\{\tau < T\}$ every fee-mode sub-interval contributes non-negative
+revenue. Lowering $h$ shrinks the first term and grows the second.
+Re-entries temper the cut, because paths that cross back below $H$
+resume b2b exposure. The simulator reports `CVaR95|no-switch` and
+`CVaR95|switched` separately. Sweeping $h$ at fixed $(\mu, \sigma, f,
+f_{\mathrm{post}})$ moves $\mathbb{E}[\Pi_{\mathrm{sw}}]$ and
+$\mathrm{CVaR}_{95}[\Pi_{\mathrm{sw}}]$ monotonically in opposite
+directions. Choosing $h$ to minimise a given risk measure is a
+control problem and is not addressed here.
 
 ## Side-by-side comparison {#comparison}
 
-Operating books plus treasury, pure GBM. Each column's $\Pi$ refers
-to that book's terminal P&L, in line with the earlier
+The table below collects the pure-GBM results for each operating
+book and the treasury, one book per column. Each column's $\Pi$ is
+that book's terminal P&L, matching the earlier
 $\Pi_{\mathrm{b2b}}$, $\Pi_{\mathrm{ret}}$, $\Pi_{\mathrm{sw}}$,
-$\Pi_{\mathrm{trea}}$ ($R_{\mathrm{fee}}$ for the fee column).
+$\Pi_{\mathrm{trea}}$ ($R_{\mathrm{fee}}$ for the fee column). The
+rows report, in order, the mean, the variance, the sign of the kVCM
+exposure, the downside shape, the capital required, and the
+counterparty exposure.
 
 | | Fee | B2b | Retained | Switching | Treasury $(k, C_{\mathrm{basis}})$ |
 | --- | --- | --- | --- | --- | --- |
@@ -505,7 +550,9 @@ $\Pi_{\mathrm{trea}}$ ($R_{\mathrm{fee}}$ for the fee column).
 | Capital | 0 | 0 | 0 | 0 | $C_{\mathrm{basis}}$ |
 | Counterparty | none | none | $\beta \Pi_{\mathrm{b2b}}$ upside | as retained on the fee leg | none |
 
-Desk totals are row-wise sums.
+Reading one column gives the full profile of that book. A desk total
+is the row-wise sum of an operating column and the treasury column,
+as laid out in §[Strategies as operating plus treasury](#strategies).
 
 Setting $\mathbb{E}[R_{\mathrm{fee}}] = \mathbb{E}[\Pi_{\mathrm{b2b}}]$
 solves for the break-even quote
@@ -515,11 +562,12 @@ Q^* = (1 + f) P S_0 \cdot \frac{e^{\mu T} - 1}{\mu T},
 $$
 
 with $Q^* \to (1 + f) P S_0$ as $\mu \to 0$. A positive drift pushes
-$Q^*$ above that level, a negative drift below. At $Q = Q^*$ the two
-books share $I_T$ and therefore share variance, but they enter it
-with opposite signs: the fee book is bounded below, and the b2b book
-carries a left-skewed loss tail. This asymmetry, present even at
-moment-equalised $Q$, is what the three dials work on.
+$Q^*$ above that level, and a negative drift pushes it below. At $Q
+= Q^*$ the two books share $I_T$ and therefore share variance, but
+they enter it with opposite signs. The fee book is bounded below.
+The b2b book carries a left-skewed loss tail. This asymmetry
+survives the moment equalisation at $Q = Q^*$ and is precisely what
+the three dials of the principal book work on.
 
 ## Adding jumps {#jumps}
 
@@ -539,22 +587,26 @@ from the drift.
 
 Means survive the overlay. The compound-Poisson identity gives
 $\mathbb{E}[S_t] = S_0 e^{\mu t}$ for every $(\lambda_J, \mu_J,
-\sigma_J)$, so
+\sigma_J)$, so the mean of $I_T$ is still the GBM expression,
 
 $$
-\mathbb{E}[I_T] = S_0 \cdot \frac{e^{\mu T} - 1}{\mu}
+\mathbb{E}[I_T] = S_0 \cdot \frac{e^{\mu T} - 1}{\mu}.
 $$
 
-still holds, and every mean-level identity above carries over:
+Every mean-level identity above carries over unchanged, including
 $\mathbb{E}[R_{\mathrm{fee}}]$, $\mathbb{E}[\Pi_{\mathrm{b2b}}]$,
 $\mathbb{E}[\Pi_{\mathrm{trea}}]$, $\mathbb{E}[\Pi_{\mathrm{ret}}]$,
-$Q^*$, and the matched-desk identity. Variances do not. Jumps
-inflate $\mathrm{Var}[S_t]$, and with it $\mathrm{Var}[I_T]$ and every
-downstream tail metric. The simulator reports the pure-GBM variance
-as a GBM anchor and leaves jump-aware tails to Monte Carlo.
-`test/jump-gbm.test.ts` verifies both predictions.
+the break-even quote $Q^*$, and the matched-desk identity. Variances
+do not. Jumps inflate $\mathrm{Var}[S_t]$, and with it
+$\mathrm{Var}[I_T]$ and every downstream tail metric. The simulator
+reports the pure-GBM variance as a GBM anchor and leaves the
+jump-aware tails to Monte Carlo. The test `test/jump-gbm.test.ts`
+verifies both predictions.
 
 ## Baselines this note assumes {#baselines}
+
+The table below lists the simplifying assumptions this note makes
+and points to where the simulator relaxes each one.
 
 | Baseline | Lifted in |
 | --- | --- |

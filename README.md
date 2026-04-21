@@ -22,12 +22,13 @@ npm test
 
 followed by `quarto preview report/validation.qmd` or `quarto preview
 report/simulator.qmd` to see the rendered pages. The simulate and
-sweep commands drop JSON artifacts into `report/data/`:
-`run-<seed>.json` holds the single-run parameters together with the
-closed-form and Monte Carlo metrics, the $I_T$ histogram, sampled
-paths and P&L traces; `sweep.json` holds the $(\alpha, \mu, \sigma)$
-grid with one Monte Carlo run per cell; and `qstar-surface.json` holds
-the $Q^*(\mu, T)$ closed-form surface.
+sweep commands drop three JSON artifacts into `report/data/`. The
+file `run-<seed>.json` holds the single-run parameters together
+with the closed-form and Monte Carlo metrics, the $I_T$ histogram,
+a handful of sampled paths, and the P&L traces. The file
+`sweep.json` holds the $(\alpha, \mu, \sigma)$ grid, with one Monte
+Carlo run per cell. The file `qstar-surface.json` holds the
+$Q^*(\mu, T)$ closed-form surface.
 
 ## Commands
 
