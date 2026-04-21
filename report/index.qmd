@@ -859,7 +859,7 @@ carbonPriceRecords = {
 
   const baseRows = new Array(nPoints);
   for (let i = 0; i < nPoints; i++) {
-    baseRows[i] = { tDays: i * dtDays, price: toTonne(values[i]), id: "base" };
+    baseRows[i] = { tDays: i * dtDays, price: toTonne(values[i]), series: "drawn (rescaled by P)" };
   }
 
   const cloudRows = [];
@@ -877,7 +877,7 @@ carbonPriceRecords = {
       });
       const id = "cloud-" + j;
       for (let i = 0; i < nPoints; i++) {
-        cloudRows.push({ tDays: i * dtDays, price: toTonne(S[i]), id });
+        cloudRows.push({ tDays: i * dtDays, price: toTonne(S[i]), id, series: "GBM samples" });
       }
     }
   }
@@ -902,27 +902,38 @@ Plot.plot({
       new Date(buildDate.getTime() - (Tdays - d) * 86400000), Tdays),
   },
   y: { label: "carbon price (USD / tonne)", zero: true, tickFormat: formatTickCurrency },
+  color: {
+    legend: true,
+    domain: [
+      "drawn (rescaled by P)",
+      ...(carbonPriceRecords.hasCloud ? ["GBM samples"] : []),
+      "αT",
+      ...(switchOn ? ["fee-mode threshold π_H (fee above)"] : []),
+    ],
+    range: [
+      "#c94",
+      ...(carbonPriceRecords.hasCloud ? ["#888"] : []),
+      "#2a7",
+      ...(switchOn ? ["#a36"] : []),
+    ],
+  },
   marks: [
     Plot.ruleY([0]),
     ...(carbonPriceRecords.hasCloud
       ? [Plot.line(carbonPriceRecords.cloudRows,
-          { x: "tDays", y: "price", z: "id", stroke: "#888", strokeOpacity: 0.25 })]
+          { x: "tDays", y: "price", z: "id", stroke: "series", strokeOpacity: 0.25 })]
       : []),
     Plot.line(carbonPriceRecords.baseRows,
-      { x: "tDays", y: "price", stroke: "#c94", strokeWidth: 2 }),
-    Plot.ruleX([run.tauFrac * Tdays],
-      { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+      { x: "tDays", y: "price", stroke: "series", strokeWidth: 2 }),
+    Plot.ruleX([{ t: run.tauFrac * Tdays, kind: "αT" }],
+      { x: "t", stroke: "kind", strokeDasharray: "4 3", strokeWidth: 2 }),
     ...(switchOn
-      ? [Plot.ruleY([barrierRatio * derived.S0 * P],
-          { stroke: "#a36", strokeDasharray: "6 3", strokeWidth: 2 })]
+      ? [Plot.ruleY([{ y: barrierRatio * derived.S0 * P, kind: "fee-mode threshold π_H (fee above)" }],
+          { y: "y", stroke: "kind", strokeDasharray: "6 3", strokeWidth: 2 })]
       : []),
   ],
 })
 ```
-
-_Orange: drawn, rescaled by $P$. Grey: 20 GBM samples. Green dashed:
-$\alpha T$. Maroon dashed: fee-mode threshold $\pi_H = h S_0 P$ in
-carbon-price units (fee mode above this line)._
 
 ### P&L along the path
 
@@ -1030,12 +1041,22 @@ Plot.plot({
       "treasury",
       "custom desk = b2b + treasury",
       ...(pnlOverTime.includeSwitch ? [pnlOverTime.switchLabel] : []),
+      "αT",
+    ],
+    range: [
+      "#4e79a7",
+      "#f28e2c",
+      "#e15759",
+      "#76b7b2",
+      "#59a14f",
+      ...(pnlOverTime.includeSwitch ? ["#edc949"] : []),
+      "#2a7",
     ],
   },
   marks: [
     Plot.ruleY([0]),
-    Plot.ruleX([run.tauFrac * Tdays],
-      { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+    Plot.ruleX([{ t: run.tauFrac * Tdays, kind: "αT" }],
+      { x: "t", stroke: "kind", strokeDasharray: "4 3", strokeWidth: 2 }),
     Plot.line(pnlOverTime.rows,
       { x: "tDays", y: "pnl", stroke: "book", z: "book", strokeWidth: 1.75 }),
   ],
@@ -1043,8 +1064,8 @@ Plot.plot({
 ```
 
 _Operating books start at 0; treasury opens at MTM $k S_0 -
-C_{\mathrm{basis}}$. Green dashed: $\alpha T$. Switching slope
-alternates at each $H = h S_0$ crossing._
+C_{\mathrm{basis}}$. Switching slope alternates at each $H = h S_0$
+crossing._
 
 ### Terminal P&L
 
