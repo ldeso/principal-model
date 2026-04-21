@@ -1,6 +1,6 @@
 ---
 title: "Model"
-subtitle: "Closed-form moments and risk metrics"
+subtitle: "Definitions and closed forms"
 shift-heading-level-by: 1
 format:
   html:

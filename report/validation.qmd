@@ -20,20 +20,18 @@ format:
 </style>
 ```
 
-Each [Model](model.qmd) identity is z-tested against the MC.
-Regenerate with `npm run simulate -- --seed 42 && npm run sweep --
---seed 42`.
+Each [Model](model.qmd) identity is z-tested against a Monte Carlo
+run. Regenerate with `npm run simulate -- --seed 42 && npm run sweep
+-- --seed 42`.
 
-Conventions: $|z| \le 2$ sampling, $|z| > 3$ suspect.
+Treat $|z| \le 2$ as sampling noise and $|z| > 3$ as suspect. Three
+identities are exact rather than statistical:
 $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] =
-(P/f)^2$ is algebraic. $b2b + \mathrm{treasury}(N P, N P S_0) = N(Q -
-P S_0)$ is pathwise deterministic. $\mathrm{SD}[\Pi_{\mathrm{ret}}] =
-(1 - \beta) \mathrm{SD}[\Pi_{\mathrm{b2b}}]$ is exact. Definitions:
-[Risk metrics](model.qmd#risk-metrics).
-
-## One parameter setting, full distributions
-
-Data from `data/run-42.json`.
+(P/f)^2$ is algebraic, $b2b + \mathrm{treasury}(N P, N P S_0) = N(Q
+- P S_0)$ holds path by path, and $\mathrm{SD}[\Pi_{\mathrm{ret}}] =
+(1 - \beta) \mathrm{SD}[\Pi_{\mathrm{b2b}}]$ is an identity. Symbol
+and risk-metric definitions: [Setup and notation](model.qmd#setup).
+The sections below draw from `data/run-42.json`.
 
 
 ```{ojs}
@@ -46,11 +44,11 @@ run = FileAttachment("data/run-42.json").json()
 import { formatTickCurrency } from "./lib/compiled/src/core/index.js"
 ```
 
-### Run parameters
+## Run parameters
 
-$(\mu, \sigma, T)$: price process. $\lambda$: throughput.
-$(f, Q, \alpha)$: business levers. $Q^*$: [break-even
-quote](model.qmd#direct-comparison).
+The price process is $(\mu, \sigma, T)$; throughput is $\lambda$;
+the business levers are $(f, Q, \alpha)$; $Q^*$ is the [break-even
+quote](model.qmd#comparison).
 
 ```{ojs}
 //| echo: false
@@ -68,13 +66,14 @@ html`<div class="metric-grid">
 </div>`
 ```
 
-### Scorecard: closed form vs Monte Carlo
+## Per-book scorecard
 
-One row per operating book plus treasury. Switching row's closed-form
-columns are `NaN` (no P&L density); mean-level anchors
-($\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau \wedge T]$,
-$\mathbb{E}[T_{\mathrm{fee}}]$, $\mathbb{E}[I_{\mathrm{fee}}]$) appear
-below.
+Each stochastic book gets a row. The switching row has no
+closed-form mean or SD — its density has no closed form — but its
+four mean-level anchors ($\mathbb{P}[\tau \le T]$,
+$\mathbb{E}[\tau \wedge T]$, $\mathbb{E}[T_{\mathrm{fee}}]$,
+$\mathbb{E}[I_{\mathrm{fee}}]$) appear in the pure-GBM table further
+down.
 
 <div class="legend-table">
 
@@ -127,13 +126,13 @@ Inputs.table(run.rows, {
 })
 ```
 
-### Desk compositions — operating + treasury
+## Desk compositions
 
-`matched` = $N(Q - P S_0)$ deterministic. `partial_desk` at
+`matched` = $N(Q - P S_0)$ is deterministic. `partial_desk` at
 `run.params.alpha` uses the $J_\alpha$ closed form.
-`syndicated_matched` = `retained + treasury(N·P, N·P·S₀)`, still
+`syndicated_matched` = `retained + treasury(N·P, N·P·S₀)` is still
 deterministic up to the premium. `switching_matched` = `switching +
-treasury(N·P, N·P·S₀)`, MC only.
+treasury(N·P, N·P·S₀)` is Monte Carlo only.
 
 ```{ojs}
 //| echo: false
@@ -195,12 +194,12 @@ Inputs.table(deskRows, {
 })
 ```
 
-### Merton jumps: means invariant, variances inflated
+## Jumps inflate variance, not mean
 
-Under [compensation](model.qmd#compensated-merton-jump-diffusion),
-means match GBM exactly; variances inflate. Canonical overlay:
-$\lambda_J = 3$/yr, $\mu_J = -0.1$, $\sigma_J = 0.15$. Expect $|z|
-\lesssim 2$ on means and SD (merton) $>$ SD (gbm).
+With the [Merton compensation](model.qmd#jumps) in place, means match
+GBM exactly and variances grow. The canonical overlay here is
+$\lambda_J = 3$/yr, $\mu_J = -0.1$, $\sigma_J = 0.15$. Expect
+$|z| \lesssim 2$ on the means and SD (merton) $>$ SD (gbm).
 
 ```{ojs}
 //| echo: false
@@ -239,10 +238,11 @@ html`<div class="metric-grid">
 </div>`
 ```
 
-### P&L distributions, one panel per stochastic book
+## P&L distributions
 
-Black: closed-form mean. Dashed grey: $\Pi = 0$. Mass left of the
-grey rule equals $\mathbb{P}[\Pi < 0]$.
+One panel per stochastic book. The black rule is the closed-form
+mean; the dashed grey rule sits at $\Pi = 0$, so the mass to its
+left is $\mathbb{P}[\Pi < 0]$.
 
 ```{ojs}
 //| echo: false
@@ -298,11 +298,11 @@ Plot.plot({
 
 _Black: closed-form $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$._
 
-### $I_T$ — the shared kernel
+## The $I_T$ histogram
 
 Dufresne (2001) gives $\mathbb{E}[I_T]$ and $\mathrm{Var}[I_T]$ in
-closed form (rules on the MC histogram). $I_T$ is not log-normal, so
-tail quantiles are MC.
+closed form, shown as rules on the Monte Carlo histogram. $I_T$ is
+not log-normal, so tail quantiles still require Monte Carlo.
 
 ```{ojs}
 //| echo: false
@@ -337,10 +337,11 @@ Plot.plot({
 
 _Black: $\mathbb{E}[I_T]$. Dashed: $\pm \mathrm{SD}[I_T]$._
 
-### The matched treasury's interim NAV
+## Matched treasury NAV over time
 
-Terminal P&L is deterministic, but $V_t = N P (1 - t/T) S_t$ is a
-scaled GBM that pins to zero at $T$ and may dip interim.
+Terminal P&L is deterministic, but interim NAV $V_t = N P (1 - t/T)
+S_t$ is a scaled GBM that pins to zero at $T$ and can dip before
+then.
 
 ```{ojs}
 //| echo: false
@@ -374,13 +375,14 @@ Plot.plot({
 
 _Grey: sampled NAV paths. Orange: first. $V_T = 0$ regardless of $S_T$._
 
-### Shortfall-against-schedule on the matched treasury
+## Matched treasury shortfall
 
 $$
 D := \max_{t \le T} \bigl[ N P (1 - t/T) (S_0 - S_t) \bigr]_+.
 $$
 
-Dashed black: 95th percentile. Solid black: 99th.
+The dashed black rule is the 95th percentile, the solid black rule
+the 99th.
 
 ```{ojs}
 //| echo: false
@@ -479,14 +481,14 @@ Plot.plot({
 })
 ```
 
-## Syndicated cession and the $(1-\beta)^2$ law
+## Syndication
 
-Formulae: [syndicated book](model.qmd#syndicated-book). At $\theta =
-0$, $\Pi_{\mathrm{ret}}^{\mathrm{op}}$ is an affine rescaling of
-$\Pi_{\mathrm{b2b}}$ with slope $(1 - \beta)$; closed-form pricing,
-no extra MC needed. The `cvar`-mode factor
-$\phi(\Phi^{-1}(0.95))/0.05 \approx 2.063$ puts `sharpe` and `cvar`
-loads on a common SD scale.
+Formulae: [Syndicating the back-to-back book](model.qmd#syndication).
+At $\theta = 0$, $\Pi_{\mathrm{ret}}^{\mathrm{op}}$ is an affine
+rescaling of $\Pi_{\mathrm{b2b}}$ with slope $(1 - \beta)$, so the
+pricing is closed form and no extra Monte Carlo is needed. The
+`cvar`-mode factor $\phi(\Phi^{-1}(0.95))/0.05 \approx 2.063$ puts
+the `sharpe` and `cvar` loads on a common SD scale.
 
 ```{ojs}
 //| echo: false
@@ -505,8 +507,8 @@ viewof pickMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "pr
 
 ### Retained CVaR₉₅ across $\beta$
 
-Linear collapse in $(1 - \beta)$. $\theta > 0$ lifts the curve by
-$\beta \rho(\theta)$.
+The curve collapses linearly in $(1 - \beta)$. A positive $\theta$
+lifts it by $\beta \rho(\theta)$.
 
 ```{ojs}
 //| echo: false
@@ -602,9 +604,9 @@ Plot.plot({
 
 ### Expected-P&L cost of syndication
 
-At $\theta = 0$ the curve is flat (no free lunch). $\theta > 0$ ⇒
-linear drag on $\mathbb{E}[\Pi_{\mathrm{ret}}] -
-\mathbb{E}[\Pi_{\mathrm{b2b}}]$.
+At $\theta = 0$ the curve is flat — no free lunch. When $\theta > 0$
+the load drags $\mathbb{E}[\Pi_{\mathrm{ret}}] -
+\mathbb{E}[\Pi_{\mathrm{b2b}}]$ down linearly in $\beta$.
 
 ```{ojs}
 //| echo: false
@@ -643,14 +645,15 @@ Plot.plot({
 })
 ```
 
-## Switching and tail truncation
+## Switching
 
-Formulae: [switching book](model.qmd#switching-book). No closed-form
-P&L density; MC is authoritative on tails. Four pure-GBM mean
-anchors are z-tested: $\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau
-\wedge T]$, $\mathbb{E}[T_{\mathrm{fee}}]$,
-$\mathbb{E}[I_{\mathrm{fee}}]$. Jumps change the $\tau$ distribution,
-so under jumps the anchors drop to MC.
+Formulae: [Switching to fee above a threshold](model.qmd#switching).
+The P&L density has no closed form, so Monte Carlo is authoritative
+on the tails. Four pure-GBM mean anchors are z-tested:
+$\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau \wedge T]$,
+$\mathbb{E}[T_{\mathrm{fee}}]$, $\mathbb{E}[I_{\mathrm{fee}}]$. Jumps
+change the $\tau$ distribution, so under jumps those anchors fall
+back to Monte Carlo too.
 
 ```{ojs}
 //| echo: false
@@ -686,10 +689,11 @@ switchingRows = switchingSweep.cells.map(c => ({
 }))
 ```
 
-### CVaR₉₅ and $\mathbb{E}[\Pi]$ vs threshold
+### Mean and tail vs threshold
 
-Lowering $h$ collapses CVaR₉₅ from the b2b reference toward the fee
-book and lifts $\mathbb{E}[\Pi]$; re-entries temper the truncation.
+As $h$ falls, the tail loss drops from the b2b reference toward
+fee-book levels and the mean rises; paths that re-enter below the
+threshold limit how far the cut goes.
 
 ```{ojs}
 //| echo: false
@@ -736,11 +740,11 @@ Plot.plot({
 })
 ```
 
-### Closed-form anchors under pure GBM
+### Pure-GBM anchors
 
-Per-threshold z-tests against `src/core/moments.ts`. Discrete-crossing
-bias on $\mathbb{P}[\tau \le T]$ and $\mathbb{E}[\tau \wedge T]$
-decreases in $n_{\mathrm{steps}}$.
+Per-threshold z-tests against `src/core/moments.ts`. The
+discrete-crossing bias on $\mathbb{P}[\tau \le T]$ and
+$\mathbb{E}[\tau \wedge T]$ shrinks as $n_{\mathrm{steps}}$ grows.
 
 ```{ojs}
 //| echo: false
@@ -782,9 +786,9 @@ Inputs.table(
 )
 ```
 
-### How often, and how much, the book is in fee mode
+### Time and count in fee mode
 
-$\mathbb{E}[T_{\mathrm{fee}}/T]$ decreases in $h$. "E[# crossings]"
+$\mathbb{E}[T_{\mathrm{fee}}/T]$ decreases with $h$. `E[# crossings]`
 counts $\mathrm{sign}(S - H)$ flips on the discretised path.
 
 ```{ojs}
@@ -810,13 +814,14 @@ Inputs.table(
 )
 ```
 
-## The break-even quote $Q^*$ as a drift-and-horizon surface
+## Break-even quote surface
 
 $$
 \frac{Q^*}{(1 + f) P S_0} = \frac{e^{\mu T} - 1}{\mu T}.
 $$
 
-Dashed rule at 1.0: $\mu = 0$ limit. $\mu > 0$ above, $\mu < 0$ below.
+The dashed rule at 1.0 is the $\mu = 0$ limit; positive drift lifts
+the curve above it, negative drift below.
 
 ```{ojs}
 //| echo: false

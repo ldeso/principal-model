@@ -20,72 +20,64 @@ format:
 ```
 
 A carbon-retirement intermediary buys kVCM tokens and burns them on
-behalf of clients. Pricing is either **fee** (markup pass-through, no
-exposure) or **principal** (fixed USD quote, balance-sheet exposure).
-Once principal is chosen, the shape of its loss tail becomes a design
-parameter.
+behalf of clients. It charges clients either a **fee** (a markup on
+the token cost, carrying no inventory and no price exposure) or a
+**principal** price (a fixed USD quote, with balance-sheet exposure).
+Once the principal book is open, the shape of its loss tail is a
+design choice. Derivations: [Model](model.qmd).
 
-## Three findings
+The fee and back-to-back books share an integrand. Both are linear
+in $I_T = \int_0^T S_t \, dt$, and at the break-even quote
+$Q = Q^*$ they have equal expected P&L. The fee book enters with a
+positive sign (its revenue is non-negative), and the back-to-back
+book with a negative sign (its upside is capped at $Q N$ and its
+downside is unbounded). Equal moments are not equal distributions.
 
-Derivations: [Model](model.qmd).
+A fully matched treasury — $k = N P$ tokens pre-bought at basis
+$C_{\mathrm{basis}} = N P S_0$ — cancels the $I_T$ term path by path,
+because treasury consumption contributes $+ P \lambda I_T$ against
+the back-to-back book's $- P \lambda I_T$. The desk collapses to
+$N(Q - P S_0)$, which is deterministic. Partial coverage
+$\alpha = \min(1, k / (N P))$ leaves the uncovered tail
+$J_\alpha = \int_{\alpha T}^T S_t \, dt$. Quota-share syndication of
+the back-to-back book at cession $\beta$ scales variance by
+$(1 - \beta)^2$; at the actuarially fair premium ($\theta = 0$),
+$\mathbb{E}[\Pi_{\mathrm{ret}}]$ does not depend on $\beta$.
 
-### Fee and b2b share a kernel but not a sign
-
-At $Q = Q^*$ the two operating books have equal expected P&L. Both
-are linear in $I_T = \int_0^T S_t \, dt$, but fee enters with sign
-$+$ (revenue, $\ge 0$) and b2b with sign $-$ (upside capped at $Q N$,
-downside unbounded). Moment equalisation is not distributional
-equalisation.
-
-### The treasury cancels b2b's $I_T$ term when fully matched
-
-Pre-buy $k = N P$ tokens at basis $C_{\mathrm{basis}} = N P S_0$:
-treasury consumption contributes $+ P \lambda I_T$, exactly
-cancelling b2b's $- P \lambda I_T$. Desk P&L collapses to $N(Q - P S_0)$.
-Partial coverage $\alpha = \min(1, k / (N P))$ leaves the uncovered
-tail $J_\alpha = \int_{\alpha T}^T S_t \, dt$. Quota-share syndication
-of b2b at cession $\beta$ scales variance by $(1 - \beta)^2$; at the
-actuarially fair premium ($\theta = 0$), $\mathbb{E}[\Pi_{\mathrm{ret}}]$
-is $\beta$-invariant.
-
-### A threshold truncates the tail rather than rescaling it
-
-Switching pricing to fee whenever $S_t \ge H = h S_0$ caps every
-retirement done in fee mode at non-negative revenue. The switch is
-symmetric in $H$: re-entries below $H$ resume b2b exposure, so a
-volatile path near $H$ may cross repeatedly. Under defaults at $h =
-1.25$, $\mathrm{CVaR}_{95}$ falls materially below the b2b reference
-while $\mathbb{E}[\Pi]$ rises. Tightening $h$ cuts the tail harder
-but amplifies re-entry. Symbols: [setup and notation](model.qmd#setup-and-notation).
+Switching to fee pricing whenever $S_t \ge H = h S_0$ caps every
+retirement done above the threshold at non-negative revenue. The
+switch is symmetric: re-entries below $H$ resume b2b exposure, so a
+volatile path near $H$ can cross it several times. At the defaults
+with $h = 1.25$, $\mathrm{CVaR}_{95}$ falls well below the b2b
+reference and $\mathbb{E}[\Pi]$ rises. Tightening $h$ cuts the tail
+harder but invites more re-entries. Symbols: [Setup and
+notation](model.qmd#setup).
 
 ---
 
-## Testing a specific trajectory
+## A drawn path
 
-The findings average over GBM futures. Specific scenarios (mid-year
-crash, historical replay) read off a single realised path. Draw one
-below; every book's deterministic P&L recomputes against its MC mean.
+The paragraphs above average over every GBM future. Specific
+scenarios (a mid-year crash, a historical replay) read off a single
+realised path. Draw one below; each book's deterministic P&L
+recomputes against its Monte Carlo mean.
 
 ::: {.callout-note appearance="simple"}
 ## How the drawn curve enters the books
 
-The drawing defines a base path. Setting $\sigma^2_{\mathrm{noise}} >
-0$ activates an additive log-normal shock (distinct from the GBM
-$\sigma$ driving the comparison MC), seeded by the PRNG slider. From
-the realised path, trapezoid rule computes $I_T$, the uncovered tail
-$J_\alpha$, and the switching split against $H = h S_0$, plus $S_T$.
-These feed every book on the [Simulator](simulator.qmd).
+The drawn curve defines a base path. Setting
+$\sigma^2_{\mathrm{noise}} > 0$ adds a log-normal shock (distinct
+from the GBM $\sigma$ that drives the comparison Monte Carlo),
+seeded by the PRNG slider. A trapezoid rule over the realised path
+yields $I_T$, the uncovered tail $J_\alpha$, the switching split
+against $H = h S_0$, and $S_T$. These feed every book on the
+[Simulator](simulator.qmd).
 :::
 
-### Presets
-
-- **Flat @ $S_0$** — constant path.
-- **Linear ±50%** — drift sensitivity.
-- **Crash @ ½T** — mid-horizon collapse.
-- **Spike @ ⅓T** — brief rally.
-- **Random walk** — hand-drawn GBM.
-- **Historical** — kVCM series from `data/kvcm-historical.json`
-  (populated by `npm run fetch:prices`).
+Buttons along the top load common shapes: a flat path at $S_0$, a
+linear drift of ±50 %, a mid-horizon crash, a brief spike at
+$\tfrac13 T$, a hand-drawn random walk, and a historical kVCM series
+read from `data/kvcm-historical.json` (populated by `npm run fetch:prices`).
 
 ```{ojs}
 //| echo: false
@@ -119,9 +111,9 @@ buildDate = {
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Inputs
 
-Inventory, contract, horizon, and price process parameters. Jumps
-off by default ($\lambda_J = 0$). See [Simulator](simulator.qmd) for
-wider ranges.
+Inventory, contract, horizon, and price-process parameters. Jumps are
+off by default ($\lambda_J = 0$); the [Simulator](simulator.qmd) page
+exposes wider ranges.
 
 ### Price process
 
@@ -891,9 +883,9 @@ customScenario = {
 _Orange: drawn base. Blue ($\sigma^2_{\mathrm{noise}} > 0$): noisy
 realised path._
 
-### Carbon price on the drawn path
+### Carbon price
 
-Same path rescaled to $\pi_t = S_t \cdot P$ (USD / tonne).
+The same path rescaled to $\pi_t = S_t \cdot P$ (USD / tonne).
 
 ```{ojs}
 //| echo: false
@@ -982,10 +974,10 @@ _Orange: drawn, rescaled by $P$. Blue: noise-realised path.
 Grey: 20 GBM samples. Green dashed: $\alpha T$.
 Maroon dashed: $\pi_H = h S_0 P$ (fee mode above this line)._
 
-### P&L over time on the drawn path
+### P&L along the path
 
-Cumulative P&L along the realised path. Custom-desk kink at $\alpha
-T$; switching-book kink at $\tau$.
+Cumulative P&L along the realised path. The custom desk kinks at
+$\alpha T$, the switching book at $\tau$.
 
 ```{ojs}
 //| echo: false
@@ -1104,10 +1096,10 @@ _Operating books start at 0; treasury opens at MTM $k S_0 -
 C_{\mathrm{basis}}$. Green dashed: $\alpha T$. Switching slope
 alternates at each $H = h S_0$ crossing._
 
-### Deterministic P&L on the drawn path
+### Terminal P&L
 
-Per-curve one-point statistics; the table pairs drawn-curve P&L with
-the MC mean.
+One-point statistics for each curve, pairing the drawn-curve P&L
+with the Monte Carlo mean.
 
 ```{ojs}
 //| echo: false
@@ -1166,6 +1158,6 @@ desk is path-insensitive.
 
 ## Scope
 
-GBM baseline with optional Merton jumps; deterministic demand. See
-[limitations](model.qmd#limitations-and-next-steps). Outputs are
-illustrative, not forecasts.
+The model is a GBM baseline with optional Merton jumps and
+deterministic demand; see [baselines this note assumes](model.qmd#baselines).
+The outputs are illustrative, not forecasts.

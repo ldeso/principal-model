@@ -8,11 +8,12 @@ format:
     toc-location: right
 ---
 
-Every slider runs a fresh MC. Symbols: [Model](model.qmd). The desk
-splits into zero-capital operating books (fee, b2b, retained,
-switching) and an active treasury at $(k, C_{\mathrm{basis}})$; desk
-P&L is `operating + treasury` sample-wise. The price process is
-compensated Merton; $\lambda_J = 0$ recovers pure GBM.
+Every slider move runs a fresh Monte Carlo. For symbols, see the
+[Model](model.qmd) page. The desk splits into zero-capital operating
+books (fee, b2b, retained, switching) plus an active treasury at
+$(k, C_{\mathrm{basis}})$; desk P&L is `operating + treasury`
+sample by sample. The price process is compensated Merton, with
+$\lambda_J = 0$ recovering pure GBM.
 
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Price process
@@ -198,10 +199,10 @@ mcResetButton = {
 
 :::
 
-## Derived quantities
+## Derived values
 
-$S_0 = \pi_0 / P$, $T$ (years), $N = \lambda T$, $\alpha = \min(1, k /
-(N P))$, $Q^* = (1 + f) P S_0 (e^{\mu T} - 1) / (\mu T)$.
+These are $S_0 = \pi_0 / P$, $T$ (years), $N = \lambda T$,
+$\alpha = \min(1, k / (N P))$, and $Q^* = (1 + f) P S_0 (e^{\mu T} - 1) / (\mu T)$.
 
 ```{ojs}
 //| echo: false
@@ -236,9 +237,10 @@ html`<div class="derived-stats">
 </div>`
 ```
 
-`implied basis per token` is $C_{\mathrm{basis}} / k$; above $S_0$ ⇒
-unrealised loss on inventory, below ⇒ unrealised gain. Translates the
-custom book's distribution without reshaping.
+The implied basis per token is $C_{\mathrm{basis}} / k$. When it
+sits above $S_0$ the inventory carries an unrealised loss, below
+$S_0$ an unrealised gain; either way the shape of the custom book's
+P&L is unchanged and only its location moves.
 
 ```{ojs}
 //| echo: false
@@ -248,12 +250,12 @@ import {
 } from "./lib/compiled/src/core/index.js"
 ```
 
-## Monte Carlo run
+## A single run
 
-Run card, summary table, histograms, sample paths. Wall time is
-sub-second at 5k–10k paths. Under the [Merton
-compensation](model.qmd#compensated-merton-jump-diffusion) the
-histogram mean rule holds position while SD, VaR, CVaR widen with
+The summary card, table, histograms, and sample paths below refresh
+on every slider change; a 5-10k-path run finishes in under a second.
+Under the [Merton compensation](model.qmd#jumps) the mean rule on
+the histogram holds its position while SD, VaR, and CVaR widen with
 the jump sliders.
 
 ```{ojs}
@@ -336,9 +338,9 @@ html`<div class="derived-stats">
 </div>`
 ```
 
-Enable switching to activate the threshold $H = h S_0$. Cards below:
-first-passage probability, mean time in fee mode, mean crossings per
-path.
+Enable switching to activate the threshold $H = h S_0$. The cards
+below then show the first-passage probability, the mean time in fee
+mode, and the mean number of crossings per path.
 
 ```{ojs}
 //| echo: false
@@ -356,10 +358,9 @@ html`${switchOn
 }`
 ```
 
-### Summary statistics
-
-One row per operating book plus treasury at $(k, C_{\mathrm{basis}})$
-and the derived custom desk $= b2b + \text{treasury}$.
+The table below has one row per operating book plus the treasury at
+$(k, C_{\mathrm{basis}})$ and the derived custom desk $= b2b +
+\text{treasury}$.
 
 | column | meaning |
 | --- | --- |
@@ -372,17 +373,15 @@ and the derived custom desk $= b2b + \text{treasury}$.
 | Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ (horizon-absolute) |
 
 P&L is the USD total over $[0, T]$; divide by $N = \lambda T$ for a
-per-tonne figure. Three things to watch as you sweep:
-
-- **The treasury row** opens at MTM $k \cdot S_0 - C_{\mathrm{basis}}$
-  and drifts as the inventory burns down — sweeping $C_{\mathrm{basis}}$
-  translates the location without touching the shape.
-- **The custom-desk row** collapses to the matched limit at
-  $k = N P$, $C_{\mathrm{basis}} = N P S_0$: $I_T$ cancels
-  between `b2b` and `treasury` consumption and the desk total
-  becomes deterministic $N (Q - P S_0)$.
-- **$k = 0$** zeroes the treasury sample-wise, so the custom desk
-  collapses onto `b2b`.
+per-tonne figure. As the sliders move, the treasury row opens at MTM
+$k \cdot S_0 - C_{\mathrm{basis}}$ and drifts as inventory burns
+down, so sweeping $C_{\mathrm{basis}}$ translates its location
+without changing its shape. The custom-desk row collapses to the
+matched limit at $k = N P$ and $C_{\mathrm{basis}} = N P S_0$, where
+$I_T$ cancels between `b2b` and `treasury` consumption and the desk
+total becomes the deterministic $N (Q - P S_0)$. At $k = 0$ the
+treasury is zero sample by sample and the custom desk collapses onto
+`b2b`.
 
 ```{ojs}
 //| echo: false
@@ -430,9 +429,10 @@ Inputs.table(summaryRows, {
 
 ### P&L distributions
 
-One panel per book, terminal P&L on the x-axis. Black: MC mean.
-Dashed grey: $\Pi = 0$. Fee is non-negative, b2b is its mirror.
-The custom-desk panel collapses to a spike at the matched limit.
+One panel per book, with terminal P&L on the x-axis. The black rule
+is the Monte Carlo mean, the dashed grey rule sits at $\Pi = 0$.
+Fee is non-negative and b2b is its mirror. The custom-desk panel
+collapses to a spike at the matched limit.
 
 ```{ojs}
 //| echo: false
@@ -491,11 +491,11 @@ Plot.plot({
 
 _Black: MC mean. Dashed grey: $\Pi = 0$._
 
-### Sample price paths and the inventory cliff
+### Price paths
 
-Twenty sampled kVCM trajectories; first highlighted. Green dashed:
-$\alpha T$ (inventory exhaustion). Custom-book randomness lives in
-$[\alpha T, T]$.
+Twenty sampled kVCM trajectories, with the first one highlighted.
+The green dashed rule marks $\alpha T$, where inventory runs out;
+the custom book's randomness lives on $[\alpha T, T]$.
 
 ```{ojs}
 //| echo: false

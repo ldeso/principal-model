@@ -1,41 +1,35 @@
 # principal-model
 
-TypeScript simulator and Quarto report for the research note
-*Klima Protocol — Fee-Based vs. Principal Model*
-([`research-note.md`](research-note.md)).
+`principal-model` simulates the books in
+[`research-note.md`](research-note.md) — *Klima Protocol — Fee-Based
+vs. Principal Model* — and builds the accompanying Quarto report. The
+report has four pages: **Summary** (`index.qmd`), **Model**
+(`model.qmd`), **Validation** (`validation.qmd`), and **Simulator**
+(`simulator.qmd`).
 
-Pages: **Summary** (`index.qmd`), **Model** (`model.qmd`), **Validation**
-(`validation.qmd`), **Simulator** (`simulator.qmd`).
+## Getting started
 
-## Requirements
-
-- Node.js ≥ 20
-- npm ≥ 10
-- Quarto ≥ 1.4 (report only)
-
-## Install
+The project needs Node.js ≥ 20 and npm ≥ 10; rendering the report also
+needs Quarto ≥ 1.4. After `npm install`, the usual workflow is
 
 ```sh
 npm install
-```
-
-## Run
-
-```sh
 npm run simulate -- --seed 42
 npm run sweep    -- --seed 42
 npm run typecheck
 npm test
 ```
 
-Artifacts land in `report/data/`:
+followed by `quarto preview report/validation.qmd` or `quarto preview
+report/simulator.qmd` to see the rendered pages. The simulate and
+sweep commands drop JSON artifacts into `report/data/`:
+`run-<seed>.json` holds the single-run parameters together with the
+closed-form and Monte Carlo metrics, the $I_T$ histogram, sampled
+paths and P&L traces; `sweep.json` holds the $(\alpha, \mu, \sigma)$
+grid with one Monte Carlo run per cell; and `qstar-surface.json` holds
+the $Q^*(\mu, T)$ closed-form surface.
 
-- `run-<seed>.json` — single-run params, closed-form and MC metrics,
-  $I_T$ histogram, sampled paths, P&L traces.
-- `sweep.json` — $(\alpha, \mu, \sigma)$ grid, MC per cell.
-- `qstar-surface.json` — $Q^*(\mu, T)$ closed-form surface.
-
-### CLI flags
+## Commands
 
 | flag | meaning |
 | --- | --- |
@@ -48,15 +42,6 @@ Artifacts land in `report/data/`:
 | `--lambdaJ x` / `--muJ x` / `--sigmaJ x` | Merton jump params (0 ⇒ pure GBM) |
 | `--h x` / `--fPost x` | threshold $h$, fee-mode rate ($h = \infty$ disables) |
 | `--sweep` | also emit `sweep.json` |
-
-## Report
-
-```sh
-npm run simulate -- --seed 42
-npm run sweep    -- --seed 42
-quarto preview report/validation.qmd
-quarto preview report/simulator.qmd
-```
 
 ## Layout
 
@@ -80,18 +65,3 @@ report/
   _glossary.qmd              shared glossary
   data/                      JSON artifacts
 ```
-
-## Identities
-
-- $\mathrm{Var}[\Pi_{\mathrm{b2b}}] / \mathrm{Var}[R_{\mathrm{fee}}] = (P / f)^2$.
-- $\alpha = 1$: $\Pi_\alpha$ is deterministic.
-- $\alpha = 0$: $\Pi_\alpha \equiv \Pi_{\mathrm{b2b}}$.
-- $Q = Q^*$ equalises $\mathbb{E}[R_{\mathrm{fee}}]$ and $\mathbb{E}[\Pi_{\mathrm{b2b}}]$.
-- $\mu = 0 \Rightarrow Q^* = (1 + f) \cdot P \cdot S_0$.
-- Matched-book NAV drawdown: $\max_t [N P (1-t/T)(S_0 - S_t)]_+$
-  (shortfall vs deterministic decay; see `src/risk.ts`).
-
-## References
-
-- Dufresne, D. (2001). *The integral of geometric Brownian motion.*
-- Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, §3.4.
