@@ -240,7 +240,17 @@ details.collapsible-section > summary::-webkit-details-marker {
   display: none;
 }
 
-details.collapsible-section > summary::before {
+/* Anchor the marker to the heading rather than the summary so `em` units
+   resolve against the heading's font-size: the arrow scales with the
+   heading and sits on the heading's line-box instead of the summary's
+   (smaller, body-inherited) one. */
+details.collapsible-section > summary > :is(h1, h2, h3, h4, h5, h6) {
+  display: inline-block;
+  margin-right: 0.5rem;
+  position: relative;
+}
+
+details.collapsible-section > summary > :is(h1, h2, h3, h4, h5, h6)::before {
   content: "▸";
   position: absolute;
   left: -1.1rem;
@@ -249,16 +259,11 @@ details.collapsible-section > summary::before {
   color: #888;
   transition: transform 0.15s ease;
 }
-details.collapsible-section[open] > summary::before {
+details.collapsible-section[open] > summary > :is(h1, h2, h3, h4, h5, h6)::before {
   transform: rotate(90deg);
 }
-details.collapsible-section > summary:hover::before {
+details.collapsible-section > summary:hover > :is(h1, h2, h3, h4, h5, h6)::before {
   color: #222;
-}
-
-details.collapsible-section > summary > :is(h1, h2, h3, h4, h5, h6) {
-  display: inline-block;
-  margin-right: 0.5rem;
 }
 
 /* --- Switching palette --------------------------------------------------- */
