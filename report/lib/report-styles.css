@@ -217,43 +217,48 @@ nav#TOC > ul { font-size: 0.78rem; }
   font-size: 1.1rem;
 }
 
-/* --- Collapsible chart callouts ----------------------------------------- */
-/* Charts on the landing page are wrapped in
-   `::: {.callout-note .chart-collapsible appearance="minimal"}` so each one
-   can be individually collapsed by the reader. The goal on narrow viewports
-   is that any remaining chart sits flush against the Terminal P&L table
-   without extra callout chrome. */
+/* --- Collapsible sections ----------------------------------------------- */
+/* Four landing-page sections (Drawn path, Carbon price, P&L along the path,
+   Terminal P&L) are authored as `::: {.collapsible-section}` fenced divs and
+   rewritten to `<details class="collapsible-section">` at load time by the
+   inline <script> near the end of index.qmd. The section's first heading
+   becomes the <summary>, so clicking the heading toggles the whole section.
+   A chevron sits in the gutter to the left; the heading itself keeps its
+   normal h3 typography. */
 
-.callout.chart-collapsible {
-  border: none;
-  margin: 0.25rem 0 1rem;
+details.collapsible-section {
+  margin: 0;
 }
 
-/* Header row: small clickable strip. Bootstrap/Quarto defaults give it a
-   heavy title weight; dial it down so it reads as a disclosure control
-   rather than a second heading above the existing h3. */
-.callout.chart-collapsible .callout-header {
-  padding: 0.15rem 0.25rem;
-  background: transparent;
+details.collapsible-section > summary {
+  list-style: none;
   cursor: pointer;
-  font-size: 0.8rem;
-  color: #555;
-  border: none;
-  border-bottom: 1px dashed #e0e0e0;
+  display: block;
+  position: relative;
 }
-.callout.chart-collapsible .callout-header:hover {
-  color: #111;
-  border-bottom-color: #999;
-}
-.callout.chart-collapsible .callout-title-container {
-  font-weight: 500;
+details.collapsible-section > summary::-webkit-details-marker {
+  display: none;
 }
 
-/* Body: strip the indent that Quarto adds for regular callouts so the
-   chart aligns with the prose column above it. */
-.callout.chart-collapsible .callout-body-container,
-.callout.chart-collapsible .callout-body {
-  padding: 0.5rem 0 0;
+details.collapsible-section > summary::before {
+  content: "▸";
+  position: absolute;
+  left: -1.1rem;
+  top: 0.15em;
+  font-size: 0.8em;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+details.collapsible-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+details.collapsible-section > summary:hover::before {
+  color: #222;
+}
+
+details.collapsible-section > summary > :is(h1, h2, h3, h4, h5, h6) {
+  display: inline-block;
+  margin-right: 0.5rem;
 }
 
 /* --- Switching palette --------------------------------------------------- */

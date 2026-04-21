@@ -386,7 +386,9 @@ switchRun = {
 }
 ```
 
-::: {.callout-note .chart-collapsible collapse="false" appearance="minimal" icon=false title="Drawn path"}
+::: {.collapsible-section}
+
+### Drawn path
 
 ```{ojs}
 //| echo: false
@@ -823,6 +825,8 @@ customScenario = {
 }
 ```
 
+::: {.collapsible-section}
+
 ### Carbon price
 
 The same path rescaled to $\pi_t = S_t \cdot P$ (USD / tonne).
@@ -863,8 +867,6 @@ carbonPriceRecords = {
   return { baseRows, cloudRows, hasCloud };
 }
 ```
-
-::: {.callout-note .chart-collapsible collapse="false" appearance="minimal" icon=false title="Chart"}
 
 ```{ojs}
 //| echo: false
@@ -916,6 +918,8 @@ Plot.plot({
 ```
 
 :::
+
+::: {.collapsible-section}
 
 ### P&L along the path
 
@@ -998,8 +1002,6 @@ pnlOverTime = {
 }
 ```
 
-::: {.callout-note .chart-collapsible collapse="false" appearance="minimal" icon=false title="Chart"}
-
 ```{ojs}
 //| echo: false
 Plot.plot({
@@ -1053,12 +1055,12 @@ crossing._
 
 :::
 
+::: {.collapsible-section}
+
 ### Terminal P&L
 
 One-point statistics for each curve, pairing the drawn-curve P&L
 with the Monte Carlo mean.
-
-::: {.callout-note .chart-collapsible collapse="false" appearance="minimal" icon=false title="Summary cards"}
 
 ```{ojs}
 //| echo: false
@@ -1069,8 +1071,6 @@ html`<div class="derived-stats">
   <div class="card"><div class="label">tail integral ∫_{αT}^{T} S_t dt</div><div class="value">${customScenario.tailInt.toFixed(4)}</div></div>
 </div>`
 ```
-
-:::
 
 ```{ojs}
 //| echo: false
@@ -1116,6 +1116,27 @@ at defaults ($\mu = -0.1$, $\sigma^2 = 0.0625$, $\lambda_J = 20$,
 Negative diff on `custom desk` indicates the token was pricier over
 $[\alpha T, T]$ than GBM expects on average. At full coverage the
 desk is path-insensitive.
+
+:::
+
+```{=html}
+<script>
+(function () {
+  for (const sec of document.querySelectorAll('.collapsible-section')) {
+    const heading = sec.querySelector('h1,h2,h3,h4,h5,h6');
+    if (!heading) continue;
+    const details = document.createElement('details');
+    details.open = true;
+    details.className = 'collapsible-section';
+    const summary = document.createElement('summary');
+    summary.appendChild(heading);
+    details.appendChild(summary);
+    while (sec.firstChild) details.appendChild(sec.firstChild);
+    sec.replaceWith(details);
+  }
+})();
+</script>
+```
 
 ## Scope
 
