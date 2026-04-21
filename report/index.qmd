@@ -726,7 +726,7 @@ viewof customCurve = {
     color: {
       type: "ordinal",
       domain: [
-        "drawn (base)",
+        "drawn",
         ...(showCloud ? ["GBM samples"] : []),
         "S₀",
       ],
