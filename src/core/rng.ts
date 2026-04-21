@@ -1,9 +1,9 @@
-// Seeded Mulberry32 PRNG with Box-Muller standard-normal sampling.
+// Mulberry32 PRNG, Box-Muller normals, Knuth product-of-uniforms Poisson.
 
 export interface Rng {
   uniform(): number;
   normal(): number;
-  /** Non-negative integer count ~ Poisson(lambda). lambda must be ≥ 0. */
+  /** Non-negative integer ~ Poisson(λ). Requires λ ≥ 0. */
   poisson(lambda: number): number;
 }
 
@@ -16,7 +16,6 @@ export function mulberry32(seed: number): Rng {
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    // Clamp away from 0 so Box-Muller's log() is safe.
     const u = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     return u === 0 ? 1 / 4294967296 : u;
   };
@@ -35,9 +34,6 @@ export function mulberry32(seed: number): Rng {
     return r * Math.cos(theta);
   };
 
-  // Knuth's product-of-uniforms Poisson sampler. Exact for any λ ≥ 0; the
-  // loop-expected iteration count is λ + 1. Callers in this repo use
-  // λ = λ_J · dt which is tiny (≪ 1) per step, so the branch is fine.
   const poisson = (lambda: number): number => {
     if (!(lambda > 0)) return 0;
     const L = Math.exp(-lambda);

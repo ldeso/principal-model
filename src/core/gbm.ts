@@ -1,14 +1,12 @@
-// Log-exact GBM path sampler with trapezoidal I_T = ∫₀ᵀ S_t dt (O(Δ²) error).
-// Optional Merton jump-diffusion overlay: compensated Poisson-driven log-normal
-// jumps, so λ_J = 0 reproduces pure GBM bit-for-bit and E[S_t] stays S_0·e^{μ t}
-// for any (λ_J, μ_J, σ_J).
+// Log-exact GBM sampler with trapezoidal I_T. Compensated Merton overlay;
+// λ_J = 0 reproduces pure GBM bit-for-bit.
 
 import type { Rng } from "./rng.js";
 
 export interface GbmPath {
   /** Prices at t_0 = 0, …, t_N = T. Length nSteps + 1. */
   S: Float64Array;
-  /** Trapezoidal estimate of ∫₀ᵀ S_t dt. */
+  /** Trapezoidal ∫₀ᵀ S_t dt. */
   IT: number;
 }
 
@@ -18,11 +16,11 @@ export interface SamplePathOpts {
   sigma: number;
   T: number;
   nSteps: number;
-  /** Merton jump intensity (expected jumps per unit time). Default 0. */
+  /** Merton intensity (/yr). Default 0. */
   lambdaJ?: number;
-  /** Mean of log-jump size. Default 0. */
+  /** Mean log-jump. Default 0. */
   muJ?: number;
-  /** SD of log-jump size. Default 0. */
+  /** Log-jump SD. Default 0. */
   sigmaJ?: number;
 }
 
@@ -33,8 +31,6 @@ export function samplePath(rng: Rng, opts: SamplePathOpts): GbmPath {
   const sigmaJ = opts.sigmaJ ?? 0;
 
   const dt = T / nSteps;
-  // Compensation κ = E[e^Y − 1] for Y ~ N(μ_J, σ_J²); subtracting λ_J·κ from
-  // the drift cancels the jumps' mean effect so E[S_t] = S_0·e^{μt}.
   const kappa = lambdaJ > 0
     ? Math.exp(muJ + 0.5 * sigmaJ * sigmaJ) - 1
     : 0;

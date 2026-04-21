@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Simulator and interactive report for the Klima fee vs. principal research note.",
+  "description": "Simulator and report for the Klima fee vs principal note.",
   "scripts": {
     "simulate": "tsx src/cli.ts",
     "sweep": "tsx src/cli.ts --sweep",

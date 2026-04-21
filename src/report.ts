@@ -1,9 +1,6 @@
-// Assembles the P&L moments scorecard and break-even table / JSON artifact from
-// a simulation run. Scorecard rows track the four zero-capital **operating
-// books** (fee, b2b, retained, switching) and the **active treasury**; desk
-// totals for concrete strategies (matched, partial, syndicated-matched,
-// switching-matched, custom) are composed at display time from
-// `operating + treasury` sample sums.
+// Scorecard, break-even, and JSON artifact. Rows cover the four operating
+// books (fee, b2b, retained, switching) and the active treasury; desk
+// totals are composed at display time from `operating + treasury`.
 
 import type { ClosedForm, McResult } from "./core/models.js";
 import { closedForm, partialDeskClosedForm, simulate } from "./core/models.js";
@@ -44,11 +41,9 @@ export interface ModelRow {
 export interface Report {
   params: Params;
   closed: ClosedForm;
-  /** Operating books + treasury. Switching row only when `barrierRatio !== Infinity`. */
+  /** Operating books + treasury; switching row only when barrierRatio finite. */
   rows: ModelRow[];
-  /** Closed-form + MC-composed desk totals (operating + treasury at the
-   *  strategy's (k_pre, C_basis)). `matched` is deterministic. Switching-desk
-   *  rows only when the barrier is active. */
+  /** Closed-form and MC-composed desk totals. */
   desks: {
     matched: { closedFormMean: number; closedFormSd: number };
     partial: ModelRow;
@@ -70,10 +65,10 @@ export interface Report {
     b2b: number[];
     retained: number[];
     treasury: number[];
-    /** Composed `b2b + treasury` at the run's (α·N·P, α·N·P·S_0). */
+    /** b2b + treasury at (α·N·P, α·N·P·S_0). */
     partialDesk: number[];
     navDrawdown: number[];
-    /** Present only when `params.barrierRatio !== Infinity`. */
+    /** Present only when barrierRatio finite. */
     switching?: number[];
   };
   syndication: {
@@ -83,29 +78,26 @@ export interface Report {
     premiumFair: number;
     premiumLoaded: number;
   };
-  /** Switching-variant block. Only present when `params.barrierRatio !== Infinity`;
-   *  closed-form anchors populated only under pure GBM (lambdaJ = 0). */
+  /** Switching block; closed-form anchors populated only under pure GBM. */
   switching?: {
     barrierRatio: number;
     barrierLevel: number;
     feePost: number;
-    /** P[path ever entered fee mode] = first-passage probability
-     *  (Harrison / Borodin-Salminen). */
+    /** P[path ever entered fee mode]. */
     probSwitch: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[first-passage time ∧ T]. τ is a path property (the first time
-     *  S_t ≥ H, or T if never); CF via `expectedHittingTime`. */
+    /** E[τ ∧ T]. */
     expectedCrossingTime: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[time spent in fee mode]. CF via `expectedTimeAboveBarrier`. */
+    /** E[T_fee]. */
     meanTimeInFee: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[I_fee]. CF via `expectedIntegralAboveBarrier`. */
+    /** E[I_fee]. */
     meanIntegralFee: { mc: number; closedForm: number | null; zScore: number | null };
-    /** Mean number of threshold crossings per path (spot-level diagnostic). */
+    /** Mean threshold crossings per path. */
     meanNCrossings: number;
-    /** Share of horizon spent in fee mode: meanTimeInFee.mc / T. */
+    /** meanTimeInFee.mc / T. */
     meanFracInFeeMode: number;
-    /** CVaR₉₅ of switching_op conditional on the path never entering fee mode. */
+    /** CVaR₉₅ conditional on {τ = T}. */
     cvar95GivenNoSwitch: number | null;
-    /** CVaR₉₅ of switching_op conditional on the path entering fee mode at least once. */
+    /** CVaR₉₅ conditional on {τ < T}. */
     cvar95GivenSwitch: number | null;
   };
 }
@@ -183,12 +175,8 @@ export function buildReport(
   const closed = closedForm(params);
   const mc: McResult = simulate(params, { keepPaths });
 
-  // Switching-variant run — shares seed with `simulate(params)` so path-reuse
-  // invariance holds (tested explicitly in simulate-switching.test.ts). We
-  // always run it even when the barrier is disabled: the wrapper short-
-  // circuits expensive-looking work to a no-op when h = Infinity. Skipping
-  // the run entirely would desynchronise the RNG tapes between shared-seed
-  // runs.
+  // Always run the switching sibling: shares seed with `simulate(params)`
+  // for path-reuse invariance. Skipping would desynchronise the RNG tapes.
   const switchingRun = simulateSwitching({
     S0: params.S0,
     mu: params.mu,
@@ -216,24 +204,15 @@ export function buildReport(
     makeRow("treasury", closed.treasury.mean, closed.treasury.sd, mc.treasury),
   ];
   if (isFinite(params.barrierRatio)) {
-    // The switching operating book has no closed-form moments; NaN-flag those
-    // so the scorecard doesn't feed a nonsense z-score.
     rows.push(makeSwitchingRow(switchingRun.pnlSamples));
   }
 
-  // Desk compositions. `matched` is deterministic (I_T cancels between b2b
-  // operating and treasury consumption at α = 1); `partial` is the horizon-
-  // based composition at params.alpha; syndicated-matched and switching-matched
-  // are the operating-layer counterparts composed with the fully-matched
-  // treasury.
   const N = closed.N;
   const matchedDeskMean = N * (params.Q - params.P * params.S0);
   const partialDeskSamples = sumSamples(mc.b2b, mc.treasury);
   const matchedTreasury = matchedTreasurySamples(mc, params);
   const syndMatchedSamples = sumSamples(mc.retained, matchedTreasury);
-  // At α = 1 the syndicated-matched desk has the matched-deterministic shift
-  // plus the syndication cash flow (premium_loaded − β · E[Π_b2b] cancels at
-  // θ = 0, is negative otherwise).
+  // At α = 1: matched shift plus premium_loaded − β·E[Π_b2b] (zero at θ = 0).
   const syndMatchedClosedMean =
     matchedDeskMean + closed.premium.loaded - params.beta * closed.b2b.mean;
   const partialCf = partialDeskClosedForm(params);
@@ -310,7 +289,6 @@ export function buildReport(
   };
 }
 
-// Path-by-path `b2b_op + treasury_α` → composed partial-desk samples.
 function sumSamples(a: Float64Array, b: Float64Array): Float64Array {
   const n = Math.min(a.length, b.length);
   const out = new Float64Array(n);
@@ -318,10 +296,8 @@ function sumSamples(a: Float64Array, b: Float64Array): Float64Array {
   return out;
 }
 
-// Synthetic matched-treasury samples: treasury(k_pre = N·P, C_basis = N·P·S_0)
-// = P · λ · I_T − N · P · S_0 (k_left = 0, consumption window = [0, T]).
-// Bitwise recovered from the shared I_T tape so I_T cancels path-by-path
-// against b2b's − P·λ·I_T term, yielding the matched identity.
+// treasury(N·P, N·P·S_0) = P·λ·I_T − N·P·S_0; derived from the shared I_T
+// tape so I_T cancels b2b's −P·λ·I_T path-wise.
 function matchedTreasurySamples(mc: McResult, params: Params): Float64Array {
   const N = params.lambda * params.T;
   const shift = N * params.P * params.S0;
@@ -332,9 +308,7 @@ function matchedTreasurySamples(mc: McResult, params: Params): Float64Array {
   return out;
 }
 
-// Switching-variant scorecard row: MC-only, no closed-form mean/sd (so NaN-flag
-// those and zero out the z-score). VaR/CVaR/probLoss/Sharpe come from the
-// standard path-sample closure.
+// Switching scorecard row: MC only, closed-form columns NaN.
 export function makeSwitchingRow(samples: Float64Array): ModelRow {
   const stats = summarize(samples);
   const sharpe = stats.sd > 0 ? stats.mean / stats.sd : null;
@@ -382,9 +356,6 @@ function buildSwitchingBlock(
   const meanFracInFeeMode = meanTimeInFeeMc / params.T;
   const meanNCrossings = crossingsSum / nPaths;
 
-  // First-crossing time τ is a path property — the first time S_t ≥ H, or
-  // T if the path never reaches H — so mean(firstCrossTimeSamples) is the
-  // direct MC estimate of E[τ ∧ T] anchored by Harrison / Borodin-Salminen.
   let expectedTauMc = 0;
   for (let i = 0; i < nPaths; i++) {
     expectedTauMc += run.firstCrossTimeSamples[i] as number;
@@ -398,10 +369,7 @@ function buildSwitchingBlock(
   const expectedTauSe =
     nPaths > 1 ? Math.sqrt(tauSse / (nPaths - 1) / nPaths) : 0;
 
-  // Closed-form anchors hold under pure GBM. Under Merton jumps the τ / I_fee
-  // distributions change (jumps can punch through the barrier), so leave
-  // those anchors null and let the report call out "MC only" rather than
-  // compare against an inapplicable oracle.
+  // Anchors hold under pure GBM; under jumps τ changes, so leave null.
   const pureGbm = params.lambdaJ === 0;
   const probSwitchCf = pureGbm
     ? firstPassageProb(params.mu, params.sigma, params.T, params.barrierRatio)

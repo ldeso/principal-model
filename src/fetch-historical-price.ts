@@ -1,4 +1,4 @@
-// Fetches the kVCM spot history via Alchemy's Prices API into report/data/.
+// Fetch kVCM spot history (Alchemy Prices API) into report/data/.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -11,7 +11,7 @@ const OUT_PATH = resolve(DATA_DIR, "kvcm-historical.json");
 const ADDRESS = "0x00fbac94fec8d4089d3fe979f39454f48c71a65d";
 const NETWORK = "base-mainnet";
 const INTERVAL = "1d";
-// Alchemy caps the 1d interval at 365 points per request.
+// Alchemy caps 1d at 365 points / request.
 const WINDOW_DAYS = 365;
 
 interface AlchemyPoint {
@@ -53,8 +53,7 @@ async function main(): Promise<void> {
 
   if (!apiKey) {
     console.warn(
-      "ALCHEMY_API_KEY not set; writing empty kvcm-historical.json. " +
-        "The Summary page's 'Historical' button will be inert.",
+      "ALCHEMY_API_KEY not set; writing empty kvcm-historical.json.",
     );
     writeOutput({
       address: ADDRESS,

@@ -22,8 +22,8 @@ const base: SimulateRunInputs = {
   seed: 2026,
 };
 
-describe("simulateRun — active treasury book", () => {
-  it("kPre = 0, cBasis = 0 ⇒ treasury is zero path-by-path", () => {
+describe("simulateRun — active treasury", () => {
+  it("kPre = 0, cBasis = 0 ⇒ treasury ≡ 0", () => {
     const r = simulateRun({ ...base, kPre: 0, cBasis: 0 });
     expect(r.tauFrac).toBe(0);
     expect(r.tokensLeftover).toBe(0);
@@ -32,7 +32,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("kPre = 0, cBasis > 0 ⇒ treasury = −cBasis path-by-path", () => {
+  it("kPre = 0, cBasis > 0 ⇒ treasury ≡ −cBasis", () => {
     const cBasis = 12;
     const r = simulateRun({ ...base, kPre: 0, cBasis });
     for (let i = 0; i < r.treasurySamples.length; i++) {
@@ -40,7 +40,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("kPre = λ·P·T (exact coverage) ⇒ treasury = P·λ·I_T − cBasis path-by-path", () => {
+  it("kPre = λ·P·T ⇒ treasury = P·λ·I_T − cBasis", () => {
     const p = { ...base, kPre: base.lambda * base.P * base.T, cBasis: 40 };
     const r = simulateRun(p);
     expect(r.tauFrac).toBe(1);
@@ -52,8 +52,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("kPre > λ·P·T ⇒ treasury marks leftover to S_T", () => {
-    // Double the needed inventory ⇒ half retired, half survives to T.
+  it("kPre > λ·P·T ⇒ leftover marked at S_T", () => {
     const covered = base.lambda * base.P * base.T;
     const p = { ...base, kPre: 2 * covered, cBasis: 77 };
     const r = simulateRun(p);
@@ -69,7 +68,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("matched desk: b2b + treasury(N·P, N·P·S_0) is deterministic N·(Q − P·S_0)", () => {
+  it("matched desk: b2b + treasury(N·P, N·P·S_0) = N·(Q − P·S_0)", () => {
     const covered = base.lambda * base.P * base.T;
     const p = { ...base, kPre: covered, cBasis: covered * base.S0 };
     const r = simulateRun(p);
@@ -80,7 +79,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("mean fee revenue matches the closed-form GBM anchor", () => {
+  it("E[R_fee] matches GBM closed form", () => {
     const p = { ...base, nPaths: 20_000, nSteps: 100 };
     const r = simulateRun(p);
     const eIT = expectedIt(p.S0, p.mu, p.T);
@@ -89,7 +88,7 @@ describe("simulateRun — active treasury book", () => {
     expect(Math.abs(s.mean - expectedFeeMean)).toBeLessThan(4 * s.stderr);
   });
 
-  it("shares the Merton kernel with samplePath (bit-for-bit under a common seed)", () => {
+  it("shares the Merton kernel with samplePath under a common seed", () => {
     const p = { ...base, nPaths: 16, nSteps: 32 };
     const r = simulateRun(p);
     const rng = mulberry32(p.seed);
@@ -102,7 +101,7 @@ describe("simulateRun — active treasury book", () => {
     }
   });
 
-  it("tauFrac = 1 when λ or P is zero (degenerate-demand guard)", () => {
+  it("tauFrac = 1 when λ or P is zero", () => {
     const rZero = simulateRun({ ...base, lambda: 0, kPre: 0, cBasis: 0 });
     expect(rZero.tauFrac).toBe(1);
     expect(rZero.tokensUsedInternal).toBe(0);
@@ -110,8 +109,8 @@ describe("simulateRun — active treasury book", () => {
   });
 });
 
-describe("simulateRun — syndicated-on-b2b operating book", () => {
-  it("β = 0 ⇒ retained = b2b path-by-path, premium = 0", () => {
+describe("simulateRun — syndicated-on-b2b", () => {
+  it("β = 0 ⇒ retained ≡ b2b, premium 0", () => {
     const r = simulateRun({ ...base, kPre: 50_000, cBasis: 4_000, beta: 0 });
     expect(r.premium).toBe(0);
     for (let i = 0; i < r.b2bSamples.length; i++) {
@@ -119,17 +118,16 @@ describe("simulateRun — syndicated-on-b2b operating book", () => {
     }
   });
 
-  it("β = 1 at θ = 0 freezes retained at the fair premium (zero variance)", () => {
+  it("β = 1 at θ = 0 freezes retained at the fair premium", () => {
     const p = { ...base, nPaths: 5_000, beta: 1 };
     const r = simulateRun(p);
     const s = summarize(r.retainedSamples);
     expect(s.variance).toBeLessThan(1e-12);
-    // Fair premium at β = 1 equals the b2b sample mean.
     const b2bMean = summarize(r.b2bSamples).mean;
     expect(s.mean).toBeCloseTo(b2bMean, 6);
   });
 
-  it("CVaR-mode premium differs from Sharpe-mode by the Gaussian factor at θ > 0", () => {
+  it("CVaR mode differs from Sharpe mode by the Gaussian factor", () => {
     const GAUSS = 2.062713055949736;
     const shared = { ...base, nPaths: 4_000, seed: 777 };
     const rFair = simulateRun({ ...shared, beta: 0.4, premiumLoad: 0 });

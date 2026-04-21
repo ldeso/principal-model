@@ -14,8 +14,7 @@ import { simulateSwitching } from "../src/core/simulate-switching.js";
 import type { SwitchingInputs } from "../src/core/simulate-switching.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 
-// Baseline inputs: pure GBM (λ_J = 0) keeps the closed-form anchors exact;
-// moderate nPaths for fast iteration.
+// Pure GBM (λ_J = 0) keeps the closed-form anchors exact.
 const base: SwitchingInputs = {
   S0: 1,
   mu: 0.05,
@@ -32,13 +31,12 @@ const base: SwitchingInputs = {
   seed: 2026,
 };
 
-describe("simulateSwitching — switching operating book", () => {
-  it("barrierRatio = Infinity collapses the switching book onto b2b", () => {
+describe("simulateSwitching", () => {
+  it("barrierRatio = Infinity collapses to b2b", () => {
     const r = simulateSwitching(base);
     for (let i = 0; i < r.everCrossedMask.length; i++) {
       expect(r.everCrossedMask[i]).toBe(0);
       expect(r.nCrossingsSamples[i]).toBe(0);
-      // tB2b accumulates dt·nSteps → base.T modulo a few ulps of drift.
       expect(r.tB2bSamples[i]).toBeCloseTo(base.T, 10);
       expect(r.tFeeSamples[i]).toBe(0);
       expect(r.IFeeSamples[i]).toBe(0);
@@ -49,10 +47,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("barrierRatio ≤ 1 starts the book in fee mode (every step bucketed to fee at t=0)", () => {
-    // h ≤ 1 puts S_0 at or above H, so the mode indicator fires immediately
-    // and every step on [0, dt] enters in fee mode. Subsequent steps may
-    // cross back below if the path drifts low.
+  it("barrierRatio ≤ 1 starts in fee mode", () => {
     const r = simulateSwitching({ ...base, barrierRatio: 1 });
     for (let i = 0; i < r.pnlSamples.length; i++) {
       expect(r.everCrossedMask[i]).toBe(1);
@@ -60,7 +55,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("I_b2b + I_fee = I_T and tB2b + tFee = T path-by-path (machine precision)", () => {
+  it("I_b2b + I_fee = I_T and tB2b + tFee = T path-wise", () => {
     const r = simulateSwitching({
       ...base, barrierRatio: 1.25, nPaths: 200, nSteps: 100,
     });
@@ -101,7 +96,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("feePost = 0 reduces the fee-mode leg to zero path-by-path", () => {
+  it("feePost = 0 zeroes the fee-mode leg", () => {
     const p = { ...base, barrierRatio: 1.2, feePost: 0 };
     const r = simulateSwitching(p);
     for (let i = 0; i < r.pnlSamples.length; i++) {
@@ -112,7 +107,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("feePost = f equals feePost = null path-by-path (lock-to-f)", () => {
+  it("feePost = f equals feePost = null path-wise", () => {
     const shared = { ...base, barrierRatio: 1.25 };
     const rNull = simulateSwitching({ ...shared, feePost: null });
     const rLocked = simulateSwitching({ ...shared, feePost: shared.fee });
@@ -123,7 +118,7 @@ describe("simulateSwitching — switching operating book", () => {
     expect(rLocked.feePostResolved).toBe(shared.fee);
   });
 
-  it("shares RNG with models.simulate under shared seed (I_T parity path-by-path)", () => {
+  it("shares RNG with models.simulate under shared seed", () => {
     const p = withOverrides(defaultParams, {
       nPaths: 64, nSteps: 50, seed: 1234,
       lambdaJ: 0, muJ: 0, sigmaJ: 0,
@@ -143,7 +138,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("shares RNG with samplePath under shared seed (bit-for-bit terminal prices)", () => {
+  it("shares RNG with samplePath under shared seed", () => {
     const p = {
       ...base, barrierRatio: Infinity, lambdaJ: 0, nPaths: 16, nSteps: 32,
     };
@@ -158,11 +153,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("produces paths with > 1 crossing when σ and threshold allow re-entry", () => {
-    // Symmetric flipping means a volatile path just above the threshold
-    // can cross many times; this exercises the indicator logic that
-    // distinguishes a path-level diagnostic (nCrossings) from book
-    // behaviour (tB2b / tFee, which accumulate across re-entries).
+  it("produces > 1 crossing per path when σ and threshold allow", () => {
     const p = {
       ...base, mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
       nPaths: 5_000, nSteps: 500, seed: 321,
@@ -179,9 +170,7 @@ describe("simulateSwitching — switching operating book", () => {
     expect(totalK / r.nCrossingsSamples.length).toBeGreaterThan(1);
   });
 
-  it("firstCrossTimeSamples ≤ tB2bSamples on every path (τ precedes any re-entry time)", () => {
-    // The spot is in b2b mode on [0, τ) by definition, so tB2b ≥ τ always;
-    // equality holds when the path stays in fee mode after τ.
+  it("firstCrossTime ≤ tB2b path-wise (τ precedes any re-entry)", () => {
     const p = {
       ...base, mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
       nPaths: 2_000, nSteps: 500, seed: 9,
@@ -194,11 +183,10 @@ describe("simulateSwitching — switching operating book", () => {
       expect(tB2b).toBeGreaterThanOrEqual(tau - 1e-9);
       if (tB2b - tau > 1e-6) diverging += 1;
     }
-    // Re-entries should produce a material fraction of diverging paths.
     expect(diverging).toBeGreaterThan(50);
   });
 
-  it("MC P[ever crossed] matches firstPassageProb under pure GBM within 4·stderr", () => {
+  it("MC P[ever crossed] matches firstPassageProb within 4·stderr", () => {
     const cases = [
       { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.5, mu: 0.0, sigma: 0.5, T: 1 },
@@ -220,7 +208,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("MC E[τ ∧ T] matches expectedHittingTime under pure GBM within 4·stderr", () => {
+  it("MC E[τ ∧ T] matches expectedHittingTime within 4·stderr", () => {
     const cases = [
       { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.5, mu: 0.0, sigma: 0.5, T: 1.5 },
@@ -238,7 +226,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("MC E[T_fee] matches expectedTimeAboveBarrier under pure GBM within 4·stderr", () => {
+  it("MC E[T_fee] matches expectedTimeAboveBarrier within 4·stderr", () => {
     const cases = [
       { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
@@ -257,7 +245,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("MC E[I_fee] matches expectedIntegralAboveBarrier under pure GBM within 4·stderr", () => {
+  it("MC E[I_fee] matches expectedIntegralAboveBarrier within 4·stderr", () => {
     const cases = [
       { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
@@ -275,7 +263,7 @@ describe("simulateSwitching — switching operating book", () => {
     }
   });
 
-  it("discrete-crossing bias decreases monotonically in nSteps", () => {
+  it("discrete-crossing bias decreases in nSteps", () => {
     const base1 = {
       ...base,
       mu: 0.0, sigma: 0.4, barrierRatio: 1.3, nPaths: 30_000, seed: 9001,
@@ -293,7 +281,7 @@ describe("simulateSwitching — switching operating book", () => {
     expect(biases[2]).toBeLessThan(biases[1] as number);
   });
 
-  it("compensated Merton jumps strictly raise P[ever crossed] at equal σ", () => {
+  it("compensated Merton jumps raise P[ever crossed] at equal σ", () => {
     const shared = {
       ...base,
       mu: 0.0, sigma: 0.3, barrierRatio: 1.4,
@@ -306,7 +294,7 @@ describe("simulateSwitching — switching operating book", () => {
     expect(pJumps).toBeGreaterThan(pGbm);
   });
 
-  it("CVaR decomposition brackets the overall CVaR by the everCrossedMask partition", () => {
+  it("CVaR brackets via everCrossedMask partition", () => {
     const p = {
       ...base,
       barrierRatio: 1.25, nPaths: 20_000, nSteps: 500, seed: 8888,
@@ -332,14 +320,14 @@ describe("simulateSwitching — switching operating book", () => {
   });
 });
 
-describe("moments.ts — first-passage and above-barrier helpers", () => {
-  it("h ≤ 1 returns P = 1 and E[τ] = 0 (threshold already breached)", () => {
+describe("moments — first-passage and above-barrier", () => {
+  it("h ≤ 1 ⇒ P = 1, E[τ] = 0", () => {
     expect(firstPassageProb(0.05, 0.3, 1, 1)).toBe(1);
     expect(firstPassageProb(0.05, 0.3, 1, 0.9)).toBe(1);
     expect(expectedHittingTime(0.05, 0.3, 1, 1)).toBe(0);
   });
 
-  it("firstPassageProb is monotone decreasing in h for fixed (μ, σ, T)", () => {
+  it("firstPassageProb monotone decreasing in h", () => {
     const ps = [1.05, 1.1, 1.25, 1.5, 2.0].map((h) =>
       firstPassageProb(0.05, 0.3, 1, h),
     );
@@ -348,13 +336,13 @@ describe("moments.ts — first-passage and above-barrier helpers", () => {
     }
   });
 
-  it("standardNormalCdf matches known anchor values", () => {
+  it("standardNormalCdf matches anchor values", () => {
     expect(standardNormalCdf(0)).toBeCloseTo(0.5, 7);
     expect(standardNormalCdf(1.96)).toBeCloseTo(0.9750021048517795, 6);
     expect(standardNormalCdf(-2)).toBeCloseTo(0.022750131948179195, 6);
   });
 
-  it("expectedHittingTime ≤ T always", () => {
+  it("expectedHittingTime ≤ T", () => {
     for (const h of [1.2, 1.5, 2, 5]) {
       const e = expectedHittingTime(0.05, 0.3, 1, h);
       expect(e).toBeLessThanOrEqual(1);
@@ -362,7 +350,7 @@ describe("moments.ts — first-passage and above-barrier helpers", () => {
     }
   });
 
-  it("expectedTimeAboveBarrier is monotone decreasing in h and bounded by T", () => {
+  it("expectedTimeAboveBarrier monotone decreasing in h, bounded by T", () => {
     const mu = 0.05, sigma = 0.3, T = 1;
     const hs = [1.0, 1.1, 1.25, 1.5, 2.0, 3.0];
     const vs = hs.map((h) => expectedTimeAboveBarrier(mu, sigma, T, h));
@@ -375,7 +363,7 @@ describe("moments.ts — first-passage and above-barrier helpers", () => {
     }
   });
 
-  it("expectedIntegralAboveBarrier → E[I_T] as h → 0⁺ and → 0 as h → ∞", () => {
+  it("expectedIntegralAboveBarrier → E[I_T] as h → 0⁺, → 0 as h → ∞", () => {
     const S0 = 1, mu = 0.05, sigma = 0.3, T = 1;
     const small = expectedIntegralAboveBarrier(S0, mu, sigma, T, 1e-6);
     const EIT = S0 * T * ((Math.exp(mu * T) - 1) / (mu * T));

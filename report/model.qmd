@@ -1,6 +1,6 @@
 ---
 title: "Model"
-subtitle: "Mathematical framework, closed-form moments, risk-metric menu"
+subtitle: "Closed-form moments and risk metrics"
 shift-heading-level-by: 1
 format:
   html:

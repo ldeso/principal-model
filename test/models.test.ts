@@ -8,9 +8,7 @@ import { covarITST } from "../src/core/moments.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 import { conditionalVaR, summarize } from "../src/core/risk.js";
 
-describe("operating books — closed form ↔ Monte Carlo", () => {
-  // Pure GBM so closed-form variance matches MC variance. Jump-aware paths are
-  // exercised in jump-gbm.test.
+describe("operating books — closed form ↔ MC", () => {
   const p = withOverrides(defaultParams, {
     nPaths: 50_000,
     nSteps: 200,
@@ -22,24 +20,24 @@ describe("operating books — closed form ↔ Monte Carlo", () => {
   const cf = closedForm(p);
   const mc = simulate(p);
 
-  it("E[R_fee] agrees within 4 stderr", () => {
+  it("E[R_fee] within 4·stderr", () => {
     const s = summarize(mc.fee);
     expect(Math.abs(s.mean - cf.fee.mean)).toBeLessThan(4 * s.stderr);
   });
 
-  it("Var[R_fee] matches closed form within 5%", () => {
+  it("Var[R_fee] within 5%", () => {
     const s = summarize(mc.fee);
     expect(Math.abs(s.variance - cf.fee.variance) / cf.fee.variance).toBeLessThan(
       0.05,
     );
   });
 
-  it("E[Π_b2b] agrees within 4 stderr", () => {
+  it("E[Π_b2b] within 4·stderr", () => {
     const s = summarize(mc.b2b);
     expect(Math.abs(s.mean - cf.b2b.mean)).toBeLessThan(4 * s.stderr);
   });
 
-  it("Var[Π_b2b] = (P · λ)² · Var[I_T], ~ (P/f)² · Var[R_fee]", () => {
+  it("Var[Π_b2b] / Var[R_fee] = (P/f)²", () => {
     const sB = summarize(mc.b2b);
     const sF = summarize(mc.fee);
     const ratio = sB.variance / sF.variance;
@@ -48,7 +46,7 @@ describe("operating books — closed form ↔ Monte Carlo", () => {
   });
 });
 
-describe("treasury — closed form ↔ Monte Carlo", () => {
+describe("treasury — closed form ↔ MC", () => {
   const base = withOverrides(defaultParams, {
     nPaths: 50_000,
     nSteps: 200,
@@ -58,7 +56,7 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     sigmaJ: 0,
   });
 
-  it("α = 0 ⇒ treasury is identically 0 path-by-path (k_pre = 0, C_basis = 0)", () => {
+  it("α = 0 ⇒ treasury ≡ 0 path-wise", () => {
     const p = withOverrides(base, { alpha: 0, nPaths: 5_000, nSteps: 50 });
     const mc = simulate(p);
     for (let i = 0; i < mc.treasury.length; i++) {
@@ -66,7 +64,7 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     }
   });
 
-  it("α = 1 mean matches closed form within 4 stderr", () => {
+  it("α = 1 mean within 4·stderr", () => {
     const p = withOverrides(base, { alpha: 1 });
     const cf = closedForm(p);
     const mc = simulate(p);
@@ -74,7 +72,7 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     expect(Math.abs(s.mean - cf.treasury.mean)).toBeLessThan(4 * s.stderr);
   });
 
-  it("α = 1 variance matches closed form within 5%", () => {
+  it("α = 1 variance within 5%", () => {
     const p = withOverrides(base, { alpha: 1 });
     const cf = closedForm(p);
     const mc = simulate(p);
@@ -84,7 +82,7 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     ).toBeLessThan(0.05);
   });
 
-  it("α = 0.4 (partial coverage) mean and variance agree with closed form", () => {
+  it("α = 0.4 mean and variance match closed form", () => {
     const p = withOverrides(base, { alpha: 0.4 });
     const cf = closedForm(p);
     const mc = simulate(p);
@@ -95,7 +93,7 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     ).toBeLessThan(0.05);
   });
 
-  it("mean is invariant under compensated Merton (jumps preserve E[I_τ])", () => {
+  it("mean invariant under compensated Merton", () => {
     const gbm = simulate(withOverrides(base, { alpha: 0.5 }));
     const merton = simulate(
       withOverrides(base, {
@@ -108,7 +106,6 @@ describe("treasury — closed form ↔ Monte Carlo", () => {
     );
     const sG = summarize(gbm.treasury);
     const sM = summarize(merton.treasury);
-    // Both should hit the same GBM mean within the larger of the two stderrs.
     const tol = 4 * Math.max(sG.stderr, sM.stderr);
     expect(Math.abs(sG.mean - sM.mean)).toBeLessThan(tol);
   });
@@ -124,7 +121,7 @@ describe("desk compositions", () => {
     sigmaJ: 0,
   });
 
-  it("α = 1 ⇒ b2b + treasury is deterministic N·(Q − P·S_0) path-by-path", () => {
+  it("α = 1 ⇒ b2b + treasury = N·(Q − P·S_0) path-wise", () => {
     const p = withOverrides(base, { alpha: 1, nPaths: 10_000, nSteps: 50 });
     const mc = simulate(p);
     const expected = p.lambda * p.T * (p.Q - p.P * p.S0);
@@ -137,7 +134,7 @@ describe("desk compositions", () => {
     expect(maxDeviation).toBeLessThan(1e-8);
   });
 
-  it("partial-desk mean matches closed form within 4 stderr", () => {
+  it("partial-desk mean within 4·stderr", () => {
     const p = withOverrides(base, { alpha: 0.4 });
     const cf = partialDeskClosedForm(p);
     const mc = simulate(p);
@@ -149,7 +146,7 @@ describe("desk compositions", () => {
     expect(Math.abs(s.mean - cf.mean)).toBeLessThan(4 * s.stderr);
   });
 
-  it("partial-desk variance matches closed form within 5%", () => {
+  it("partial-desk variance within 5%", () => {
     const p = withOverrides(base, { alpha: 0.4 });
     const cf = partialDeskClosedForm(p);
     const mc = simulate(p);
@@ -161,7 +158,7 @@ describe("desk compositions", () => {
     expect(Math.abs(s.variance - cf.variance) / cf.variance).toBeLessThan(0.05);
   });
 
-  it("Cov[I_T, S_T] closed form agrees with MC within 5%", () => {
+  it("Cov[I_T, S_T] within 5%", () => {
     const p = withOverrides(base, { nPaths: 100_000, nSteps: 250 });
     const mc = simulate(p);
     let meanIT = 0;
@@ -183,7 +180,7 @@ describe("desk compositions", () => {
 });
 
 describe("break-even quote Q*", () => {
-  it("equalises E[R_fee] and E[Π_b2b] at Q = Q*", () => {
+  it("equalises E[R_fee] and E[Π_b2b]", () => {
     const p = defaultParams;
     const cf = closedForm(p);
     const N = p.lambda * p.T;
@@ -191,25 +188,25 @@ describe("break-even quote Q*", () => {
     expect(b2bAtQstar).toBeCloseTo(cf.fee.mean, 9);
   });
 
-  it("reduces to (1 + f) · P · S_0 as μ → 0", () => {
+  it("→ (1 + f)·P·S_0 as μ → 0", () => {
     const p = withOverrides(defaultParams, { mu: 0 });
     const cf = closedForm(p);
     expect(cf.QStar).toBeCloseTo((1 + p.f) * p.P * p.S0, 12);
   });
 
-  it("exceeds (1 + f) · P · S_0 for μ > 0", () => {
+  it("> (1 + f)·P·S_0 for μ > 0", () => {
     const p = withOverrides(defaultParams, { mu: 0.15 });
     const cf = closedForm(p);
     expect(cf.QStar).toBeGreaterThan((1 + p.f) * p.P * p.S0);
   });
 
-  it("falls below (1 + f) · P · S_0 for μ < 0", () => {
+  it("< (1 + f)·P·S_0 for μ < 0", () => {
     const p = withOverrides(defaultParams, { mu: -0.1 });
     const cf = closedForm(p);
     expect(cf.QStar).toBeLessThan((1 + p.f) * p.P * p.S0);
   });
 
-  it("is invariant in β (Q* touches only fee and b2b)", () => {
+  it("is β-invariant", () => {
     const p = defaultParams;
     const q0 = closedForm(withOverrides(p, { beta: 0 })).QStar;
     for (const beta of [0.25, 0.5, 0.75, 1]) {
@@ -220,17 +217,13 @@ describe("break-even quote Q*", () => {
 });
 
 describe("matched desk identity", () => {
-  it("closed-form matched desk = N·(Q − P·S_0) and has zero variance", () => {
+  it("closed-form matched desk = N·(Q − P·S_0), variance 0", () => {
     const p = withOverrides(defaultParams, { alpha: 1 });
     const cf = closedForm(p);
-    // At α = 1 the partial-desk closed form collapses to the matched identity:
-    // E[J_1] = 0, so partial desk mean = Q·N − N·P·S_0 = N·(Q − P·S_0).
     const expected = p.lambda * p.T * (p.Q - p.P * p.S0);
     const partial = partialDeskClosedForm(p);
     expect(partial.mean).toBeCloseTo(expected, 9);
     expect(partial.variance).toBeLessThan(1e-12);
-    // Sanity: the closed-form treasury at α = 1 plus closed-form b2b mean
-    // reproduces the same matched total.
     expect(cf.b2b.mean + cf.treasury.mean).toBeCloseTo(expected, 9);
   });
 });
@@ -245,7 +238,7 @@ describe("syndicated-on-b2b operating book", () => {
     sigmaJ: 0,
   });
 
-  it("β = 0 ⇒ retained = b2b path-by-path (premium is zero)", () => {
+  it("β = 0 ⇒ retained ≡ b2b, premium 0", () => {
     const p = withOverrides(base, { beta: 0, premiumLoad: 0 });
     const mc = simulate(p);
     const cf = closedForm(p);
@@ -258,18 +251,17 @@ describe("syndicated-on-b2b operating book", () => {
     expect(cf.premium.loaded).toBe(0);
   });
 
-  it("β = 1 at θ = 0 collapses to the fair premium, zero variance", () => {
+  it("β = 1 at θ = 0 collapses to the fair premium, variance 0", () => {
     const p = withOverrides(base, { beta: 1, premiumLoad: 0, nPaths: 10_000 });
     const mc = simulate(p);
     const cf = closedForm(p);
     const s = summarize(mc.retained);
     expect(s.variance).toBeLessThan(1e-12);
     expect(s.mean).toBeCloseTo(cf.premium.loaded, 10);
-    // Fair premium = β · E[Π_b2b]; at β = 1 it absorbs the entire expected book.
     expect(cf.premium.fair).toBeCloseTo(cf.b2b.mean, 10);
   });
 
-  it("mean and variance agree with closed form for arbitrary (β, θ)", () => {
+  it("mean and variance match closed form for arbitrary (β, θ)", () => {
     for (const mode of ["sharpe", "cvar"] as const) {
       const p = withOverrides(base, {
         beta: 0.3, premiumLoad: 0.5, premiumMode: mode,
@@ -284,7 +276,7 @@ describe("syndicated-on-b2b operating book", () => {
     }
   });
 
-  it("variance collapses as (1 − β)² · Var[Π_b2b] (α-free at the operating layer)", () => {
+  it("variance collapses as (1 − β)²·Var[Π_b2b]", () => {
     const p = withOverrides(base, { beta: 0.6 });
     const cf = closedForm(p);
     const expected = (1 - p.beta) ** 2 * cf.b2b.variance;
@@ -293,9 +285,7 @@ describe("syndicated-on-b2b operating book", () => {
     expect(Math.abs(s.variance - expected) / expected).toBeLessThan(0.05);
   });
 
-  it("fair-premium mean invariance in β (θ = 0)", () => {
-    // At θ = 0 the premium exactly replaces ceded expected P&L, so E[retained]
-    // is independent of β — the no-free-lunch check.
+  it("fair-premium mean is β-invariant at θ = 0", () => {
     const betas = [0, 0.25, 0.5, 0.75, 1];
     const means: number[] = [];
     const cis: number[] = [];
@@ -312,7 +302,7 @@ describe("syndicated-on-b2b operating book", () => {
     }
   });
 
-  it("CVaR₉₅ is non-increasing in β at θ = 0", () => {
+  it("CVaR₉₅ non-increasing in β at θ = 0", () => {
     const betas = [0, 0.25, 0.5, 0.75, 1];
     const cvars: number[] = [];
     for (const beta of betas) {
@@ -326,7 +316,7 @@ describe("syndicated-on-b2b operating book", () => {
     }
   });
 
-  it("CVaR-mode premium scales Sharpe-mode load by the Gaussian CVaR factor", () => {
+  it("CVaR-mode premium = Gaussian factor × Sharpe-mode load", () => {
     const GAUSS = 2.062713055949736;
     const pSharpe = withOverrides(base, {
       beta: 0.4, premiumLoad: 0.7, premiumMode: "sharpe",

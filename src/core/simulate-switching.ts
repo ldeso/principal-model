@@ -1,35 +1,19 @@
-// Switching-operating-book Monte Carlo runner. The book's mode is a pure
-// state function of the kVCM spot relative to the threshold H = h · S_0:
-// principal (b2b) pricing when S_t < H, fee-based pricing at rate f_post
-// when S_t ≥ H. The book rides the spot across H symmetrically — it flips
-// back to b2b whenever S_t falls below H, and the horizon can contain any
-// number of crossings.
+// Switching operating book MC runner. Mode: fee if S_t ≥ H = h·S_0, b2b
+// otherwise; indicator rides S_t symmetrically.
 //
-// This runner emits the **pure operating book** `switching_op`:
+//   switching_op(T) = Q·λ·T_b2b − P·λ·I_b2b + f_post·P·λ·I_fee,
 //
-//   switching_op(T) = Q · λ · T_b2b − P · λ · I_b2b + f_post · P · λ · I_fee,
+// starting at P&L(0) = 0. I_b2b + I_fee = I_T by construction.
 //
-// starting from P&L(0) = 0, where
-//   T_b2b   = ∫₀ᵀ 1{S_t < H} dt
-//   I_b2b   = ∫₀ᵀ 1{S_t < H} · S_t dt
-//   I_fee   = ∫₀ᵀ 1{S_t ≥ H} · S_t dt      (I_b2b + I_fee = I_T).
+// The inner log-Euler step is inlined to bucket per-step trapezoid pieces
+// into I_b2b / I_fee by the entry-mode indicator 1{Sprev ≥ H}. RNG
+// consumption matches `samplePath`, so a shared seed draws identical paths.
 //
-// Desk compositions (switching + treasury, or syndicated switching) are
-// assembled at the consumer level from these samples plus the treasury
-// samples from `simulate-run`.
-//
-// The inner log-Euler step is inlined rather than delegated to `samplePath`
-// because the mode check wants per-step access to (Sprev, Si) and the
-// trapezoid contribution must be routed to the correct bucket (I_b2b vs
-// I_fee). RNG consumption per step matches `samplePath` exactly, so runs
-// that share `seed` with `simulate()` draw bit-for-bit identical paths.
-//
-// Pure-GBM closed-form anchors (see ./moments.ts) z-test the simulator on
-// every run:
-//   P[τ ≤ T]    from `firstPassageProb`
-//   E[τ ∧ T]    from `expectedHittingTime`          (τ is a path property)
-//   E[T_fee]    from `expectedTimeAboveBarrier`
-//   E[I_fee]    from `expectedIntegralAboveBarrier`
+// Pure-GBM anchors (see ./moments.ts):
+//   P[τ ≤ T]    firstPassageProb
+//   E[τ ∧ T]    expectedHittingTime
+//   E[T_fee]    expectedTimeAboveBarrier
+//   E[I_fee]    expectedIntegralAboveBarrier
 
 import { mulberry32 } from "./rng.js";
 
@@ -37,67 +21,54 @@ export interface SwitchingInputs {
   S0: number;
   mu: number;
   sigma: number;
-  /** Protocol price kVCM/tonne. */
   P: number;
-  /** Retirement flow, tonnes per unit time. */
   lambda: number;
   T: number;
-  /** Fixed USD quote per tonne (b2b-mode pricing). */
   Q: number;
-  /** Fee rate used for the same-seed fee-book reference (`fee · P · λ · I_T`)
-   *  and for the switching book's fee-mode leg when `feePost` resolves to
-   *  `null` (zero-config lock-to-f path). */
+  /** Fee rate; `feePost = null` locks the fee-mode rate to this. */
   fee: number;
-  /** Switching-variant threshold ratio h = H/S0. Infinity disables the switch.
-   *  h ≤ 1 starts the book in fee mode (the spot is already at or above H). */
+  /** Threshold ratio; Infinity disables; h ≤ 1 starts in fee mode. */
   barrierRatio: number;
-  /** Switching-variant fee-mode fee rate. `null` locks it to `fee`. */
+  /** Fee-mode rate; `null` ⇒ locked to `fee`. */
   feePost: number | null;
-  /** Merton jump intensity. 0 ⇒ pure GBM. */
+  /** 0 ⇒ pure GBM. */
   lambdaJ?: number;
   muJ?: number;
   sigmaJ?: number;
   nPaths: number;
   nSteps: number;
   seed: number;
-  /** Sample trajectories retained for plotting; capped by nPaths. */
+  /** Sample paths retained; capped by nPaths. */
   keepPaths?: number;
 }
 
 export interface SwitchingResult {
   /** Pure switching operating book. */
   pnlSamples: Float64Array;
-  /** Same-seed b2b operating reference: Q · N − P · λ · I_T. */
+  /** Same-seed b2b reference: Q·N − P·λ·I_T. */
   b2bSamples: Float64Array;
-  /** Same-seed fee operating reference: fee · P · λ · I_T. */
+  /** Same-seed fee reference: fee·P·λ·I_T. */
   feeSamples: Float64Array;
-  /** Time spent in b2b mode per path, ∈ [0, T]. */
+  /** Time in b2b mode per path. */
   tB2bSamples: Float64Array;
-  /** Time spent in fee mode per path, = T − tB2b. */
+  /** T − tB2b. */
   tFeeSamples: Float64Array;
-  /** 1 iff the path ever entered fee mode (S_t ≥ H at some t). */
+  /** 1 iff the path entered fee mode. */
   everCrossedMask: Uint8Array;
-  /** First time S_t crosses H per path, or T if it never does. Path-level
-   *  property independent of the book's response; the Harrison /
-   *  Borodin-Salminen expected-hitting-time oracle anchors
-   *  `mean(firstCrossTimeSamples)`. */
+  /** First S_t ≥ H time per path, or T. */
   firstCrossTimeSamples: Float64Array;
-  /** Number of times S_t crossed the threshold H per path (raw count of
-   *  sign(S − H) flips along the discretised path). */
+  /** Number of discrete sign(S − H) flips per path. */
   nCrossingsSamples: Uint32Array;
-  /** ∫₀ᵀ 1{mode = b2b} · S_t dt per path. */
   IB2bSamples: Float64Array;
-  /** ∫₀ᵀ 1{mode = fee} · S_t dt per path. I_b2b + I_fee = I_T exactly by
-   *  construction. */
   IFeeSamples: Float64Array;
   ITSamples: Float64Array;
   terminalS: Float64Array;
   sampledPaths: Float64Array[];
-  /** Inventory notional N = λ · T. */
+  /** N = λ·T. */
   N: number;
-  /** Post-switch fee rate resolved at call time (`fee` if feePost = null). */
+  /** Resolved fee-mode rate. */
   feePostResolved: number;
-  /** Threshold level H = h · S0, materialised for plot overlays. */
+  /** H = h·S_0. */
   barrierLevel: number;
 }
 
@@ -116,8 +87,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
   const feePostResolved = feePost ?? fee;
   const H = barrierRatio * S0;
 
-  // Jump-compensation κ = E[e^Y − 1]: zero when λ_J = 0, same formula as
-  // gbm.ts::samplePath so path draws coincide bit-for-bit under shared seed.
+  // Matches gbm.ts::samplePath so shared-seed draws coincide.
   const kappa = lambdaJ > 0
     ? Math.exp(muJ + 0.5 * sigmaJ * sigmaJ) - 1
     : 0;
@@ -154,9 +124,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
     let tB2b = 0;
     let tFee = 0;
     let everCrossed = Sprev >= H;
-    // Path-level first-crossing time τ := inf{t : S_t ≥ H} ∧ T. Starts at
-    // T (never-crosses fallback) and is overwritten on the first step
-    // that completes above H; h ≤ 1 (Sprev ≥ H at init) gives τ = 0.
+    // τ := inf{t : S_t ≥ H} ∧ T; h ≤ 1 (Sprev ≥ H) ⇒ τ = 0.
     let firstCrossTime = everCrossed ? 0 : T;
     let crossings = 0;
 
@@ -172,12 +140,8 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
       const Si = Sprev * Math.exp(drift + diffusion * z + jumpSum);
       if (Spath) Spath[k] = Si;
 
-      // Per-step trapezoid piece ½(S_{k-1} + S_k)·dt. Summing reproduces
-      // samplePath's weighting exactly, so I_b2b + I_fee = I_T to machine
-      // precision. The piece is bucketed by the entry-mode indicator
-      // 1{Sprev ≥ H}; a step that crosses the threshold mid-flight
-      // contributes its whole piece to the entry-mode bucket, with an
-      // O(dt) discretisation error that vanishes as nSteps → ∞.
+      // Bucket ½(S_{k-1} + S_k)·dt by the entry-mode indicator.
+      // Sum of pieces reproduces samplePath's I_T to machine precision.
       const piece = 0.5 * (Sprev + Si) * dt;
       const prevAbove = Sprev >= H;
 

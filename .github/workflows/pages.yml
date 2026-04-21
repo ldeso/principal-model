@@ -30,12 +30,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch historical kVCM price (Alchemy Prices API)
+      - name: Fetch kVCM historical prices
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
         run: npm run fetch:prices
 
-      - name: Run simulator (emits report/data/*.json consumed by the notebook)
+      - name: Run simulator
         run: |
           npm run simulate -- --seed 42
           npm run sweep -- --seed 42

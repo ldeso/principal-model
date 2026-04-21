@@ -1,6 +1,6 @@
 ---
 title: "Simulator"
-subtitle: "Live in-browser Monte Carlo on parameters of your choosing"
+subtitle: "In-browser Monte Carlo"
 format:
   html:
     toc: true
@@ -8,18 +8,11 @@ format:
     toc-location: right
 ---
 
-Every slider on this page kicks off a fresh Monte Carlo in your
-browser; the [Model](model.qmd) page defines the symbols. Two
-things are slightly different here. First, the desk is split into
-zero-capital **operating books** (fee, b2b, retained, switching —
-each with $P\!\&\!L(0) = 0$, every tonne sourced at spot) and an
-**active treasury** parameterised by raw inventory state $(k,
-C_{\mathrm{basis}})$ — kVCM tokens on hand plus their sunk USD cost.
-Any strategy's desk P&L is `operating + treasury` evaluated
-sample-wise; the custom-desk histogram below shows $b2b + \text{treasury}$
-at your slider settings. Second, the price process is always the
-compensated Merton jump-diffusion; set the three jump sliders
-$(\lambda_J, \mu_J, \sigma_J)$ to zero for pure GBM.
+Every slider runs a fresh MC. Symbols: [Model](model.qmd). The desk
+splits into zero-capital operating books (fee, b2b, retained,
+switching) and an active treasury at $(k, C_{\mathrm{basis}})$; desk
+P&L is `operating + treasury` sample-wise. The price process is
+compensated Merton; $\lambda_J = 0$ recovers pure GBM.
 
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Price process
@@ -126,8 +119,7 @@ viewof barrierRatioSlider = Inputs.range([1, 3], { step: 0.01, value: 1.25, labe
 
 ```{ojs}
 //| echo: false
-// Disabling the switch drives the effective threshold to Infinity regardless
-// of the slider value; the scorecard row and the threshold line disappear.
+// Disabled switch ⇒ barrier Infinity.
 barrierRatio = switchOn ? barrierRatioSlider : Infinity
 ```
 
@@ -143,8 +135,7 @@ viewof feePostSlider = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fe
 
 ```{ojs}
 //| echo: false
-// null when locked (simulateSwitching interprets this as "use inputs.fee");
-// a numeric value when the user wants an independent fee-mode rate.
+// null ⇒ simulateSwitching uses inputs.fee.
 feePost = feePostLocked ? null : feePostSlider
 ```
 
@@ -209,11 +200,8 @@ mcResetButton = {
 
 ## Derived quantities
 
-Closed-form summaries of the slider state: $S_0 = \pi_0 / P$, horizon
-$T$ in years, $N = \lambda T$ total tonnes, coverage $\alpha =
-\min(1, k / (N P))$, and the break-even quote $Q^* = (1 + f) P S_0
-\cdot (e^{\mu T} - 1) / (\mu T)$ at which the fee and back-to-back
-books share expected P&L.
+$S_0 = \pi_0 / P$, $T$ (years), $N = \lambda T$, $\alpha = \min(1, k /
+(N P))$, $Q^* = (1 + f) P S_0 (e^{\mu T} - 1) / (\mu T)$.
 
 ```{ojs}
 //| echo: false
@@ -248,10 +236,9 @@ html`<div class="derived-stats">
 </div>`
 ```
 
-`implied basis per token` is $C_{\mathrm{basis}} / k$ versus $S_0$:
-above $S_0$, existing inventory sits on an unrealised loss; below,
-an unrealised gain. It translates the custom book's P&L distribution
-without touching its shape.
+`implied basis per token` is $C_{\mathrm{basis}} / k$; above $S_0$ ⇒
+unrealised loss on inventory, below ⇒ unrealised gain. Translates the
+custom book's distribution without reshaping.
 
 ```{ojs}
 //| echo: false
@@ -263,14 +250,11 @@ import {
 
 ## Monte Carlo run
 
-A run card (paths, wall time, coverage, leftover tokens), a summary
-table, histograms, and sample price paths follow. Wall time stays
-sub-second at 5,000–10,000 paths; at 40,000 the bottleneck is
-re-plotting, not the simulation itself. The [Merton compensation
-identity](model.qmd#compensated-merton-jump-diffusion) tells you
-what to expect when sweeping the jump sliders: the black mean rule
-on each histogram holds position (means survive) while SD, VaR, and
-CVaR widen as the jumps land.
+Run card, summary table, histograms, sample paths. Wall time is
+sub-second at 5k–10k paths. Under the [Merton
+compensation](model.qmd#compensated-merton-jump-diffusion) the
+histogram mean rule holds position while SD, VaR, CVaR widen with
+the jump sliders.
 
 ```{ojs}
 //| echo: false
@@ -287,7 +271,6 @@ run = {
   const t0 = performance.now();
   const raw = simulate(inputs);
   const elapsedMs = performance.now() - t0;
-  // Custom-desk samples = b2b + treasury at the slider's (k, C_basis).
   const customDeskSamples = new Float64Array(raw.b2bSamples.length);
   for (let i = 0; i < customDeskSamples.length; i++) {
     customDeskSamples[i] = raw.b2bSamples[i] + raw.treasurySamples[i];
@@ -308,10 +291,7 @@ run = {
 
 ```{ojs}
 //| echo: false
-// Sibling run of the switching operating book. The switching book is itself
-// zero-capital (starts at P&L(0) = 0 and sources every tonne at spot); the
-// matched-desk variant is `switching + treasury(N·P, N·P·S₀)` sample-wise,
-// which we don't surface on this page — see Validation for composed desks.
+// Switching operating book; composed desk deferred to Validation.
 switchRun = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
@@ -356,13 +336,9 @@ html`<div class="derived-stats">
 </div>`
 ```
 
-Toggle **enable switching** in the side panel to activate the
-threshold $H = h \cdot S_0$. The book's mode tracks $S_t$
-symmetrically: fee pricing whenever $S_t \ge H$, b2b pricing whenever
-it falls back below. The cards below report
-$\mathbb{P}[\text{ever in fee}]$ (first-passage probability), the
-mean time in fee mode, and the mean number of threshold crossings
-per path — a volatile path just above $H$ can cross many times.
+Enable switching to activate the threshold $H = h S_0$. Cards below:
+first-passage probability, mean time in fee mode, mean crossings per
+path.
 
 ```{ojs}
 //| echo: false
@@ -382,20 +358,18 @@ html`${switchOn
 
 ### Summary statistics
 
-One row per **operating book** (fee, b2b, retained, switching) plus
-one row for the **treasury** at the slider's $(k, C_{\mathrm{basis}})$
-and a derived **custom desk** row $= b2b + \text{treasury}$. The
-switching row appears only when "enable switching" is toggled on.
+One row per operating book plus treasury at $(k, C_{\mathrm{basis}})$
+and the derived custom desk $= b2b + \text{treasury}$.
 
 | column | meaning |
 | --- | --- |
-| $\mathbb{E}[\Pi]$ (mc) | sample mean |
-| SD | sample standard deviation |
-| $\pm \mathrm{CI}_{95}$ | 95% half-width of the mean, $1.96 \cdot \mathrm{SD} / \sqrt{n}$ |
+| $\mathbb{E}[\Pi]$ | sample mean |
+| SD | sample SD |
+| $\pm \mathrm{CI}_{95}$ | $1.96 \cdot \mathrm{SD} / \sqrt{n}$ |
 | $\mathrm{VaR}_{95} / \mathrm{VaR}_{99}$ | 5% / 1% loss thresholds |
-| $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | tail-mean losses inside those thresholds |
-| $\mathbb{P}[\Pi < 0]$ | probability of a losing realisation |
-| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ (horizon-absolute, not annualised) |
+| $\mathrm{CVaR}_{95} / \mathrm{CVaR}_{99}$ | tail means |
+| $\mathbb{P}[\Pi < 0]$ | loss probability |
+| Sharpe | $\mathbb{E}[\Pi] / \mathrm{SD}[\Pi]$ (horizon-absolute) |
 
 P&L is the USD total over $[0, T]$; divide by $N = \lambda T$ for a
 per-tonne figure. Three things to watch as you sweep:
@@ -418,7 +392,6 @@ summaryRows = [
   { book: "retained (syndicated-on-b2b)", ...run.retained },
   { book: "treasury (k, C_basis)", ...run.treasury },
   { book: "custom desk = b2b + treasury", ...run.customDesk },
-  // Switching row only when the threshold is active.
   ...(switchOn
     ? [{ book: `switching (h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
     : []),
@@ -457,19 +430,12 @@ Inputs.table(summaryRows, {
 
 ### P&L distributions
 
-One panel per book, terminal P&L on the x-axis. Solid black rule is
-the MC mean; dashed grey rule is $\Pi = 0$. The fee panel is
-non-negative and right-skewed (it inherits $I_T$'s right skew); the
-b2b panel is the mirror. The treasury panel shifts linearly with
-$C_{\mathrm{basis}}$ and widens with $k$. The custom-desk panel
-(`b2b + treasury`) collapses to a spike at $k = N P$,
-$C_{\mathrm{basis}} = N P S_0$ — the matched limit, with $I_T$
-cancelling between the two summands.
+One panel per book, terminal P&L on the x-axis. Black: MC mean.
+Dashed grey: $\Pi = 0$. Fee is non-negative, b2b is its mirror.
+The custom-desk panel collapses to a spike at the matched limit.
 
 ```{ojs}
 //| echo: false
-// Switching facet follows the same predicate as the summary table row
-// (see the `summaryRows` cell above) so table and histogram agree in lockstep.
 includeSwitch = switchOn
 switchLabel = includeSwitch ? `switching (h=${barrierRatio.toFixed(2)})` : null
 ```
@@ -478,7 +444,6 @@ switchLabel = includeSwitch ? `switching (h=${barrierRatio.toFixed(2)})` : null
 //| echo: false
 pnlRecords = {
   const rows = [];
-  // Subsample for plotting responsiveness.
   const stride = Math.max(1, Math.floor(run.feeSamples.length / 2500));
   for (let i = 0; i < run.feeSamples.length; i += stride) {
     rows.push({ book: "fee", pnl: run.feeSamples[i] });
@@ -524,23 +489,13 @@ Plot.plot({
 })
 ```
 
-_Solid black: MC mean. Dashed grey: $\Pi = 0$. The custom-desk
-panel collapses to a spike as $k \to N P$ with
-$C_{\mathrm{basis}} = N P S_0$ (matched limit, $I_T$ cancels between
-b2b and treasury); the retained panel sits on top of the b2b panel
-at $\beta = 0$ and collapses to a spike as $\beta \to 1$
-(syndication limit)._
+_Black: MC mean. Dashed grey: $\Pi = 0$._
 
 ### Sample price paths and the inventory cliff
 
-Twenty sampled kVCM trajectories (grey, first path highlighted
-orange). The dashed green rule at $\alpha T$ marks inventory
-exhaustion: the intermediary draws from inventory to the left of it
-and buys at spot to the right. The custom book's randomness lives in
-the right-of-rule region (plus a terminal $S_T$ contribution when
-over-hedged). At $\alpha = 100\%$ the rule sits at or past $T$; at
-$\alpha = 0$, at $t = 0$. Paths fan out like $\sigma\sqrt{t}$ — the
-visual signature of GBM.
+Twenty sampled kVCM trajectories; first highlighted. Green dashed:
+$\alpha T$ (inventory exhaustion). Custom-book randomness lives in
+$[\alpha T, T]$.
 
 ```{ojs}
 //| echo: false
@@ -577,7 +532,6 @@ Plot.plot({
     Plot.line(pathRecords, { x: "tDays", y: "S", z: "id", stroke: "#888", strokeOpacity: 0.35 }),
     Plot.line(pathRecords.filter(r => r.id === 0), { x: "tDays", y: "S", stroke: "#c94", strokeWidth: 2 }),
     Plot.ruleX([run.tauFrac * Tdays], { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
-    // Switching threshold H — dashed horizontal in the switching palette.
     ...(switchOn
       ? [Plot.ruleY([barrierRatio * derived.S0], { stroke: "#a36", strokeDasharray: "6 3", strokeWidth: 2 })]
       : []),
@@ -585,12 +539,6 @@ Plot.plot({
 })
 ```
 
-_Grey: sampled GBM trajectories of the kVCM spot. Orange: first path
-highlighted. Green dashed rule: inventory-exhaustion time; right of
-it, retirements are sourced at spot. Maroon dashed rule (when
-switching is on): threshold $H = h \cdot S_0$ — paths sitting above
-that line run in fee mode; paths below run in b2b mode. The book
-tracks $S_t$ across the line in both directions, so a path that
-rallies above $H$ and then retraces hands the book back to b2b
-exposure._
+_Grey: sampled spot paths. Orange: first path. Green dashed: $\alpha
+T$. Maroon dashed (when switching is on): $H = h S_0$._
 

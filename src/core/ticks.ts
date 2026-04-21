@@ -1,7 +1,4 @@
-// Calendar-ish tick helpers for the OJS horizon axes. `tickStep` picks the
-// span (whole weeks up to 60 days, whole months up to 2 years, whole years
-// beyond), and the other helpers agree by construction so axes and date
-// labels never drift.
+// Horizon-axis tick helpers for OJS plots.
 
 export function tickStep(tdays: number): number {
   if (tdays <= 60) return 7;
@@ -34,9 +31,8 @@ export function formatTickDate(date: Date, tdays: number): string {
   return date.toLocaleString("en-US", { year: "numeric" });
 }
 
-// Currency tick formatter. Mirrors d3-format "$~s" for |v| >= 1000 (k/M/B/T
-// with trimmed trailing zeros) but avoids the milli-prefix footgun for |v| < 1:
-// 0.1 renders as "$0.1", not d3's ambiguous "$100m".
+// Currency formatter matching d3's "$~s" for |v| ≥ 1000; for |v| < 1 uses
+// decimal notation rather than d3's milli prefix.
 export function formatTickCurrency(v: number): string {
   if (!Number.isFinite(v)) return "";
   if (v === 0) return "$0";
@@ -48,8 +44,7 @@ export function formatTickCurrency(v: number): string {
     Math.max(0, Math.floor(Math.log10(x) / 3)),
   );
   let scaled = x / Math.pow(1000, tier);
-  // Rounding can spill across a boundary (e.g. 999.9 -> "1.00e+3"), so bump
-  // the tier to avoid emitting "$1000" instead of "$1k".
+  // Rounding can spill across a tier boundary (999.9 → "1.00e+3").
   if (scaled >= 999.5 && tier < suffixes.length - 1) {
     tier += 1;
     scaled = x / Math.pow(1000, tier);

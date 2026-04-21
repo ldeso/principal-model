@@ -1,5 +1,4 @@
-// Empirical risk metrics on Monte Carlo P&L samples.
-// Loss L := −Π; VaR_q and CVaR_q are reported as positive numbers.
+// Empirical risk metrics. Loss L := −Π; VaR_q and CVaR_q reported positive.
 
 export interface Summary {
   mean: number;
@@ -26,7 +25,7 @@ export function summarize(samples: ArrayLike<number>): Summary {
   return { mean, variance, sd, stderr, ci95: 1.96 * stderr };
 }
 
-/** Linear-interpolation empirical quantile (numpy default). `q ∈ [0, 1]`. */
+/** Linear-interpolation empirical quantile. `q ∈ [0, 1]`. */
 export function quantile(samples: ArrayLike<number>, q: number): number {
   if (q < 0 || q > 1) throw new Error("quantile: q must be in [0, 1]");
   const n = samples.length;
@@ -62,10 +61,6 @@ export function probLoss(pnl: ArrayLike<number>): number {
   return k / pnl.length;
 }
 
-/** Full per-sample P&L summary: mean/SD/95% CI, historical VaR/CVaR at 95
- *  and 99, loss probability, Sharpe. Bundles the metrics the OJS report
- *  cells need into one pass. Returns variance = 0 (and sharpe = null) for
- *  degenerate samples so callers don't have to special-case n < 2. */
 export interface FullSummary {
   mean: number;
   sd: number;
@@ -108,12 +103,7 @@ export function summarise(samples: ArrayLike<number>): FullSummary {
   };
 }
 
-/** Matched-book NAV shortfall against the deterministic decay schedule:
- *   shortfall_t = max(0, N · P · (1 − k/N_steps) · (S_0 − S_k)).
- *
- * The research note's literal V_0 − V_t is pinned to V_0 by the V_T = 0 burn
- * convention and has zero variance; this schedule-relative version keeps the
- * same solvency intent with a non-trivial distribution. See README. */
+/** Shortfall vs deterministic decay: max_t [N·P·(1 − k/(n−1))·(S₀ − S_k)]₊. */
 export function shortfallVsSchedule(
   S: ArrayLike<number>,
   notional: number,

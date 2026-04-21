@@ -8,7 +8,7 @@ project:
 
 website:
   title: "Klima Protocol — Fee vs. Principal"
-  description: "Research programme on revenue and risk for a carbon-retirement intermediary."
+  description: "Revenue and risk for a carbon-retirement intermediary."
   navbar:
     left:
       - href: index.qmd

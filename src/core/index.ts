@@ -1,7 +1,5 @@
-// Barrel export for the OJS-facing API. The Simulator page's OJS cells
-// import from the compiled form of this file at
-// report/lib/compiled/src/core/index.js so the browser runs the same code
-// the Vitest suite covers.
+// OJS-facing barrel. The Simulator's OJS imports from the compiled form at
+// report/lib/compiled/src/core/index.js.
 
 export { mulberry32 } from "./rng.js";
 export type { Rng } from "./rng.js";

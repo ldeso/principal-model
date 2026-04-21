@@ -18,26 +18,22 @@ describe("expm1OverX", () => {
     }
   });
 
-  it("is smooth across the series threshold (both sides ≈ 1)", () => {
-    // |x| of order 1e-8 → analytic value within 1e-8 of 1. Test that the
-    // branch split at |x| < 1e-8 doesn't introduce a discontinuity larger
-    // than the expected linear-term contribution.
+  it("is smooth across the series threshold", () => {
     const left = expm1OverX(1.1e-8);
     const right = expm1OverX(9e-9);
     expect(Math.abs(left - 1)).toBeLessThan(1e-7);
     expect(Math.abs(right - 1)).toBeLessThan(1e-7);
-    // Difference is O(|x_left − x_right|) = O(2e-9).
     expect(Math.abs(left - right)).toBeLessThan(1e-8);
   });
 });
 
 describe("Dufresne moments", () => {
-  it("E[I_T] → S_0 · T as μ → 0", () => {
+  it("E[I_T] → S_0·T as μ → 0", () => {
     expect(expectedIt(1, 0, 3)).toBeCloseTo(3, 12);
     expect(expectedIt(2.5, 1e-12, 1.5)).toBeCloseTo(2.5 * 1.5, 10);
   });
 
-  it("E[I_T] matches the Dufresne closed form for μ ≠ 0", () => {
+  it("E[I_T] matches Dufresne for μ ≠ 0", () => {
     const S0 = 1.3;
     const mu = 0.08;
     const T = 2;
@@ -45,7 +41,7 @@ describe("Dufresne moments", () => {
     expect(expectedIt(S0, mu, T)).toBeCloseTo(expected, 12);
   });
 
-  it("Var[I_T] = 0 when σ = 0 regardless of μ, S_0, T", () => {
+  it("Var[I_T] = 0 when σ = 0", () => {
     for (const mu of [-0.1, 0, 0.05, 0.2]) {
       for (const S0 of [0.5, 1, 3.2]) {
         for (const T of [0.5, 1, 2]) {
@@ -60,7 +56,7 @@ describe("Dufresne moments", () => {
     expect(varianceIt(1, 0, 0.8, 2)).toBeGreaterThan(0);
   });
 
-  it("matches the bundled gbmMoments helper", () => {
+  it("matches gbmMoments helper", () => {
     const m = gbmMoments(1.4, 0.07, 0.55, 1.25);
     expect(m.mean).toBe(expectedIt(1.4, 0.07, 1.25));
     expect(m.variance).toBe(varianceIt(1.4, 0.07, 0.55, 1.25));

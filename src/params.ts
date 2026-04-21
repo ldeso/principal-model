@@ -5,43 +5,36 @@ export interface Params {
   mu: number;
   /** GBM volatility (annualised). */
   sigma: number;
-  /** Protocol price kVCM/tonne, constant. */
+  /** kVCM per tonne. */
   P: number;
-  /** Retirement flow, tonnes per unit time. */
+  /** Retirement flow, tonnes / unit time. */
   lambda: number;
-  /** Horizon (same time unit as μ, σ, λ). */
+  /** Horizon. */
   T: number;
   /** Fee rate. */
   f: number;
-  /** Fixed USD quote per tonne (principal model). */
+  /** Fixed USD quote per tonne. */
   Q: number;
-  /** Pre-purchase fraction for the partial variant ∈ [0, 1]; α = 1 ↔ matched, α = 0 ↔ back-to-back. */
+  /** Coverage fraction ∈ [0, 1]; α = 1 ↔ matched, α = 0 ↔ b2b. */
   alpha: number;
 
-  /** Syndicated-variant external cession fraction of the (1−α) stochastic leg; 0 ⇒ no
-   *  syndication and Π_ret ≡ Π_α. */
+  /** Cession fraction of the b2b operating book. */
   beta: number;
-  /** Syndicated-variant counterparty risk-load multiplier θ ≥ 0. θ = 0 ⇒ fair premium. */
+  /** Counterparty risk load θ ≥ 0; 0 ⇒ fair premium. */
   premiumLoad: number;
-  /** Syndicated-variant load basis: `"sharpe"` multiplies θ·SD[Π_b2b]; `"cvar"` multiplies
-   *  the Gaussian-CVaR95 proxy ≈ 2.063·SD[Π_b2b]. */
+  /** Load basis: `sharpe` ⇒ θ·SD; `cvar` ⇒ Gaussian-CVaR95 ≈ 2.063·SD. */
   premiumMode: "sharpe" | "cvar";
 
-  /** Switching-variant upper threshold ratio h = H/S0. The book's mode is a pure
-   *  state function of S_t: fee pricing whenever S_t ≥ h·S0, b2b pricing whenever
-   *  S_t < h·S0. h = Infinity disables the switch (falls back to the syndicated
-   *  retained book); h ≤ 1 starts the book in fee mode at t = 0. */
+  /** Threshold ratio h = H/S₀; Infinity disables; h ≤ 1 starts in fee mode. */
   barrierRatio: number;
-  /** Switching-variant fee rate applied to every fee-mode interval. `null`
-   *  locks it to `f` (zero-config path); a number sets it independently for the
-   *  "richer markup while in fee mode" research lever. */
+  /** Fee-mode fee rate; `null` ⇒ locked to `f`. */
   feePost: number | null;
 
-  /** Merton jump intensity (expected jumps per unit time). 0 ⇒ pure GBM. */
+  /** Merton intensity (/yr); 0 ⇒ pure GBM. */
   lambdaJ: number;
-  /** Mean of log-jump size. */
+  /** Mean log-jump. */
   muJ: number;
-  /** SD of log-jump size. */
+  /** Log-jump SD. */
   sigmaJ: number;
 
   nPaths: number;
@@ -49,11 +42,9 @@ export interface Params {
   seed: number;
 }
 
-// Defaults for μ, σ, λ_J, μ_J, σ_J are calibrated from the kVCM daily series
-// in report/data/kvcm-historical.json via a 5σ-bulk Merton split (the "low
-// volume / low liquidity" regime of the model). S0, P, Q, f, λ, T, α remain
-// at their scale-free research-note values so the closed-form identities in
-// test/models.test.ts stay numerically convenient.
+// μ, σ, λ_J, μ_J, σ_J: calibrated from report/data/kvcm-historical.json
+// (5σ-bulk Merton split). S0, P, Q, f, λ, T, α at scale-free research-note
+// values.
 export const defaultParams: Params = {
   S0: 1.0,
   mu: -0.1,

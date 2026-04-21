@@ -89,7 +89,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
   if (params.lambdaJ > 0) {
     console.log(
       `  jumps: λ_J=${params.lambdaJ}  μ_J=${params.muJ}  σ_J=${params.sigmaJ}` +
-        `  (closed-form SD columns remain the GBM anchor)`,
+        `  (cf SD = GBM anchor)`,
     );
   }
 
@@ -219,7 +219,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
   return report;
 }
 
-// Sweep grid driving the Validation page's sliders; fewer paths for speed.
+// Sweep grid for the Validation sliders.
 const SWEEP_ALPHAS = [0, 0.25, 0.5, 0.75, 1];
 const SWEEP_MUS = [-0.1, 0, 0.05, 0.1, 0.2];
 const SWEEP_SIGMAS = [0.2, 0.5, 0.8, 1.2];
@@ -292,11 +292,7 @@ function runSweep(baseParams: Params): unknown {
   };
 }
 
-// Switching-variant threshold sweep: the operator-decision chart (CVaR₉₅
-// and E[Π] vs h) is derived from these cells. Infinity = "switch disabled",
-// which anchors the curve to the operating-retained reference. Kept
-// separate from SWEEP_ALPHAS/MUS/SIGMAS so we don't blow up the (α, μ, σ)
-// grid into a 4-dim product.
+// Threshold sweep; Infinity ⇒ switch disabled (retained anchor).
 const SWEEP_BARRIERS = [1.0, 1.1, 1.25, 1.5, 2.0, Infinity];
 
 function runSwitchingSweep(baseParams: Params): unknown {
@@ -322,9 +318,7 @@ function runSwitchingSweep(baseParams: Params): unknown {
     cells.push({
       h,
       switching: r.switching ?? null,
-      // `row` is the switching operating book when the threshold is active; at
-      // h = Infinity we anchor to the retained operating book so the sweep
-      // plot still has a comparable "no-switch" reference.
+      // h = Infinity ⇒ fall back to retained for a comparable anchor.
       row: cellMetrics("switching") ?? cellMetrics("retained"),
       retained: cellMetrics("retained"),
       b2b: cellMetrics("b2b"),
@@ -338,11 +332,7 @@ function runSwitchingSweep(baseParams: Params): unknown {
 const QSTAR_MUS = [-0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];
 const QSTAR_TS = [0.25, 0.5, 1, 2, 3];
 
-// Canonical Merton overlay used to verify the compensated-Merton section of
-// research-note.md: the compensated drift keeps every closed-form *mean*
-// identical to the GBM anchor even with fat, negatively-biased jumps. Fixed
-// parameters so the Validation-page verification table is stable across
-// reruns.
+// Canonical Merton overlay; fixed for stable Validation-page output.
 const JUMP_CHECK: { lambdaJ: number; muJ: number; sigmaJ: number } = {
   lambdaJ: 3,
   muJ: -0.1,
@@ -350,8 +340,6 @@ const JUMP_CHECK: { lambdaJ: number; muJ: number; sigmaJ: number } = {
 };
 
 function runJumpCheck(baseParams: Params): unknown {
-  // Rerun with the canonical overlay; reuse the caller's seed/nPaths/nSteps so
-  // the MC noise bands match the main-run scale.
   const jumpParams = withOverrides(baseParams, JUMP_CHECK);
   const r = buildReport(jumpParams, { keepPaths: 0, traceSize: 0, histBins: 0 });
   return {
@@ -400,7 +388,7 @@ function printJumpCheck(check: unknown): void {
     `\nCompensated Merton overlay (λ_J=${lambdaJ}, μ_J=${muJ}, σ_J=${sigmaJ})`,
   );
   console.log(
-    "  means still match the GBM closed form; SD inflates; see the compensated Merton section of research-note.md",
+    "  means match GBM closed form; SD inflates (see research-note.md).",
   );
   console.log(
     "  book           E[Π] gbm-cf   E[Π] merton   ±CI95          SD gbm-cf    SD merton     z",

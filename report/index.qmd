@@ -10,7 +10,6 @@ format:
 
 ```{=html}
 <style>
-  /* Drawable custom-curve widget — landing page only. */
   .pc-curve-box { border: 1px solid #ddd; border-radius: 8px; background: #fafafa; padding: 0.75rem 1rem 1rem; margin: 0.75rem 0; }
   .pc-curve-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.6rem; align-items: center; }
   .pc-curve-toolbar button { padding: 0.3rem 0.7rem; border: 1px solid #888; background: #fff; color: #111; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
@@ -20,126 +19,78 @@ format:
 </style>
 ```
 
-A carbon-retirement intermediary retires carbon credits for its
-clients by buying kVCM tokens on the open market and burning them.
-Two pricing choices frame the business: pass the token cost through
-and add a **fee** (no balance-sheet exposure), or quote a **fixed USD
-price** up front and absorb the token risk on the **principal** book.
-The two choices produce different revenue distributions, and once the
-principal book is chosen the shape of its loss tail is an active
-design decision.
+A carbon-retirement intermediary buys kVCM tokens and burns them on
+behalf of clients. Pricing is either **fee** (markup pass-through, no
+exposure) or **principal** (fixed USD quote, balance-sheet exposure).
+Once principal is chosen, the shape of its loss tail becomes a design
+parameter.
 
 ## Three findings
 
-The [Model](model.qmd) page derives each claim in full; what follows
-is the shape-of-the-answer.
+Derivations: [Model](model.qmd).
 
 ### Fee and b2b share a kernel but not a sign
 
-Fix $Q$ at the break-even level $Q^*$ and the fee and b2b operating
-books have identical expected P&L. Their distributions are near
-mirror images, though: both are linear in the shared random kernel
-$I_T = \int_0^T S_t \, dt$, but fee enters with a plus (revenue,
-bounded below by zero) and b2b with a minus (upside capped at $Q
-N$, downside unbounded). Matching means does not match distributions
-— at $Q^*$ the b2b book has paid for a loss tail the fee book does
-not carry.
+At $Q = Q^*$ the two operating books have equal expected P&L. Both
+are linear in $I_T = \int_0^T S_t \, dt$, but fee enters with sign
+$+$ (revenue, $\ge 0$) and b2b with sign $-$ (upside capped at $Q N$,
+downside unbounded). Moment equalisation is not distributional
+equalisation.
 
 ### The treasury cancels b2b's $I_T$ term when fully matched
 
-With retirement flow $\lambda$ tonnes per unit time and total tonnes
-$N = \lambda T$, buying the full $N P$ tokens at $t = 0$ gives a
-treasury whose consumption integral contributes $+ P \lambda I_T$ to
-desk P&L — exactly opposite to b2b's $- P \lambda I_T$. The sum
-collapses to the deterministic $N(Q - P S_0)$. Partial pre-purchase
-$(k, C_{\mathrm{basis}})$ — inventory notional $k$ in kVCM and sunk
-USD basis $C_{\mathrm{basis}}$ — leaves a tail $J_\alpha =
-\int_{\alpha T}^T S_t \, dt$ uncancelled, where the coverage fraction
-$\alpha = \min(1, k / (N P))$ is the share of retirements the
-treasury can source from inventory; the desk SD shrinks with the
-length of the covered window $[0, \alpha T]$, and $C_{\mathrm{basis}}$
-translates the distribution without changing its shape. Quota-share
-syndication of the b2b operating book is a second, multiplicative
-dial: ceding a fraction $\beta$ to a counterparty against an up-front
-premium collapses variance as $(1 - \beta)^2$, and at the actuarially
-fair premium (counterparty risk load $\theta = 0$) cession preserves
-expected P&L. Risk managers should track coverage and cession
-separately from the unrealised P&L on held tokens.
+Pre-buy $k = N P$ tokens at basis $C_{\mathrm{basis}} = N P S_0$:
+treasury consumption contributes $+ P \lambda I_T$, exactly
+cancelling b2b's $- P \lambda I_T$. Desk P&L collapses to $N(Q - P S_0)$.
+Partial coverage $\alpha = \min(1, k / (N P))$ leaves the uncovered
+tail $J_\alpha = \int_{\alpha T}^T S_t \, dt$. Quota-share syndication
+of b2b at cession $\beta$ scales variance by $(1 - \beta)^2$; at the
+actuarially fair premium ($\theta = 0$), $\mathbb{E}[\Pi_{\mathrm{ret}}]$
+is $\beta$-invariant.
 
 ### A threshold truncates the tail rather than rescaling it
 
-Pre-buying and syndication multiply the loss tail by a constant.
-Switching pricing to the fee book whenever the token sits above an
-upper threshold $H = h \cdot S_0$ (with threshold multiple $h \ge 1$)
-caps every retirement done in fee mode at non-negative revenue, so
-the tail is bounded rather than scaled. The switch is symmetric —
-fee mode whenever $S_t \ge H$, b2b mode whenever $S_t$ falls back
-below — so a price rally followed by a retrace returns the book to
-b2b exposure, and a volatile path near $H$ may cross the threshold
-many times. Under the default calibration and $h = 1.25$ the switch
-collapses $\mathrm{CVaR}_{95}$ — the mean loss in the worst 5 % of
-paths — materially below the b2b reference while *raising* expected
-P&L; tightening $h$ toward 1 truncates harder, but re-entries into
-b2b mode temper the cap. The three levers — capital (via the
-treasury), counterparty credit ($\beta$), market timing ($h$) —
-compose multiplicatively and consume distinct resources; together
-they close the asymmetry the first finding identifies. Every symbol
-above is defined in the [Model page's setup and notation
-section](model.qmd#setup-and-notation).
+Switching pricing to fee whenever $S_t \ge H = h S_0$ caps every
+retirement done in fee mode at non-negative revenue. The switch is
+symmetric in $H$: re-entries below $H$ resume b2b exposure, so a
+volatile path near $H$ may cross repeatedly. Under defaults at $h =
+1.25$, $\mathrm{CVaR}_{95}$ falls materially below the b2b reference
+while $\mathbb{E}[\Pi]$ rises. Tightening $h$ cuts the tail harder
+but amplifies re-entry. Symbols: [setup and notation](model.qmd#setup-and-notation).
 
 ---
 
 ## Testing a specific trajectory
 
-The findings above describe *averages* over all GBM futures.
-Scenarios that pin down a specific narrative — *token halves at
-mid-year*, *replay the last twelve months of kVCM* — read more
-naturally off a single realised path. Draw one below (click and
-drag); every book's deterministic P&L recomputes against the
-comparable Monte Carlo mean in real time. Toolbar presets cover the
-common shapes, including a historical-replay when the kVCM series has
-been fetched.
+The findings average over GBM futures. Specific scenarios (mid-year
+crash, historical replay) read off a single realised path. Draw one
+below; every book's deterministic P&L recomputes against its MC mean.
 
 ::: {.callout-note appearance="simple"}
 ## How the drawn curve enters the books
 
-Your samples define a base path. The noise slider sets
-$\sigma^2_{\mathrm{noise}} \ge 0$, the annualised variance of an
-additive log-normal shock layered on top of the base curve (a
-robustness dial distinct from the GBM volatility $\sigma$ that drives
-the comparison Monte Carlo); $\sigma^2_{\mathrm{noise}} > 0$ activates
-the overlay, seeded by the PRNG slider for reproducibility. From the
-realised path we compute $I_T$, the coverage-uncovered tail integral
-$J_\alpha = \int_{\alpha T}^T S_t \, dt$, and the switching split
-$I_{\mathrm{b2b}} = \int_0^T \mathbf{1}\{S_t < H\} \, S_t \, dt$ and
-$I_{\mathrm{fee}} = I_T - I_{\mathrm{b2b}}$ against the threshold
-$H = h \cdot S_0$ — all by trapezoid rule — plus $S_T$ as the last
-sample. These are the same quantities every book on the
-[Simulator](simulator.qmd) consumes. Leave noise at zero to read
-deterministic P&L off the curve; raise it to see how robust a
-narrative is to typical day-to-day jitter.
+The drawing defines a base path. Setting $\sigma^2_{\mathrm{noise}} >
+0$ activates an additive log-normal shock (distinct from the GBM
+$\sigma$ driving the comparison MC), seeded by the PRNG slider. From
+the realised path, trapezoid rule computes $I_T$, the uncovered tail
+$J_\alpha$, and the switching split against $H = h S_0$, plus $S_T$.
+These feed every book on the [Simulator](simulator.qmd).
 :::
 
 ### Presets
 
-Each button installs a starting shape; refine by hand after clicking.
-
-- **Flat @ $S_0$** — constant path. Under $\mu = 0$ this is the GBM
-  mean, so the three book P&Ls should land near their MC means.
-- **Linear ±50%** — calibrates how drift moves each book.
-- **Crash @ ½T** — mid-year collapse; informative when coverage falls
-  just inside the uncovered window.
-- **Spike @ ⅓T** — brief rally the back-to-back book has to source
-  through.
-- **Random walk** — a hand-drawn GBM approximation, reference only.
-- **Historical** — the real kVCM series from `data/kvcm-historical.json`
-  when populated by `npm run fetch:prices`; disabled otherwise.
+- **Flat @ $S_0$** — constant path.
+- **Linear ±50%** — drift sensitivity.
+- **Crash @ ½T** — mid-horizon collapse.
+- **Spike @ ⅓T** — brief rally.
+- **Random walk** — hand-drawn GBM.
+- **Historical** — kVCM series from `data/kvcm-historical.json`
+  (populated by `npm run fetch:prices`).
 
 ```{ojs}
 //| echo: false
 historicalPrices = {
-  // Fetched at build time by `npm run fetch:prices` (Alchemy Prices API).
-  // Missing or empty file ⇒ the "Historical" preset below is inert.
+  // Fetched at build by `npm run fetch:prices` (Alchemy Prices API).
   try {
     const r = await fetch("data/kvcm-historical.json");
     if (!r.ok) return { data: [] };
@@ -152,12 +103,9 @@ historicalPrices = {
 
 ```{ojs}
 //| echo: false
-// "Today" anchor for the custom-curve x-axis. Prefers the fetchedAt
-// timestamp baked into kvcm-historical.json by `npm run fetch:prices`
-// so the rightmost tick reflects build time rather than page-open
-// time; falls back to the current date if the build-time fetch is
-// missing. Captured once per page load so ticks don't shift while the
-// document is open.
+// X-axis anchor: prefer the fetchedAt timestamp from
+// kvcm-historical.json; fall back to the current date. Captured once
+// per page load.
 buildDate = {
   const iso = historicalPrices && historicalPrices.fetchedAt;
   if (iso) {
@@ -171,10 +119,9 @@ buildDate = {
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Inputs
 
-Inventory, contract, horizon, and the price process (drift, variance,
-and optional Merton jumps) driving the comparison Monte Carlo. Jumps
-are off by default — Poisson jump intensity $\lambda_J = 0$ jumps per
-year; see the [Simulator](simulator.qmd) for a wider-ranging sweep.
+Inventory, contract, horizon, and price process parameters. Jumps
+off by default ($\lambda_J = 0$). See [Simulator](simulator.qmd) for
+wider ranges.
 
 ### Price process
 
@@ -236,9 +183,8 @@ viewof cBasis = Inputs.range([0, 1000000], { step: 100, value: 21000, label: "in
 
 ```{ojs}
 //| echo: false
-// Step = 1 (not 5): a coarser step causes a range-input snap when the
-// value is set to `history.length - 1`, inflating nPoints past the
-// available history and leaving a non-historical fill at the left edge.
+// Step = 1 avoids a range-input snap when setting value to
+// history.length - 1.
 viewof Tdays = {
   const hist = (historicalPrices && Array.isArray(historicalPrices.data))
     ? historicalPrices.data
@@ -292,8 +238,7 @@ viewof barrierRatioSlider = Inputs.range([1, 3], { step: 0.01, value: 1.25, labe
 
 ```{ojs}
 //| echo: false
-// Disabling the switch drives the effective threshold to Infinity regardless
-// of the slider value; the scorecard row and the threshold line disappear.
+// Disabled switch ⇒ barrier Infinity.
 barrierRatio = switchOn ? barrierRatioSlider : Infinity
 ```
 
@@ -309,8 +254,7 @@ viewof feePostSlider = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fe
 
 ```{ojs}
 //| echo: false
-// null when locked (simulateSwitching interprets this as "use inputs.fee");
-// a numeric value when the user wants an independent fee-mode rate.
+// null ⇒ simulateSwitching uses inputs.fee.
 feePost = feePostLocked ? null : feePostSlider
 ```
 
@@ -403,9 +347,8 @@ derived = {
 
 ```{ojs}
 //| echo: false
-// Self-contained comparison MC for the drawn-curve table. Drift,
-// variance, and jump parameters come from the sidebar; nPaths / nSteps
-// stay pinned at the Simulator's defaults.
+// Comparison MC for the drawn-curve table. Params from sidebar;
+// nPaths / nSteps pinned at Simulator defaults.
 run = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
@@ -435,9 +378,8 @@ run = {
 
 ```{ojs}
 //| echo: false
-// Switching-book MC sibling. Shares `seed` with `run` so the GBM path draws
-// coincide bit-for-bit. The switching book is a pure operating book —
-// matched-desk composition (switching + treasury) is deferred to Validation.
+// Shares `seed` with `run`; switching + treasury composition deferred
+// to Validation.
 switchRun = {
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
@@ -455,10 +397,8 @@ switchRun = {
 ```{ojs}
 //| echo: false
 viewof customCurve = {
-  // One sample per day. The rightmost point is the build-time anchor
-  // (values[nPoints-1] = today) and the leftmost is (Tdays) days ago,
-  // so moving the horizon slider extends or trims the left edge
-  // without reshaping the already-drawn right edge.
+  // One sample per day. Rightmost point = build-time anchor; leftmost
+  // = Tdays ago.
   const TDaysVal = Tdays;
   const nPoints = TDaysVal + 1;
   const width = 820;
@@ -479,11 +419,8 @@ viewof customCurve = {
   const muJVal = muJ;
   const sigmaJVal = sigmaJ;
 
-  // Persist the drawn curve indexed by days-ago (0 = build-time anchor)
-  // so shrinking and regrowing the horizon restores the previously
-  // drawn samples at the leftmost part of the curve. NaN marks "never
-  // drawn" so π₀/P slider changes still refresh the initial fill (via
-  // the derived S₀) for days that haven't been touched.
+  // Persist drawn curve by days-ago (0 = build-time anchor). NaN =
+  // "never drawn" so π₀/P changes refresh the fill via derived S₀.
   const MAX_TDAYS = 1095;
   const masterKey = "__findingsCustomCurveByDaysAgo";
   let master = window[masterKey];
@@ -493,17 +430,13 @@ viewof customCurve = {
     window[masterKey] = master;
   }
 
-  // "random" means the Random path preset is live: a slider nudge
-  // regenerates the path + cloud from the current params. Anything
-  // else (drawn curves, other presets, Historical) stays put when
-  // the jump sliders move. Persisted in window so the flag survives
-  // cell re-runs.
+  // "random": slider nudges regenerate path + cloud. Otherwise the
+  // curve stays put when jump sliders move. Persisted in `window` so
+  // the flag survives cell re-runs.
   const modeKey = "__findingsCustomCurveMode";
   if (typeof window[modeKey] !== "string") window[modeKey] = "custom";
 
-  // Seed the canvas with the historical series on first page load. The
-  // one-shot window flag is required: without it, every slider-driven
-  // re-run of this cell would overwrite user edits.
+  // Seed the canvas with the historical series on first load.
   const seededKey = "__findingsCustomCurveSeeded";
   if (!window[seededKey]) {
     window[seededKey] = true;
@@ -522,13 +455,9 @@ viewof customCurve = {
     values[i] = isNaN(stored) ? S0Val : stored;
   }
 
-  // Sample cloud built the same way as the simulator page: one
-  // mulberry32(seed) stream, samplePath consumed sequentially
-  // (mirrors src/core/simulate-run.ts:81, 103-104), so identical
-  // (seed, μ, σ, λ_J, μ_J, σ_J, T, S₀) produce identical clouds on
-  // both pages. Path 0 is the one the Random path preset promotes to
-  // the drawn (orange) curve — same convention as the simulator's
-  // highlighted first path.
+  // Mirrors simulator's mulberry32(seed) + samplePath; same
+  // (seed, μ, σ, λ_J, μ_J, σ_J, T, S₀) yield identical clouds on
+  // both pages. Path 0 is promoted to the drawn curve by "Random path".
   const N_CLOUD = 20;
   const cloudRng = mulberry32(seedVal);
   const cloud = new Array(N_CLOUD);
@@ -822,9 +751,7 @@ viewof customCurve = {
     });
   });
   addButton("Random path", () => {
-    // Set the mode before the seed dispatch: the triggered cell re-run
-    // reads modeKey during init and regenerates the cloud + path 0
-    // from the new seed. Keeps a single regeneration codepath.
+    // Set mode before seed dispatch so the re-run reads modeKey at init.
     window[modeKey] = "random";
     const newSeed = 1 + Math.floor(Math.random() * 9999);
     const seedView = viewof seed;
@@ -836,19 +763,14 @@ viewof customCurve = {
   historicalBtn.textContent = history.length >= 2 ? "Historical" : "Historical (unavailable)";
   historicalBtn.disabled = history.length < 2;
   historicalBtn.addEventListener("click", () => {
-    // Flag must be set before the Tdays dispatch so the re-run picks
-    // it up and skips random-path regeneration.
+    // Flag before Tdays dispatch; right-align the daily series.
     window[modeKey] = "custom";
-    // Right-align the daily historical series: the most recent sample
-    // lands on today (rightmost point) and earlier samples fill back
-    // in toward the left.
     const dayCount = history.length;
     const targetTdays = Math.max(30, Math.min(MAX_TDAYS, dayCount - 1));
     const tdaysView = viewof Tdays;
 
     if (Number(tdaysView.value) !== targetTdays) {
-      // Stash the series into master so the cell's re-run — triggered
-      // by the Tdays change below — picks it up without a second fill.
+      // Stash into master before triggering the Tdays re-run.
       for (let daysAgo = 0; daysAgo <= targetTdays; daysAgo++) {
         master[daysAgo] = history[dayCount - 1 - daysAgo].value;
       }
@@ -857,7 +779,7 @@ viewof customCurve = {
       return;
     }
 
-    // Idempotent re-click: Tdays already at target, so redraw in place.
+    // Re-click at current Tdays: redraw in place.
     for (let i = 0; i < nPoints; i++) {
       const daysAgo = nPoints - 1 - i;
       values[i] = history[dayCount - 1 - daysAgo].value;
@@ -966,18 +888,12 @@ customScenario = {
 }
 ```
 
-_Orange: the base curve you drew. Blue (shown only when
-$\sigma^2_{\mathrm{noise}} > 0$): the noisy realised path fed into the
-integrals, overlaid. Cycle the PRNG seed slider for different noise
-realisations on the same base._
+_Orange: drawn base. Blue ($\sigma^2_{\mathrm{noise}} > 0$): noisy
+realised path._
 
 ### Carbon price on the drawn path
 
-The same drawn/realised path rescaled to USD per tonne
-($\pi_t = S_t \cdot P$) — the unit the contract quotes in. Today $P$ is
-a constant slider, so the curve shape matches the canvas; the cell is
-written as $S_t \cdot P(t)$ so a future variable-$P$ conversion drops in
-without changing the chart.
+Same path rescaled to $\pi_t = S_t \cdot P$ (USD / tonne).
 
 ```{ojs}
 //| echo: false
@@ -987,9 +903,6 @@ carbonPriceRecords = {
   const hasNoise = sigmaN > 0;
   const hasCloud = (lambdaJ > 0) || (derived.sigma > 0);
   const dtDays = Tdays / (nPoints - 1);
-  // Local conversion. Today P is a constant slider, so price-per-tonne
-  // is a straight rescale of S_t. Written as a helper so a future
-  // time-varying P_k drops in without touching the plot.
   const toTonne = (s) => s * P;
 
   const baseRows = new Array(nPoints);
@@ -1001,9 +914,8 @@ carbonPriceRecords = {
     }
   }
 
-  // Rebuild the 20-path cloud the same way as the canvas cell
-  // (viewof customCurve, above) so the chart's grey cloud is bit-identical
-  // to the canvas overlay under the same (seed, μ, σ, λ_J, μ_J, σ_J).
+  // Same construction as the canvas cell; bit-identical under equal
+  // (seed, μ, σ, λ_J, μ_J, σ_J).
   const cloudRows = [];
   if (hasCloud) {
     const N_CLOUD = 20;
@@ -1066,22 +978,14 @@ Plot.plot({
 })
 ```
 
-_Orange: drawn base rescaled by $P$. Blue: noise-realised path (when
-$\sigma^2_{\mathrm{noise}} > 0$). Grey: twenty sampled GBM trajectories
-(when $\sigma > 0$ or $\lambda_J > 0$). Green dashed rule:
-inventory-exhaustion time $\alpha T$. Maroon dashed rule (when
-switching is enabled): threshold in price-per-tonne units, $\pi_H =
-h \cdot S_0 \cdot P$ — the book runs in fee mode whenever the
-realised path is above that line._
+_Orange: drawn, rescaled by $P$. Blue: noise-realised path.
+Grey: 20 GBM samples. Green dashed: $\alpha T$.
+Maroon dashed: $\pi_H = h S_0 P$ (fee mode above this line)._
 
 ### P&L over time on the drawn path
 
-Each book's deterministic P&L accrued up to time $t$ along the
-drawn/realised path. The rightmost point of each series reconciles with
-the `P&L on drawn curve` column of the table below. The custom book
-shows the characteristic kink at $\alpha T$ (inventory exhaustion); the
-switching book (when $h < 3$) shows a second kink at $\tau$, the moment
-the barrier is first crossed.
+Cumulative P&L along the realised path. Custom-desk kink at $\alpha
+T$; switching-book kink at $\tau$.
 
 ```{ojs}
 //| echo: false
@@ -1093,8 +997,7 @@ pnlOverTime = {
   const dtDays = Tdays / (nPoints - 1);
   const N = derived.N;
 
-  // Keep the αT breakpoint identical to customScenario so the terminal custom
-  // desk matches the table's `customDesk` to FP noise.
+  // Same αT breakpoint as customScenario so the terminal desk matches.
   const tauFrac = (lam > 0 && P > 0)
     ? Math.min(1, kPre / (lam * P * T))
     : 1;
@@ -1106,14 +1009,12 @@ pnlOverTime = {
   const switchLabel = `switching (h=${barrierRatio.toFixed(2)})`;
   const fPost = feePost ?? fee;
 
-  // Cumulative state updated in lockstep with k.
   let I = 0;
   let Ib2b = 0;
   let Ifee = 0;
   let tB2b = 0;
   let tFee = 0;
 
-  // Treasury opens at MTM at t = 0; operating books all start at 0.
   const treasuryOpen = kPre * derived.S0 - cBasis;
 
   const rows = [];
@@ -1126,9 +1027,8 @@ pnlOverTime = {
       else            { Ib2b += piece; tB2b += dt; }
     }
 
-    // Edge-weighted tail integral on [tailStartIdx, k]. Zero-width
-    // (k === tailStartIdx) collapses to 0. O(nPoints²) overall but
-    // nPoints ≤ 1096, so fine.
+    // Edge-weighted tail integral on [tailStartIdx, k]; O(nPoints²)
+    // but nPoints ≤ 1096.
     let tailIk = 0;
     if (k > tailStartIdx && tailStartIdx < nPoints) {
       for (let j = tailStartIdx; j <= k; j++) {
@@ -1200,21 +1100,14 @@ Plot.plot({
 })
 ```
 
-_Each line traces one book's deterministic cumulative P&L along the drawn
-(or noise-realised) path. Operating books start at 0; the treasury opens at
-its MTM $k \cdot S_0 - C_{\mathrm{basis}}$. Green dashed rule:
-inventory-exhaustion time $\alpha T$. The switching series appears only
-when switching is enabled; its slope alternates between the b2b and fee
-regimes every time the drawn path crosses $H = h \cdot S_0$ in either
-direction._
+_Operating books start at 0; treasury opens at MTM $k S_0 -
+C_{\mathrm{basis}}$. Green dashed: $\alpha T$. Switching slope
+alternates at each $H = h S_0$ crossing._
 
 ### Deterministic P&L on the drawn path
 
-The cards below report one-point statistics of the realised curve
-(min/max, its mean $I_T / T$, terminal $S_T$, the coverage-uncovered
-tail integral). The table then gives each book's P&L on that curve
-next to its MC mean; the diff column is the headline stress-test
-number. The switching row appears only when switching is enabled.
+Per-curve one-point statistics; the table pairs drawn-curve P&L with
+the MC mean.
 
 ```{ojs}
 //| echo: false
@@ -1234,7 +1127,6 @@ customRows = [
   { book: "retained (syndicated-on-b2b)", pnl: customScenario.retainedOp, mcMean: run.retained.mean,   diff: customScenario.retainedOp - run.retained.mean },
   { book: "treasury",                     pnl: customScenario.treasury,   mcMean: run.treasury.mean,   diff: customScenario.treasury   - run.treasury.mean },
   { book: "custom desk = b2b + treasury", pnl: customScenario.customDesk, mcMean: run.customDesk.mean, diff: customScenario.customDesk - run.customDesk.mean },
-  // Switching row only when the threshold is active, matching simulator.qmd.
   ...(switchOn
     ? [{
         book: `switching (h=${barrierRatio.toFixed(2)})`,
@@ -1264,30 +1156,16 @@ Inputs.table(customRows, {
 })
 ```
 
-_**drawn**: deterministic P&L implied by the sketched trajectory.
-**MC mean**: $\mathbb{E}[\Pi]$ from a self-contained Monte Carlo at
-fixed defaults ($\mu = 0.05$, $\sigma^2 = 0.25$, no jumps, 5,000
-paths). **diff** = drawn − MC mean: how this scenario deviates from
-the average GBM future._
+_**drawn**: P&L on the sketched path. **MC mean**: $\mathbb{E}[\Pi]$
+at defaults ($\mu = 0.05$, $\sigma^2 = 0.25$, no jumps, 5,000 paths).
+**diff** = drawn − MC mean._
 
-**Reading the diff column.** A negative diff on `custom desk` is the
-stress-test signal — the token was pricier over the uncovered
-window $[\alpha T, T]$ than GBM expects on average. Diffs near zero
-mean the drawn curve is a typical GBM path, and at full coverage
-($k = NP$, $C_{\mathrm{basis}} = NP \cdot S_0$) the custom desk
-collapses to the deterministic matched total and is insensitive to
-the curve by construction. The retained row applies the $(1 - \beta)$
-cession dial to the b2b operating book and adds the MC-priced
-premium; the switching row is only meaningful when the drawn path
-crosses $H = h \cdot S_0$ and is hidden when the switch is off.
-Enable switching and draw a path that rallies above $H$ then
-retraces — the switching P&L reflects both regimes in turn as the
-indicator flips.
+Negative diff on `custom desk` indicates the token was pricier over
+$[\alpha T, T]$ than GBM expects on average. At full coverage the
+desk is path-insensitive.
 
 ## Scope
 
-GBM baseline with an optional compensated Merton jump overlay;
-retirement demand deterministic. Gas, on-chain slippage, discounting,
-and credit sit outside the model — the [Model page's limitations
-table](model.qmd#limitations-and-next-steps) is authoritative.
-Outputs are illustrative, not forecasts.
+GBM baseline with optional Merton jumps; deterministic demand. See
+[limitations](model.qmd#limitations-and-next-steps). Outputs are
+illustrative, not forecasts.
