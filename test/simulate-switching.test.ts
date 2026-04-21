@@ -197,7 +197,24 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
     }
   });
 
-  it("MC E[first-crossing ∧ T] = mean tB2b matches expectedHittingTime within 4·stderr", () => {
+  it("firstCrossTimeSamples equals tB2bSamples path-by-path under one-way", () => {
+    // Under one-way the book latches at the first crossing, so the b2b
+    // occupation time is itself the first-crossing time (or T if no
+    // crossing). The two arrays should agree to machine precision.
+    const p = {
+      ...base, switchMode: "one-way" as const,
+      barrierRatio: 1.2, nPaths: 500, nSteps: 500, seed: 13,
+    };
+    const r = simulateSwitching(p);
+    for (let i = 0; i < r.tB2bSamples.length; i++) {
+      expect(r.firstCrossTimeSamples[i]).toBeCloseTo(
+        r.tB2bSamples[i] as number,
+        12,
+      );
+    }
+  });
+
+  it("MC E[first-crossing ∧ T] matches expectedHittingTime within 4·stderr", () => {
     const cases = [
       { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.5, mu: 0.0, sigma: 0.5, T: 1.5 },
@@ -209,7 +226,7 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
         nPaths: 20_000, nSteps: 1_000,
       };
       const r = simulateSwitching(p);
-      const s = summarize(r.tB2bSamples);
+      const s = summarize(r.firstCrossTimeSamples);
       const cfT = expectedHittingTime(c.mu, c.sigma, c.T, c.h);
       expect(Math.abs(s.mean - cfT)).toBeLessThan(4 * s.stderr + 0.01);
     }
@@ -308,6 +325,50 @@ describe("simulateSwitching — two-way mode (Markov indicator formulation)", ()
     }
     expect(maxK).toBeGreaterThan(1);
     expect(totalK / r.nCrossingsSamples.length).toBeGreaterThan(1);
+  });
+
+  it("firstCrossTimeSamples diverges from tB2bSamples on re-entering paths under two-way", () => {
+    // On any path that crosses H upward and falls back below, two-way
+    // accumulates extra tB2b time after τ, so tB2b > firstCrossTime; on
+    // paths that stay above H after the first crossing or never cross,
+    // they agree. Pick parameters that produce ample re-entry traffic.
+    const p = {
+      ...base, switchMode: "two-way" as const,
+      mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
+      nPaths: 2_000, nSteps: 500, seed: 9,
+    };
+    const r = simulateSwitching(p);
+    let diverging = 0;
+    for (let i = 0; i < r.firstCrossTimeSamples.length; i++) {
+      const tau = r.firstCrossTimeSamples[i] as number;
+      const tB2b = r.tB2bSamples[i] as number;
+      // On every path tB2b ≥ τ up to discretisation: the spot is in b2b mode
+      // on [0, τ) by definition of τ. Re-entries widen the gap.
+      expect(tB2b).toBeGreaterThanOrEqual(tau - 1e-9);
+      if (tB2b - tau > 1e-6) diverging += 1;
+    }
+    expect(diverging).toBeGreaterThan(50);
+  });
+
+  it("MC E[first-crossing ∧ T] matches expectedHittingTime under two-way within 4·stderr", () => {
+    // τ is a path property — the Harrison oracle anchors its MC estimate
+    // under both modes. Under two-way the book doesn't latch at τ, but
+    // the stopping time itself is unchanged.
+    const cases = [
+      { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
+      { h: 1.5, mu: 0.0, sigma: 0.5, T: 1.5 },
+    ];
+    for (const c of cases) {
+      const p = {
+        ...base, switchMode: "two-way" as const,
+        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
+        nPaths: 20_000, nSteps: 1_000,
+      };
+      const r = simulateSwitching(p);
+      const s = summarize(r.firstCrossTimeSamples);
+      const cfT = expectedHittingTime(c.mu, c.sigma, c.T, c.h);
+      expect(Math.abs(s.mean - cfT)).toBeLessThan(4 * s.stderr + 0.01);
+    }
   });
 
   it("MC E[T_fee] matches expectedTimeAboveBarrier under pure GBM within 4·stderr", () => {

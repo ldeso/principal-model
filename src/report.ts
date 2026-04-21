@@ -96,10 +96,11 @@ export interface Report {
     /** P[path ever entered fee mode] = first-passage probability. Same Harrison
      *  oracle under both modes. */
     probSwitch: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[first-passage time ∧ T] under one-way. Absent under two-way: the
-     *  book's b2b-occupation time is not a first-crossing time, so the
-     *  Harrison anchor does not apply to anything we currently sample. */
-    expectedCrossingTime?: { mc: number; closedForm: number | null; zScore: number | null };
+    /** E[first-passage time ∧ T]. τ is a path property (the first time
+     *  S_t ≥ H, or T if never), so the Harrison anchor applies under both
+     *  modes — only the book's response to τ differs. CF populated only
+     *  under pure GBM (lambdaJ = 0). */
+    expectedCrossingTime: { mc: number; closedForm: number | null; zScore: number | null };
     /** E[time spent in fee mode]. Two-way CF via `expectedTimeAboveBarrier`;
      *  one-way CF via `T − expectedHittingTime`. */
     meanTimeInFee: { mc: number; closedForm: number | null; zScore: number | null };
@@ -390,33 +391,21 @@ function buildSwitchingBlock(
   const meanFracInFeeMode = meanTimeInFeeMc / params.T;
   const meanNCrossings = crossingsSum / nPaths;
 
-  // Under one-way, τ is the first-crossing time (equal to T on paths that
-  // never crossed). We reconstruct the one-way τ sample from tB2b, which
-  // equals τ on one-way runs. Under two-way, tB2b is the total time in b2b
-  // mode (not a stopping time); the reconstruction still gives the MC
-  // estimate of the first crossing time conditional on "first crossing" ≡
-  // "first step where S ≥ H", so expectedCrossingTime stays well-defined
-  // and comparable with the Harrison oracle. We recompute τ_i = min over
-  // the path of the step time at which Sprev ≥ H is first true; since that
-  // requires extra MC bookkeeping the cheap proxy is tB2b under one-way and
-  // "T if no crossing else some t ∈ [0, T]" under two-way — and the
-  // `everCrossedMask`-weighted average of tB2b on the subset {never crossed}
-  // is T by construction, so the closed-form anchor only applies under one-way.
-  const tauSamples: Float64Array | null =
-    run.switchMode === "one-way" ? run.tB2bSamples : null;
+  // First-crossing time τ is a path property (independent of `switchMode`),
+  // so mean(firstCrossTimeSamples) is the direct MC estimate of E[τ ∧ T]
+  // and the Harrison / Borodin-Salminen anchor applies under both modes.
   let expectedTauMc = 0;
-  let expectedTauSe = 0;
-  if (tauSamples !== null) {
-    let tauSum = 0;
-    for (let i = 0; i < nPaths; i++) tauSum += tauSamples[i] as number;
-    expectedTauMc = tauSum / nPaths;
-    let sse = 0;
-    for (let i = 0; i < nPaths; i++) {
-      const d = (tauSamples[i] as number) - expectedTauMc;
-      sse += d * d;
-    }
-    expectedTauSe = nPaths > 1 ? Math.sqrt(sse / (nPaths - 1) / nPaths) : 0;
+  for (let i = 0; i < nPaths; i++) {
+    expectedTauMc += run.firstCrossTimeSamples[i] as number;
   }
+  expectedTauMc /= nPaths;
+  let tauSse = 0;
+  for (let i = 0; i < nPaths; i++) {
+    const d = (run.firstCrossTimeSamples[i] as number) - expectedTauMc;
+    tauSse += d * d;
+  }
+  const expectedTauSe =
+    nPaths > 1 ? Math.sqrt(tauSse / (nPaths - 1) / nPaths) : 0;
 
   // Closed-form anchors hold under pure GBM. Under Merton jumps the τ / I_fee
   // distributions change (jumps can punch through the barrier), so leave
@@ -426,14 +415,14 @@ function buildSwitchingBlock(
   const probSwitchCf = pureGbm
     ? firstPassageProb(params.mu, params.sigma, params.T, params.barrierRatio)
     : null;
-  const expectedTauCfOneWay = pureGbm
+  const expectedTauCf = pureGbm
     ? expectedHittingTime(params.mu, params.sigma, params.T, params.barrierRatio)
     : null;
-  const expectedTauCf =
-    run.switchMode === "one-way" ? expectedTauCfOneWay : null;
 
-  // E[T_fee] closed form. Under two-way: ∫₀ᵀ Φ((νt − log h)/(σ√t)) dt.
-  // Under one-way: T − E[τ ∧ T].
+  // E[T_fee] closed form. Under two-way: ∫₀ᵀ Φ((νt − log h)/(σ√t)) dt — the
+  // fee-mode indicator tracks S_t across H symmetrically so re-entries into
+  // b2b mode subtract from T_fee. Under one-way the book latches at τ, so
+  // E[T_fee] = T − E[τ ∧ T] exactly.
   const meanTimeInFeeCf = pureGbm
     ? run.switchMode === "two-way"
       ? expectedTimeAboveBarrier(
@@ -442,8 +431,8 @@ function buildSwitchingBlock(
           params.T,
           params.barrierRatio,
         )
-      : expectedTauCfOneWay !== null
-        ? params.T - expectedTauCfOneWay
+      : expectedTauCf !== null
+        ? params.T - expectedTauCf
         : null
     : null;
 
@@ -499,15 +488,11 @@ function buildSwitchingBlock(
     barrierLevel: run.barrierLevel,
     feePost: run.feePostResolved,
     probSwitch: { mc: probSwitchMc, closedForm: probSwitchCf, zScore: probZ },
-    ...(tauSamples !== null
-      ? {
-          expectedCrossingTime: {
-            mc: expectedTauMc,
-            closedForm: expectedTauCf,
-            zScore: tauZ,
-          },
-        }
-      : {}),
+    expectedCrossingTime: {
+      mc: expectedTauMc,
+      closedForm: expectedTauCf,
+      zScore: tauZ,
+    },
     meanTimeInFee: {
       mc: meanTimeInFeeMc,
       closedForm: meanTimeInFeeCf,

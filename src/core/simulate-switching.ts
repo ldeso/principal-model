@@ -91,6 +91,13 @@ export interface SwitchingResult {
   tFeeSamples: Float64Array;
   /** 1 iff the path ever entered fee mode (S_t ≥ H at some t). */
   everCrossedMask: Uint8Array;
+  /** First time S_t crosses H per path, or T if it never does. Path-level
+   *  property independent of `switchMode`: under one-way this equals the
+   *  book's latch time, under two-way it's still the same stopping time
+   *  (the book just doesn't freeze at it). The Harrison / Borodin-Salminen
+   *  expected-hitting-time oracle anchors `mean(firstCrossTimeSamples)` in
+   *  both modes. */
+  firstCrossTimeSamples: Float64Array;
   /** Number of times S_t crossed the threshold H per path (spot-level
    *  diagnostic, mode-agnostic). Under both modes this is the raw count
    *  of sign(S − H) flips along the discretised path; only the book's
@@ -146,6 +153,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
   const tB2bSamples = new Float64Array(nPaths);
   const tFeeSamples = new Float64Array(nPaths);
   const everCrossedMask = new Uint8Array(nPaths);
+  const firstCrossTimeSamples = new Float64Array(nPaths);
   const nCrossingsSamples = new Uint32Array(nPaths);
   const IB2bSamples = new Float64Array(nPaths);
   const IFeeSamples = new Float64Array(nPaths);
@@ -171,6 +179,11 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
     // above H. Under one-way it freezes entryMode to fee from that point on.
     // Under two-way it's diagnostic only (feeds everCrossedMask).
     let everCrossed = Sprev >= H;
+    // Path-level first-crossing time τ := inf{t : S_t ≥ H} ∧ T. Defined
+    // regardless of mode; used as the Harrison-oracle anchor in report.ts.
+    // Starts at T (never-crosses fallback) and is overwritten on the first
+    // step that completes above H; h ≤ 1 (Sprev ≥ H at init) gives τ = 0.
+    let firstCrossTime = everCrossed ? 0 : T;
     let crossings = 0;
 
     for (let k = 1; k <= nSteps; k++) {
@@ -207,7 +220,10 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
 
       const currAbove = Si >= H;
       if (prevAbove !== currAbove) crossings += 1;
-      if (currAbove) everCrossed = true;
+      if (currAbove && !everCrossed) {
+        firstCrossTime = k * dt;
+        everCrossed = true;
+      }
 
       Sprev = Si;
     }
@@ -220,6 +236,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
     tB2bSamples[i] = tB2b;
     tFeeSamples[i] = tFee;
     nCrossingsSamples[i] = crossings;
+    firstCrossTimeSamples[i] = firstCrossTime;
     everCrossedMask[i] = everCrossed ? 1 : 0;
 
     feeSamples[i] = fee * P * lambda * IT;
@@ -237,6 +254,7 @@ export function simulateSwitching(inputs: SwitchingInputs): SwitchingResult {
     tB2bSamples,
     tFeeSamples,
     everCrossedMask,
+    firstCrossTimeSamples,
     nCrossingsSamples,
     IB2bSamples,
     IFeeSamples,

@@ -188,13 +188,11 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
         `  cf=${fmtMaybe(sw.probSwitch.closedForm, 4)}` +
         `  z=${fmtMaybe(sw.probSwitch.zScore, 2)}`,
     );
-    if (sw.expectedCrossingTime) {
-      console.log(
-        `  E[first-cross∧T] mc=${fmt(sw.expectedCrossingTime.mc, 4)}` +
-          `  cf=${fmtMaybe(sw.expectedCrossingTime.closedForm, 4)}` +
-          `  z=${fmtMaybe(sw.expectedCrossingTime.zScore, 2)}`,
-      );
-    }
+    console.log(
+      `  E[first-cross∧T] mc=${fmt(sw.expectedCrossingTime.mc, 4)}` +
+        `  cf=${fmtMaybe(sw.expectedCrossingTime.closedForm, 4)}` +
+        `  z=${fmtMaybe(sw.expectedCrossingTime.zScore, 2)}`,
+    );
     console.log(
       `  E[T_fee]         mc=${fmt(sw.meanTimeInFee.mc, 4)}` +
         `  cf=${fmtMaybe(sw.meanTimeInFee.closedForm, 4)}` +
