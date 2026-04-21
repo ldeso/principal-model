@@ -187,7 +187,7 @@ export function expectedHittingTime(
 // specialised to (m, v²) = (νt, σ²t), c = log h, gives
 //   E[S_t · 1{S_t ≥ h·S_0}]
 //     = S_0 · e^{μt} · Φ((μt + σ²t/2 − log h) / (σ√t)).
-// Integrating both over [0, T] yields the two-way anchors consumed by
+// Integrating both over [0, T] yields the mean-level anchors consumed by
 // `report.ts` to z-test the MC E[time in fee mode] and E[I_fee].
 
 // Tail CDF Φ((νt − log h) / (σ√t)): smooth limit at t → 0⁺.

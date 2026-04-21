@@ -27,21 +27,15 @@ export interface Params {
    *  the Gaussian-CVaR95 proxy ≈ 2.063·SD[Π_b2b]. */
   premiumMode: "sharpe" | "cvar";
 
-  /** Switching-variant upper threshold ratio h = H/S0. h = Infinity disables the switch
-   *  (falls back to the syndicated retained book); h ≤ 1 starts the book in fee mode.
-   *  Under `switchMode = "two-way"` the book's mode is a pure state function of S_t
-   *  relative to h·S0; under `"one-way"` the first upward crossing latches fee mode for
-   *  the remainder of the horizon. */
+  /** Switching-variant upper threshold ratio h = H/S0. The book's mode is a pure
+   *  state function of S_t: fee pricing whenever S_t ≥ h·S0, b2b pricing whenever
+   *  S_t < h·S0. h = Infinity disables the switch (falls back to the syndicated
+   *  retained book); h ≤ 1 starts the book in fee mode at t = 0. */
   barrierRatio: number;
-  /** Switching-variant post-switch fee rate applied to every fee-mode interval. `null`
+  /** Switching-variant fee rate applied to every fee-mode interval. `null`
    *  locks it to `f` (zero-config path); a number sets it independently for the
    *  "richer markup while in fee mode" research lever. */
   feePost: number | null;
-  /** Switching-variant mode. `"two-way"` (default): the book rides S_t across h·S0
-   *  symmetrically — fee mode whenever S_t ≥ h·S0, b2b mode whenever S_t < h·S0.
-   *  `"one-way"`: the first upward crossing latches fee mode for the remainder of [0, T]
-   *  (the legacy barrier-triggered stopping-time formulation). */
-  switchMode: "one-way" | "two-way";
 
   /** Merton jump intensity (expected jumps per unit time). 0 ⇒ pure GBM. */
   lambdaJ: number;
@@ -77,7 +71,6 @@ export const defaultParams: Params = {
 
   barrierRatio: Infinity,
   feePost: null,
-  switchMode: "two-way",
 
   lambdaJ: 20,
   muJ: -0.05,

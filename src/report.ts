@@ -14,10 +14,7 @@ import {
   firstPassageProb,
 } from "./core/moments.js";
 import { simulateSwitching } from "./core/simulate-switching.js";
-import type {
-  SwitchingResult,
-  SwitchMode,
-} from "./core/simulate-switching.js";
+import type { SwitchingResult } from "./core/simulate-switching.js";
 import type { Params } from "./params.js";
 import {
   conditionalVaR,
@@ -89,25 +86,20 @@ export interface Report {
   /** Switching-variant block. Only present when `params.barrierRatio !== Infinity`;
    *  closed-form anchors populated only under pure GBM (lambdaJ = 0). */
   switching?: {
-    switchMode: SwitchMode;
     barrierRatio: number;
     barrierLevel: number;
     feePost: number;
-    /** P[path ever entered fee mode] = first-passage probability. Same Harrison
-     *  oracle under both modes. */
+    /** P[path ever entered fee mode] = first-passage probability
+     *  (Harrison / Borodin-Salminen). */
     probSwitch: { mc: number; closedForm: number | null; zScore: number | null };
     /** E[first-passage time ∧ T]. τ is a path property (the first time
-     *  S_t ≥ H, or T if never), so the Harrison anchor applies under both
-     *  modes — only the book's response to τ differs. CF populated only
-     *  under pure GBM (lambdaJ = 0). */
+     *  S_t ≥ H, or T if never); CF via `expectedHittingTime`. */
     expectedCrossingTime: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[time spent in fee mode]. Two-way CF via `expectedTimeAboveBarrier`;
-     *  one-way CF via `T − expectedHittingTime`. */
+    /** E[time spent in fee mode]. CF via `expectedTimeAboveBarrier`. */
     meanTimeInFee: { mc: number; closedForm: number | null; zScore: number | null };
-    /** E[I_fee]. Two-way CF via `expectedIntegralAboveBarrier`; one-way leaves
-     *  it null (no simple closed form for E[J_τ] under the latched indicator). */
+    /** E[I_fee]. CF via `expectedIntegralAboveBarrier`. */
     meanIntegralFee: { mc: number; closedForm: number | null; zScore: number | null };
-    /** MC-only, both modes. Under one-way: 0 or 1. */
+    /** Mean number of threshold crossings per path (spot-level diagnostic). */
     meanNCrossings: number;
     /** Share of horizon spent in fee mode: meanTimeInFee.mc / T. */
     meanFracInFeeMode: number;
@@ -208,7 +200,6 @@ export function buildReport(
     fee: params.f,
     barrierRatio: params.barrierRatio,
     feePost: params.feePost,
-    switchMode: params.switchMode,
     lambdaJ: params.lambdaJ,
     muJ: params.muJ,
     sigmaJ: params.sigmaJ,
@@ -391,9 +382,9 @@ function buildSwitchingBlock(
   const meanFracInFeeMode = meanTimeInFeeMc / params.T;
   const meanNCrossings = crossingsSum / nPaths;
 
-  // First-crossing time τ is a path property (independent of `switchMode`),
-  // so mean(firstCrossTimeSamples) is the direct MC estimate of E[τ ∧ T]
-  // and the Harrison / Borodin-Salminen anchor applies under both modes.
+  // First-crossing time τ is a path property — the first time S_t ≥ H, or
+  // T if the path never reaches H — so mean(firstCrossTimeSamples) is the
+  // direct MC estimate of E[τ ∧ T] anchored by Harrison / Borodin-Salminen.
   let expectedTauMc = 0;
   for (let i = 0; i < nPaths; i++) {
     expectedTauMc += run.firstCrossTimeSamples[i] as number;
@@ -418,35 +409,23 @@ function buildSwitchingBlock(
   const expectedTauCf = pureGbm
     ? expectedHittingTime(params.mu, params.sigma, params.T, params.barrierRatio)
     : null;
-
-  // E[T_fee] closed form. Under two-way: ∫₀ᵀ Φ((νt − log h)/(σ√t)) dt — the
-  // fee-mode indicator tracks S_t across H symmetrically so re-entries into
-  // b2b mode subtract from T_fee. Under one-way the book latches at τ, so
-  // E[T_fee] = T − E[τ ∧ T] exactly.
   const meanTimeInFeeCf = pureGbm
-    ? run.switchMode === "two-way"
-      ? expectedTimeAboveBarrier(
-          params.mu,
-          params.sigma,
-          params.T,
-          params.barrierRatio,
-        )
-      : expectedTauCf !== null
-        ? params.T - expectedTauCf
-        : null
+    ? expectedTimeAboveBarrier(
+        params.mu,
+        params.sigma,
+        params.T,
+        params.barrierRatio,
+      )
     : null;
-
-  // E[I_fee] closed form. Only available under two-way + pure GBM.
-  const meanIntegralFeeCf =
-    pureGbm && run.switchMode === "two-way"
-      ? expectedIntegralAboveBarrier(
-          params.S0,
-          params.mu,
-          params.sigma,
-          params.T,
-          params.barrierRatio,
-        )
-      : null;
+  const meanIntegralFeeCf = pureGbm
+    ? expectedIntegralAboveBarrier(
+        params.S0,
+        params.mu,
+        params.sigma,
+        params.T,
+        params.barrierRatio,
+      )
+    : null;
 
   const pSe = Math.sqrt(
     Math.max(1e-12, probSwitchMc * (1 - probSwitchMc)) / nPaths,
@@ -483,7 +462,6 @@ function buildSwitchingBlock(
     withSwitch.length >= 20 ? conditionalVaR(withSwitch, 0.95) : null;
 
   return {
-    switchMode: run.switchMode,
     barrierRatio: params.barrierRatio,
     barrierLevel: run.barrierLevel,
     feePost: run.feePostResolved,

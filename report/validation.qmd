@@ -94,9 +94,9 @@ block: closed-form moments versus their MC estimates, with the $z$
 column checking their agreement. Right block: tail metrics that have
 no closed form. The switching row prints `NaN` in the scorecard's
 closed-form moment columns (no closed-form P&L density), but its
-mode-level anchors $\mathbb{P}[\tau \le T]$, $\mathbb{E}[T_{\mathrm{fee}}]$,
-and (under two-way) $\mathbb{E}[I_{\mathrm{fee}}]$ are tracked in
-dedicated panels below.
+mean-level anchors $\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau \wedge T]$,
+$\mathbb{E}[T_{\mathrm{fee}}]$, and $\mathbb{E}[I_{\mathrm{fee}}]$
+are tracked in dedicated panels below.
 
 <div class="legend-table">
 
@@ -733,25 +733,23 @@ Plot.plot({
 ## Switching and tail truncation
 
 The switching operating book earns the fee-book payoff whenever
-$S_t \ge H = h \cdot S_0$ and the b2b payoff whenever $S_t < H$. Two
-variants: **two-way** (the default) tracks the indicator
-symmetrically, flipping back to b2b if the spot falls back below
-$H$; **one-way** latches fee mode on the first upward crossing and
-holds it for the remainder of $[0, T]$. See [the switching book in
-the model](model.qmd#switching-book) for the formulae.
+$S_t \ge H = h \cdot S_0$ and the b2b payoff whenever $S_t < H$. The
+book flips symmetrically as the spot crosses $H$ in either
+direction — see [the switching book in the
+model](model.qmd#switching-book) for the formulae.
 
-No closed-form P&L density exists for either variant — the joint
-distribution of $(T_{\mathrm{fee}}, I_{\mathrm{fee}}, I_{\mathrm{b2b}})$
-is the same non-trivial object in both cases — so Monte Carlo is
-authoritative on the mean, variance, and tails. Three **mode-level**
-anchors under pure GBM are tracked here as z-test oracles:
-$\mathbb{P}[\tau \le T]$ (Harrison 1985; shared between modes),
+No closed-form P&L density exists — the joint distribution of
+$(T_{\mathrm{fee}}, I_{\mathrm{fee}}, I_{\mathrm{b2b}})$ is
+non-trivial — so Monte Carlo is authoritative on the mean,
+variance, and tails. Four mean-level anchors under pure GBM are
+tracked here as z-test oracles: $\mathbb{P}[\tau \le T]$ (Harrison
+1985), $\mathbb{E}[\tau \wedge T]$,
 $\mathbb{E}[T_{\mathrm{fee}}] = \int_0^T \Phi((\nu t - \log h) /
-(\sigma \sqrt{t})) \, dt$, and (two-way only)
+(\sigma \sqrt{t})) \, dt$, and
 $\mathbb{E}[I_{\mathrm{fee}}] = S_0 \int_0^T e^{\mu t} \Phi((\mu t +
-\tfrac12 \sigma^2 t - \log h)/(\sigma \sqrt{t})) \, dt$. Merton jumps
-inflate $\mathbb{P}[\tau \le T]$ and change $\mathbb{E}[T_{\mathrm{fee}}]$;
-under jumps the anchors drop to MC-only.
+\tfrac12 \sigma^2 t - \log h)/(\sigma \sqrt{t})) \, dt$. Merton
+jumps change the τ distribution (jumps can punch through the
+threshold) so under jumps the anchors drop to MC-only.
 
 ```{ojs}
 //| echo: false
@@ -763,13 +761,15 @@ switchingSweep = FileAttachment("data/switching-sweep.json").json()
 switchingRows = switchingSweep.cells.map(c => ({
   h: c.h === null ? Infinity : c.h,
   hLabel: c.h === null ? "∞ (no switch)" : c.h.toFixed(2),
-  switchMode: c.switchMode,
   mean: c.row.mean,
   cvar95: c.row.cvar95,
   cvar99: c.row.cvar99,
   probLoss: c.row.probLoss,
   probSwitchMc: c.switching ? c.switching.probSwitch.mc : 0,
   probSwitchCf: c.switching?.probSwitch?.closedForm ?? null,
+  expectedTauMc: c.switching ? c.switching.expectedCrossingTime.mc : switchingSweep.base.T,
+  expectedTauCf: c.switching?.expectedCrossingTime?.closedForm ?? null,
+  expectedTauZ: c.switching?.expectedCrossingTime?.zScore ?? null,
   meanTimeInFeeMc: c.switching ? c.switching.meanTimeInFee.mc : 0,
   meanTimeInFeeCf: c.switching?.meanTimeInFee?.closedForm ?? null,
   meanTimeInFeeZ: c.switching?.meanTimeInFee?.zScore ?? null,
@@ -787,21 +787,13 @@ switchingRows = switchingSweep.cells.map(c => ({
 
 ### CVaR₉₅ and $\mathbb{E}[\Pi]$ as functions of the threshold
 
-Two curves per panel, one per mode. Lowering $h$ collapses CVaR₉₅
-from the b2b reference (dashed horizontal) toward the fee book's
-lightly negative CVaR and simultaneously lifts $\mathbb{E}[\Pi]$ as
-losses are converted to fee revenue. The **one-way** curve (teal)
-truncates more aggressively — once entered, fee mode stays entered —
-while the **two-way** curve (maroon) sits on the conservative side:
-re-entry into b2b mode gives back some of the tail cap but tracks
-the regime more faithfully. The knee where either curve diverges
-from the no-switch baseline is the operator's natural decision
-point.
-
-```{ojs}
-//| echo: false
-MODE_COLOURS = ({ "one-way": "#2a8b82", "two-way": "#a33b5b" })
-```
+Lowering $h$ collapses CVaR₉₅ from the b2b reference (dashed
+horizontal) toward the fee book's lightly negative CVaR and
+simultaneously lifts $\mathbb{E}[\Pi]$ as losses are converted to
+fee revenue. Re-entries into b2b mode (every time the spot drops
+back below $H$) temper the truncation; the knee where the curve
+diverges from the no-switch baseline is the operator's natural
+decision point.
 
 ```{ojs}
 //| echo: false
@@ -812,14 +804,13 @@ Plot.plot({
   marginRight: 60,
   marginBottom: 55,
   grid: true,
-  caption: "Switching book — CVaR₉₅ (USD loss, lower is better) as a function of threshold h. Finite h on a log scale; the dashed horizontal is the retained-on-b2b anchor. Two curves (one-way vs two-way) show how mode choice reshapes the tail cap.",
+  caption: "Switching book — CVaR₉₅ (USD loss, lower is better) as a function of threshold h. Finite h on a log scale; the dashed horizontal is the retained-on-b2b anchor. Lower h truncates more of the loss tail but also caps more of the upside.",
   x: { label: "threshold h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
   y: { label: "CVaR95 of switching book   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
-  color: { legend: true, domain: ["one-way", "two-way"], range: [MODE_COLOURS["one-way"], MODE_COLOURS["two-way"]], label: "mode" },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "switchMode", strokeWidth: 2 }),
-    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", fill: "switchMode", r: 4 }),
+    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", stroke: "#a33b5b", strokeWidth: 2 }),
+    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "cvar95", fill: "#a33b5b", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
     Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedCvar95 ?? 0, t: "retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
@@ -838,11 +829,10 @@ Plot.plot({
   caption: "Expected P&L across thresholds. Tighter h shifts the mean upward because the fee book's positive-revenue payoff replaces b2b's mean-zero-but-fat-tailed payoff on paths that ever enter fee mode.",
   x: { label: "threshold h = H/S₀   (log)", labelAnchor: "center", labelOffset: 36, type: "log", domain: [1, 3] },
   y: { label: "E[Π] (switching)   (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
-  color: { legend: true, domain: ["one-way", "two-way"], range: [MODE_COLOURS["one-way"], MODE_COLOURS["two-way"]], label: "mode" },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "switchMode", strokeWidth: 2 }),
-    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", fill: "switchMode", r: 4 }),
+    Plot.line(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", stroke: "#2a7", strokeWidth: 2 }),
+    Plot.dot(switchingRows.filter(r => isFinite(r.h)), { x: "h", y: "mean", fill: "#2a7", r: 4 }),
     Plot.ruleY([switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? null], { stroke: "#888", strokeDasharray: "4 4" }),
     Plot.text([{x: 2.6, y: switchingRows.find(r => !isFinite(r.h))?.retainedMean ?? 0, t: "retained (h=∞)"}],
       { x: "x", y: "y", text: "t", fill: "#666", textAnchor: "end", dy: -8 })
@@ -852,47 +842,49 @@ Plot.plot({
 
 ### Closed-form anchors under pure GBM
 
-For each threshold and mode the simulator's Monte Carlo estimates of
-$\mathbb{E}[T_{\mathrm{fee}}]$ and $\mathbb{E}[I_{\mathrm{fee}}]$ are
-z-tested against the Simpson-quadrature closed forms from
-`src/core/moments.ts`. The $z$ columns follow the same convention as
-the main scorecard ($|z| \le 2$ healthy, $|z| > 3$ points at a
-bug). Under one-way the $\mathbb{E}[I_{\mathrm{fee}}]$ anchor is
-blank — there is no simple closed form for $\mathbb{E}[J_\tau]$
-under the latched indicator.
+For each threshold the simulator's Monte Carlo estimates of the
+four mean-level anchors are z-tested against the closed forms from
+`src/core/moments.ts`. The $z$ columns follow the same convention
+as the main scorecard ($|z| \le 2$ healthy, $|z| > 3$ points at a
+bug); the discrete-crossing bias on $\mathbb{P}[\tau \le T]$ and
+$\mathbb{E}[\tau \wedge T]$ shrinks monotonically with $n_{\mathrm{steps}}$
+(see `test/simulate-switching.test.ts`).
 
 ```{ojs}
 //| echo: false
 Inputs.table(
   switchingRows.filter(r => isFinite(r.h)),
   {
-    columns: ["switchMode", "hLabel", "probSwitchMc", "probSwitchCf",
+    columns: ["hLabel", "probSwitchMc", "probSwitchCf",
+              "expectedTauMc", "expectedTauCf", "expectedTauZ",
               "meanTimeInFeeMc", "meanTimeInFeeCf", "meanTimeInFeeZ",
-              "meanIntegralFeeMc", "meanIntegralFeeCf", "meanIntegralFeeZ",
-              "meanNCrossings"],
+              "meanIntegralFeeMc", "meanIntegralFeeCf", "meanIntegralFeeZ"],
     header: {
-      switchMode: "mode",
       hLabel: "h",
-      probSwitchMc: "P[ever fee] (mc)",
-      probSwitchCf: "P[ever fee] (cf)",
+      probSwitchMc: "P[τ≤T] (mc)",
+      probSwitchCf: "P[τ≤T] (cf)",
+      expectedTauMc: "E[τ∧T] (mc)",
+      expectedTauCf: "E[τ∧T] (cf)",
+      expectedTauZ: "z(τ)",
       meanTimeInFeeMc: "E[T_fee] (mc)",
       meanTimeInFeeCf: "E[T_fee] (cf)",
       meanTimeInFeeZ: "z(T_fee)",
       meanIntegralFeeMc: "E[I_fee] (mc)",
       meanIntegralFeeCf: "E[I_fee] (cf)",
       meanIntegralFeeZ: "z(I_fee)",
-      meanNCrossings: "E[#crossings]",
     },
     format: {
       probSwitchMc: x => x.toFixed(3),
       probSwitchCf: x => x === null ? "—" : x.toFixed(3),
+      expectedTauMc: x => x.toFixed(4),
+      expectedTauCf: x => x === null ? "—" : x.toFixed(4),
+      expectedTauZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
       meanTimeInFeeMc: x => x.toFixed(4),
       meanTimeInFeeCf: x => x === null ? "—" : x.toFixed(4),
       meanTimeInFeeZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
       meanIntegralFeeMc: x => x.toFixed(4),
       meanIntegralFeeCf: x => x === null ? "—" : x.toFixed(4),
       meanIntegralFeeZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
-      meanNCrossings: x => x.toFixed(3),
     }
   }
 )
@@ -900,20 +892,19 @@ Inputs.table(
 
 ### How often, and how much, the book is in fee mode
 
-Mean fraction of the horizon spent above $H$ — drops as $h$ rises
-and zero at $h = \infty$ by definition. Under two-way the "E[#
-crossings]" column counts re-entries into and out of fee mode; under
-one-way it still counts raw spot-level crossings even though the
-book latches on the first.
+Mean fraction of the horizon spent above $H$ drops as $h$ rises and
+is zero at $h = \infty$ by definition. The "E[# crossings]" column
+counts sign-of-$(S - H)$ flips along the discretised path, so a
+volatile path near $H$ produces many re-entries even on a single
+Monte Carlo run.
 
 ```{ojs}
 //| echo: false
 Inputs.table(
   switchingRows.filter(r => isFinite(r.h)),
   {
-    columns: ["switchMode", "hLabel", "meanFracInFeeMode", "meanNCrossings", "mean", "cvar95"],
+    columns: ["hLabel", "meanFracInFeeMode", "meanNCrossings", "mean", "cvar95"],
     header: {
-      switchMode: "mode",
       hLabel: "h",
       meanFracInFeeMode: "E[T_fee/T]",
       meanNCrossings: "E[# crossings]",

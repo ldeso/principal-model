@@ -14,11 +14,10 @@ price per tonne, drift and variance, optional Merton jump overlay,
 initial inventory as tokens + cost basis, constant retirements per
 day). A drawable custom-curve scenario on the Summary page (with an
 Alchemy-fed historical preset) evaluates every book on a single
-user-sketched path. The switching book runs in one of two modes —
-**two-way** (default; fee mode whenever $S_t \ge h \cdot S_0$, b2b
-mode whenever it falls back) or **one-way** (latches fee mode on the
-first upward crossing) — selectable on every page and via
-`--switchMode`.
+user-sketched path. The switching book runs a symmetric Markov
+indicator: fee mode whenever $S_t \ge h \cdot S_0$, b2b mode
+whenever $S_t$ falls back below, so the horizon can contain any
+number of re-entries.
 
 ## Requirements
 
@@ -64,8 +63,7 @@ Artifacts are written to `report/data/`:
 | `--mu x` / `--sigma x` | override $\mu$, $\sigma$ |
 | `--f x` / `--Q x` / `--T x` | override fee, quote, horizon |
 | `--lambdaJ x` / `--muJ x` / `--sigmaJ x` | Merton jump params (default 0 ⇒ pure GBM) |
-| `--h x` / `--fPost x` | switching threshold $h$ and post-switch fee (default $h = \infty$ disables the switch) |
-| `--switchMode one-way\|two-way` | switching dynamics (default `two-way`; `one-way` latches fee mode on the first upward crossing) |
+| `--h x` / `--fPost x` | switching threshold $h$ and fee-mode fee (default $h = \infty$ disables the switch) |
 | `--sweep` | additionally write `sweep.json` |
 
 ## Interactive report

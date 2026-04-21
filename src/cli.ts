@@ -15,7 +15,7 @@ import { conditionalVaR, probLoss, summarize, valueAtRisk } from "./core/risk.js
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(HERE, "..", "report", "data");
 
-type NumericParamKey = Exclude<keyof Params, "premiumMode" | "switchMode">;
+type NumericParamKey = Exclude<keyof Params, "premiumMode">;
 
 const FLAG_TO_PARAM: Record<string, NumericParamKey> = {
   seed: "seed",
@@ -59,13 +59,6 @@ function parseArgs(argv: string[]): CliArgs {
         throw new Error(`--premiumMode must be "sharpe" or "cvar"`);
       }
       overrides.premiumMode = val;
-      continue;
-    }
-    if (key === "switchMode") {
-      if (val !== "one-way" && val !== "two-way") {
-        throw new Error(`--switchMode must be "one-way" or "two-way"`);
-      }
-      overrides.switchMode = val;
       continue;
     }
     const field = FLAG_TO_PARAM[key];
@@ -178,8 +171,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     const fmtMaybe = (x: number | null, d = 3) =>
       x === null || !isFinite(x) ? "—" : fmt(x, d);
     console.log(
-      `\nSwitching  mode=${sw.switchMode}  h=${params.barrierRatio}` +
-        `  H=${fmt(sw.barrierLevel, 4)}` +
+      `\nSwitching  h=${params.barrierRatio}  H=${fmt(sw.barrierLevel, 4)}` +
         `  f_post=${fmt(sw.feePost, 4)}` +
         (params.feePost === null ? " (locked to f)" : ""),
     );
@@ -300,55 +292,47 @@ function runSweep(baseParams: Params): unknown {
   };
 }
 
-// Switching-variant barrier sweep: the operator-decision chart (CVaR₉₅ and
-// E[Π] vs h) is derived from these cells. Two mode curves (one-way, two-way)
-// are swept per h, plus Infinity = "switch disabled" which anchors both
-// curves to the operating-retained reference. Kept separate from
-// SWEEP_ALPHAS/MUS/SIGMAS so we don't blow up the (α, μ, σ) grid.
+// Switching-variant threshold sweep: the operator-decision chart (CVaR₉₅
+// and E[Π] vs h) is derived from these cells. Infinity = "switch disabled",
+// which anchors the curve to the operating-retained reference. Kept
+// separate from SWEEP_ALPHAS/MUS/SIGMAS so we don't blow up the (α, μ, σ)
+// grid into a 4-dim product.
 const SWEEP_BARRIERS = [1.0, 1.1, 1.25, 1.5, 2.0, Infinity];
-const SWEEP_MODES: ("one-way" | "two-way")[] = ["one-way", "two-way"];
 
 function runSwitchingSweep(baseParams: Params): unknown {
   const p0 = withOverrides(baseParams, { nPaths: 20_000, nSteps: 100 });
   const cells: unknown[] = [];
-  for (const mode of SWEEP_MODES) {
-    for (const h of SWEEP_BARRIERS) {
-      const p = withOverrides(p0, { barrierRatio: h, switchMode: mode });
-      const r = buildReport(p, { keepPaths: 0, traceSize: 0, histBins: 0 });
-      const cellMetrics = (name: string): CellMetrics | null => {
-        const row = r.rows.find((x) => x.name === name);
-        if (!row) return null;
-        return {
-          mean: row.mcMean,
-          sd: row.mcSd,
-          var95: row.var95,
-          var99: row.var99,
-          cvar95: row.cvar95,
-          cvar99: row.cvar99,
-          probLoss: row.probLoss,
-          sharpe: row.sharpe,
-        };
+  for (const h of SWEEP_BARRIERS) {
+    const p = withOverrides(p0, { barrierRatio: h });
+    const r = buildReport(p, { keepPaths: 0, traceSize: 0, histBins: 0 });
+    const cellMetrics = (name: string): CellMetrics | null => {
+      const row = r.rows.find((x) => x.name === name);
+      if (!row) return null;
+      return {
+        mean: row.mcMean,
+        sd: row.mcSd,
+        var95: row.var95,
+        var99: row.var99,
+        cvar95: row.cvar95,
+        cvar99: row.cvar99,
+        probLoss: row.probLoss,
+        sharpe: row.sharpe,
       };
-      cells.push({
-        h,
-        switchMode: mode,
-        switching: r.switching ?? null,
-        // `row` is the switching operating book when the barrier is active; on
-        // h = Infinity we anchor to the retained operating book so the sweep
-        // plot still has a comparable "no-switch" reference.
-        row: cellMetrics("switching") ?? cellMetrics("retained"),
-        retained: cellMetrics("retained"),
-        b2b: cellMetrics("b2b"),
-        fee: cellMetrics("fee"),
-        treasury: cellMetrics("treasury"),
-      });
-    }
+    };
+    cells.push({
+      h,
+      switching: r.switching ?? null,
+      // `row` is the switching operating book when the threshold is active; at
+      // h = Infinity we anchor to the retained operating book so the sweep
+      // plot still has a comparable "no-switch" reference.
+      row: cellMetrics("switching") ?? cellMetrics("retained"),
+      retained: cellMetrics("retained"),
+      b2b: cellMetrics("b2b"),
+      fee: cellMetrics("fee"),
+      treasury: cellMetrics("treasury"),
+    });
   }
-  return {
-    grid: { barriers: SWEEP_BARRIERS, modes: SWEEP_MODES },
-    base: p0,
-    cells,
-  };
+  return { grid: { barriers: SWEEP_BARRIERS }, base: p0, cells };
 }
 
 const QSTAR_MUS = [-0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];

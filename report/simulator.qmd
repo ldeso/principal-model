@@ -116,7 +116,7 @@ viewof premiumMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: 
 
 ```{ojs}
 //| echo: false
-viewof switchMode = Inputs.radio(["off", "two-way", "one-way"], { value: "off", label: "mode" })
+viewof switchOn = Inputs.toggle({ label: "enable switching", value: false })
 ```
 
 ```{ojs}
@@ -126,10 +126,9 @@ viewof barrierRatioSlider = Inputs.range([1, 3], { step: 0.01, value: 1.25, labe
 
 ```{ojs}
 //| echo: false
-// "off" disables switching by driving the effective threshold to Infinity,
-// regardless of the slider value. Two-way tracks S_t ≥ H symmetrically;
-// one-way latches fee mode on the first upward crossing.
-barrierRatio = switchMode === "off" ? Infinity : barrierRatioSlider
+// Disabling the switch drives the effective threshold to Infinity regardless
+// of the slider value; the scorecard row and the threshold line disappear.
+barrierRatio = switchOn ? barrierRatioSlider : Infinity
 ```
 
 ```{ojs}
@@ -139,13 +138,13 @@ viewof feePostLocked = Inputs.toggle({ label: "lock f_post to f", value: true })
 
 ```{ojs}
 //| echo: false
-viewof feePostSlider = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "post-switch fee rate f_post" })
+viewof feePostSlider = Inputs.range([0, 1], { step: 0.01, value: 0.4, label: "fee-mode rate f_post" })
 ```
 
 ```{ojs}
 //| echo: false
 // null when locked (simulateSwitching interprets this as "use inputs.fee");
-// a numeric value when the user wants an independent post-switch rate.
+// a numeric value when the user wants an independent fee-mode rate.
 feePost = feePostLocked ? null : feePostSlider
 ```
 
@@ -175,7 +174,7 @@ mcResetButton = {
     lambdaDay: 1, kPre: 300000, cBasis: 21000,
     Tdays: 365, Q: 180, fee: 0.4,
     beta: 0, theta: 0, premiumMode: "sharpe",
-    switchMode: "off", barrierRatioSlider: 1.25,
+    switchOn: false, barrierRatioSlider: 1.25,
     feePostLocked: true, feePostSlider: 0.4,
     nPaths: 5000, nSteps: 100, seed: 42,
   };
@@ -185,7 +184,7 @@ mcResetButton = {
     lambdaDay: viewof lambdaDay, kPre: viewof kPre, cBasis: viewof cBasis,
     Tdays: viewof Tdays, Q: viewof Q, fee: viewof fee,
     beta: viewof beta, theta: viewof theta, premiumMode: viewof premiumMode,
-    switchMode: viewof switchMode, barrierRatioSlider: viewof barrierRatioSlider,
+    switchOn: viewof switchOn, barrierRatioSlider: viewof barrierRatioSlider,
     feePostLocked: viewof feePostLocked, feePostSlider: viewof feePostSlider,
     nPaths: viewof nPaths, nSteps: viewof nSteps, seed: viewof seed,
   };
@@ -314,13 +313,11 @@ run = {
 // matched-desk variant is `switching + treasury(N·P, N·P·S₀)` sample-wise,
 // which we don't surface on this page — see Validation for composed desks.
 switchRun = {
-  const effectiveMode = switchMode === "off" ? "two-way" : switchMode;
   const inputs = {
     S0: derived.S0, mu, sigma: derived.sigma, P,
     lambda: derived.lambda, T: derived.T,
     Q, fee,
     barrierRatio, feePost,
-    switchMode: effectiveMode,
     lambdaJ, muJ, sigmaJ,
     nPaths, nSteps, seed,
     keepPaths: 0,
@@ -359,22 +356,18 @@ html`<div class="derived-stats">
 </div>`
 ```
 
-Pick a switching mode from the side panel to activate the threshold
-$H = h \cdot S_0$. **Two-way** (the default on — except set to "off"
-here so the page opens with a pure b2b baseline) tracks $S_t$
-symmetrically: fee mode whenever $S_t \ge H$, b2b mode whenever it
-falls back below. **One-way** latches fee mode on the first upward
-crossing for the remainder of $[0, T]$. Both modes coincide on paths
-that cross at most once; two-way lets re-entry into b2b mode temper
-the tail truncation, one-way locks it in. The cards below report
-$\mathbb{P}[\text{ever in fee}]$, the mean time in fee mode, and the
-mean number of threshold crossings per path.
+Toggle **enable switching** in the side panel to activate the
+threshold $H = h \cdot S_0$. The book's mode tracks $S_t$
+symmetrically: fee pricing whenever $S_t \ge H$, b2b pricing whenever
+it falls back below. The cards below report
+$\mathbb{P}[\text{ever in fee}]$ (first-passage probability), the
+mean time in fee mode, and the mean number of threshold crossings
+per path — a volatile path just above $H$ can cross many times.
 
 ```{ojs}
 //| echo: false
-html`${(switchMode !== "off")
+html`${switchOn
   ? `<div class="derived-stats">
-    <div class="card"><div class="label">mode</div><div class="value">${switchMode}</div></div>
     <div class="card"><div class="label">threshold h</div><div class="value">${barrierRatio.toFixed(2)} (H = $${(barrierRatio * derived.S0).toFixed(4)})</div></div>
     <div class="card"><div class="label">f_post</div><div class="value">${(feePost ?? fee).toFixed(3)}${feePost === null ? " (locked to f)" : ""}</div></div>
     <div class="card"><div class="label">P[ever in fee]</div><div class="value">${(switchRun.probSwitch * 100).toFixed(1)}%</div></div>
@@ -383,7 +376,7 @@ html`${(switchMode !== "off")
     <div class="card"><div class="label">switching E[Π]</div><div class="value">${(switchRun.summary.mean >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.mean).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
     <div class="card"><div class="label">switching CVaR₉₅</div><div class="value">${(switchRun.summary.cvar95 >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   </div>`
-  : `<div class="derived-stats"><div class="card"><div class="label">switching</div><div class="value">off — pick "two-way" or "one-way" in the side panel to activate</div></div></div>`
+  : `<div class="derived-stats"><div class="card"><div class="label">switching</div><div class="value">off — toggle "enable switching" in the side panel to activate</div></div></div>`
 }`
 ```
 
@@ -392,7 +385,7 @@ html`${(switchMode !== "off")
 One row per **operating book** (fee, b2b, retained, switching) plus
 one row for the **treasury** at the slider's $(k, C_{\mathrm{basis}})$
 and a derived **custom desk** row $= b2b + \text{treasury}$. The
-switching row appears only when the barrier slider sits below 3.
+switching row appears only when "enable switching" is toggled on.
 
 | column | meaning |
 | --- | --- |
@@ -425,12 +418,9 @@ summaryRows = [
   { book: "retained (syndicated-on-b2b)", ...run.retained },
   { book: "treasury (k, C_basis)", ...run.treasury },
   { book: "custom desk = b2b + treasury", ...run.customDesk },
-  // Switching row only when a mode is selected.
-  ...(switchMode !== "off"
-    ? [{
-        book: `switching (${switchMode}, h=${barrierRatio.toFixed(2)})`,
-        ...switchRun.summary,
-      }]
+  // Switching row only when the threshold is active.
+  ...(switchOn
+    ? [{ book: `switching (h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
     : []),
 ]
 ```
@@ -480,8 +470,8 @@ cancelling between the two summands.
 //| echo: false
 // Switching facet follows the same predicate as the summary table row
 // (see the `summaryRows` cell above) so table and histogram agree in lockstep.
-includeSwitch = switchMode !== "off"
-switchLabel = includeSwitch ? `switching (${switchMode}, h=${barrierRatio.toFixed(2)})` : null
+includeSwitch = switchOn
+switchLabel = includeSwitch ? `switching (h=${barrierRatio.toFixed(2)})` : null
 ```
 
 ```{ojs}
@@ -588,7 +578,7 @@ Plot.plot({
     Plot.line(pathRecords.filter(r => r.id === 0), { x: "tDays", y: "S", stroke: "#c94", strokeWidth: 2 }),
     Plot.ruleX([run.tauFrac * Tdays], { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
     // Switching threshold H — dashed horizontal in the switching palette.
-    ...(switchMode !== "off"
+    ...(switchOn
       ? [Plot.ruleY([barrierRatio * derived.S0], { stroke: "#a36", strokeDasharray: "6 3", strokeWidth: 2 })]
       : []),
   ]
@@ -599,7 +589,8 @@ _Grey: sampled GBM trajectories of the kVCM spot. Orange: first path
 highlighted. Green dashed rule: inventory-exhaustion time; right of
 it, retirements are sourced at spot. Maroon dashed rule (when
 switching is on): threshold $H = h \cdot S_0$ — paths sitting above
-that line run in fee mode; paths below run in b2b mode. Under
-two-way the book tracks $S_t$ across the line in both directions;
-under one-way the first upward crossing latches the book in fee mode._
+that line run in fee mode; paths below run in b2b mode. The book
+tracks $S_t$ across the line in both directions, so a path that
+rallies above $H$ and then retraces hands the book back to b2b
+exposure._
 

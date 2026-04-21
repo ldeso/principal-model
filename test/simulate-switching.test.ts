@@ -14,9 +14,8 @@ import { simulateSwitching } from "../src/core/simulate-switching.js";
 import type { SwitchingInputs } from "../src/core/simulate-switching.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 
-// Baseline inputs: pure GBM (λ_J = 0) keeps the first-passage CDF exact;
-// moderate nPaths for fast iteration. `switchMode` defaults to "two-way" —
-// each test opts into "one-way" explicitly when it wants the legacy dynamic.
+// Baseline inputs: pure GBM (λ_J = 0) keeps the closed-form anchors exact;
+// moderate nPaths for fast iteration.
 const base: SwitchingInputs = {
   S0: 1,
   mu: 0.05,
@@ -33,90 +32,114 @@ const base: SwitchingInputs = {
   seed: 2026,
 };
 
-describe("simulateSwitching — shared invariants (mode-agnostic)", () => {
-  it("barrierRatio = Infinity collapses the switching book onto b2b in both modes", () => {
-    for (const switchMode of ["one-way", "two-way"] as const) {
-      const r = simulateSwitching({ ...base, switchMode });
-      for (let i = 0; i < r.everCrossedMask.length; i++) {
-        expect(r.everCrossedMask[i]).toBe(0);
-        expect(r.nCrossingsSamples[i]).toBe(0);
-        // tB2b accumulates dt·nSteps → base.T modulo a few ulps of drift.
-        expect(r.tB2bSamples[i]).toBeCloseTo(base.T, 10);
-        expect(r.tFeeSamples[i]).toBe(0);
-        expect(r.IFeeSamples[i]).toBe(0);
-      }
-      for (let i = 0; i < r.pnlSamples.length; i++) {
-        expect(r.pnlSamples[i]).toBeCloseTo(r.b2bSamples[i] as number, 10);
-      }
+describe("simulateSwitching — switching operating book", () => {
+  it("barrierRatio = Infinity collapses the switching book onto b2b", () => {
+    const r = simulateSwitching(base);
+    for (let i = 0; i < r.everCrossedMask.length; i++) {
+      expect(r.everCrossedMask[i]).toBe(0);
+      expect(r.nCrossingsSamples[i]).toBe(0);
+      // tB2b accumulates dt·nSteps → base.T modulo a few ulps of drift.
+      expect(r.tB2bSamples[i]).toBeCloseTo(base.T, 10);
+      expect(r.tFeeSamples[i]).toBe(0);
+      expect(r.IFeeSamples[i]).toBe(0);
+      expect(r.firstCrossTimeSamples[i]).toBe(base.T);
+    }
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      expect(r.pnlSamples[i]).toBeCloseTo(r.b2bSamples[i] as number, 10);
     }
   });
 
-  it("barrierRatio ≤ 1 starts the book in fee mode (every step bucketed to fee)", () => {
-    // Under one-way this fires the latch at t = 0; under two-way the mode
-    // tracks S_t ≥ H, which at t = 0 is true. From t = 0 either code path
-    // enters fee on the first step.
-    for (const switchMode of ["one-way", "two-way"] as const) {
-      const r = simulateSwitching({ ...base, switchMode, barrierRatio: 1 });
-      for (let i = 0; i < r.pnlSamples.length; i++) {
-        expect(r.everCrossedMask[i]).toBe(1);
-        // Under one-way tB2b stays 0 (latched at t=0); under two-way the
-        // spot may dip back below H = S_0 so tB2b can accumulate.
-        if (switchMode === "one-way") {
-          expect(r.tB2bSamples[i]).toBe(0);
-          expect(r.IB2bSamples[i]).toBe(0);
-          expect(r.pnlSamples[i]).toBeCloseTo(r.feeSamples[i] as number, 10);
-        }
-      }
+  it("barrierRatio ≤ 1 starts the book in fee mode (every step bucketed to fee at t=0)", () => {
+    // h ≤ 1 puts S_0 at or above H, so the mode indicator fires immediately
+    // and every step on [0, dt] enters in fee mode. Subsequent steps may
+    // cross back below if the path drifts low.
+    const r = simulateSwitching({ ...base, barrierRatio: 1 });
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      expect(r.everCrossedMask[i]).toBe(1);
+      expect(r.firstCrossTimeSamples[i]).toBe(0);
     }
   });
 
   it("I_b2b + I_fee = I_T and tB2b + tFee = T path-by-path (machine precision)", () => {
-    for (const switchMode of ["one-way", "two-way"] as const) {
-      const r = simulateSwitching({
-        ...base, switchMode, barrierRatio: 1.25, nPaths: 200, nSteps: 100,
-      });
-      for (let i = 0; i < r.pnlSamples.length; i++) {
-        expect((r.IB2bSamples[i] as number) + (r.IFeeSamples[i] as number))
-          .toBeCloseTo(r.ITSamples[i] as number, 12);
-        expect((r.tB2bSamples[i] as number) + (r.tFeeSamples[i] as number))
-          .toBeCloseTo(base.T, 12);
-      }
+    const r = simulateSwitching({
+      ...base, barrierRatio: 1.25, nPaths: 200, nSteps: 100,
+    });
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      expect((r.IB2bSamples[i] as number) + (r.IFeeSamples[i] as number))
+        .toBeCloseTo(r.ITSamples[i] as number, 12);
+      expect((r.tB2bSamples[i] as number) + (r.tFeeSamples[i] as number))
+        .toBeCloseTo(base.T, 12);
+    }
+  });
+
+  it("hand-computes switching_op = Q·λ·tB2b − P·λ·I_b2b + f_post·P·λ·I_fee", () => {
+    const p = {
+      ...base, barrierRatio: 1.2, nPaths: 30, nSteps: 40, seed: 1111,
+    };
+    const r = simulateSwitching(p);
+    const fPost = p.feePost ?? p.fee;
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      const tB2b = r.tB2bSamples[i] as number;
+      const IB2b = r.IB2bSamples[i] as number;
+      const IFee = r.IFeeSamples[i] as number;
+      const expected =
+        p.Q * p.lambda * tB2b -
+        p.P * p.lambda * IB2b +
+        fPost * p.P * p.lambda * IFee;
+      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
+    }
+    const r2 = simulateSwitching({ ...p, feePost: 0.15 });
+    for (let i = 0; i < r2.pnlSamples.length; i++) {
+      const tB2b = r2.tB2bSamples[i] as number;
+      const IB2b = r2.IB2bSamples[i] as number;
+      const IFee = r2.IFeeSamples[i] as number;
+      const expected =
+        p.Q * p.lambda * tB2b -
+        p.P * p.lambda * IB2b +
+        0.15 * p.P * p.lambda * IFee;
+      expect(r2.pnlSamples[i]).toBeCloseTo(expected, 9);
+    }
+  });
+
+  it("feePost = 0 reduces the fee-mode leg to zero path-by-path", () => {
+    const p = { ...base, barrierRatio: 1.2, feePost: 0 };
+    const r = simulateSwitching(p);
+    for (let i = 0; i < r.pnlSamples.length; i++) {
+      const tB2b = r.tB2bSamples[i] as number;
+      const IB2b = r.IB2bSamples[i] as number;
+      const expected = p.Q * p.lambda * tB2b - p.P * p.lambda * IB2b;
+      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
     }
   });
 
   it("feePost = f equals feePost = null path-by-path (lock-to-f)", () => {
-    for (const switchMode of ["one-way", "two-way"] as const) {
-      const shared = { ...base, switchMode, barrierRatio: 1.25 };
-      const rNull = simulateSwitching({ ...shared, feePost: null });
-      const rLocked = simulateSwitching({ ...shared, feePost: shared.fee });
-      for (let i = 0; i < rNull.pnlSamples.length; i++) {
-        expect(rNull.pnlSamples[i]).toBeCloseTo(rLocked.pnlSamples[i] as number, 10);
-      }
-      expect(rNull.feePostResolved).toBe(shared.fee);
-      expect(rLocked.feePostResolved).toBe(shared.fee);
+    const shared = { ...base, barrierRatio: 1.25 };
+    const rNull = simulateSwitching({ ...shared, feePost: null });
+    const rLocked = simulateSwitching({ ...shared, feePost: shared.fee });
+    for (let i = 0; i < rNull.pnlSamples.length; i++) {
+      expect(rNull.pnlSamples[i]).toBeCloseTo(rLocked.pnlSamples[i] as number, 10);
     }
+    expect(rNull.feePostResolved).toBe(shared.fee);
+    expect(rLocked.feePostResolved).toBe(shared.fee);
   });
 
   it("shares RNG with models.simulate under shared seed (I_T parity path-by-path)", () => {
-    for (const switchMode of ["one-way", "two-way"] as const) {
-      const p = withOverrides(defaultParams, {
-        nPaths: 64, nSteps: 50, seed: 1234,
-        lambdaJ: 0, muJ: 0, sigmaJ: 0,
-        barrierRatio: Infinity, switchMode,
-      });
-      const mc = simulate(p);
-      const sw = simulateSwitching({
-        S0: p.S0, mu: p.mu, sigma: p.sigma, P: p.P, lambda: p.lambda, T: p.T,
-        Q: p.Q, fee: p.f,
-        barrierRatio: p.barrierRatio, feePost: p.feePost,
-        switchMode: p.switchMode,
-        lambdaJ: 0, muJ: 0, sigmaJ: 0,
-        nPaths: p.nPaths, nSteps: p.nSteps, seed: p.seed,
-      });
-      for (let i = 0; i < p.nPaths; i++) {
-        expect(sw.ITSamples[i]).toBeCloseTo(mc.IT[i] as number, 12);
-        expect(sw.terminalS[i]).toBeCloseTo(mc.terminalS[i] as number, 12);
-      }
+    const p = withOverrides(defaultParams, {
+      nPaths: 64, nSteps: 50, seed: 1234,
+      lambdaJ: 0, muJ: 0, sigmaJ: 0,
+      barrierRatio: Infinity,
+    });
+    const mc = simulate(p);
+    const sw = simulateSwitching({
+      S0: p.S0, mu: p.mu, sigma: p.sigma, P: p.P, lambda: p.lambda, T: p.T,
+      Q: p.Q, fee: p.f,
+      barrierRatio: p.barrierRatio, feePost: p.feePost,
+      lambdaJ: 0, muJ: 0, sigmaJ: 0,
+      nPaths: p.nPaths, nSteps: p.nSteps, seed: p.seed,
+    });
+    for (let i = 0; i < p.nPaths; i++) {
+      expect(sw.ITSamples[i]).toBeCloseTo(mc.IT[i] as number, 12);
+      expect(sw.terminalS[i]).toBeCloseTo(mc.terminalS[i] as number, 12);
     }
   });
 
@@ -134,45 +157,45 @@ describe("simulateSwitching — shared invariants (mode-agnostic)", () => {
       expect(r.ITSamples[i]).toBeCloseTo(path.IT, 12);
     }
   });
-});
 
-describe("simulateSwitching — one-way mode (legacy stopping-time formulation)", () => {
-  it("hand-computes switching_op = Q·λ·τ − P·λ·I_τ + f_post·P·λ·J_τ", () => {
+  it("produces paths with > 1 crossing when σ and threshold allow re-entry", () => {
+    // Symmetric flipping means a volatile path just above the threshold
+    // can cross many times; this exercises the indicator logic that
+    // distinguishes a path-level diagnostic (nCrossings) from book
+    // behaviour (tB2b / tFee, which accumulate across re-entries).
     const p = {
-      ...base, switchMode: "one-way" as const,
-      barrierRatio: 1.2, nPaths: 30, nSteps: 40, seed: 9999,
+      ...base, mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
+      nPaths: 5_000, nSteps: 500, seed: 321,
     };
     const r = simulateSwitching(p);
-    const fPost = p.feePost ?? p.fee;
-    for (let i = 0; i < r.pnlSamples.length; i++) {
-      const tau = r.tB2bSamples[i] as number;
-      const ITau = r.IB2bSamples[i] as number;
-      const JTau = r.IFeeSamples[i] as number;
-      const expected =
-        p.Q * p.lambda * tau -
-        p.P * p.lambda * ITau +
-        fPost * p.P * p.lambda * JTau;
-      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
-      expect(ITau + JTau).toBeCloseTo(r.ITSamples[i] as number, 12);
+    let maxK = 0;
+    let totalK = 0;
+    for (let i = 0; i < r.nCrossingsSamples.length; i++) {
+      const k = r.nCrossingsSamples[i] as number;
+      totalK += k;
+      if (k > maxK) maxK = k;
     }
+    expect(maxK).toBeGreaterThan(1);
+    expect(totalK / r.nCrossingsSamples.length).toBeGreaterThan(1);
   });
 
-  it("everCrossedMask matches the legacy switched-before-T predicate", () => {
-    // nCrossingsSamples is a spot-level diagnostic (mode-agnostic), so under
-    // one-way a path may cross the threshold multiple times even though the
-    // book latches fee mode on the first crossing. The book-level "did the
-    // path ever enter fee mode" predicate is `everCrossedMask`, which under
-    // one-way lines up with the legacy `switched < T` bit.
+  it("firstCrossTimeSamples ≤ tB2bSamples on every path (τ precedes any re-entry time)", () => {
+    // The spot is in b2b mode on [0, τ) by definition, so tB2b ≥ τ always;
+    // equality holds when the path stays in fee mode after τ.
     const p = {
-      ...base, switchMode: "one-way" as const,
-      barrierRatio: 1.1, nPaths: 500, nSteps: 500, seed: 7,
+      ...base, mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
+      nPaths: 2_000, nSteps: 500, seed: 9,
     };
     const r = simulateSwitching(p);
-    for (let i = 0; i < r.everCrossedMask.length; i++) {
-      // tB2b == T iff the path never reached fee mode (latched or otherwise).
-      const neverEntered = (r.tB2bSamples[i] as number) > base.T - 1e-9;
-      expect(Boolean(r.everCrossedMask[i])).toBe(!neverEntered);
+    let diverging = 0;
+    for (let i = 0; i < r.firstCrossTimeSamples.length; i++) {
+      const tau = r.firstCrossTimeSamples[i] as number;
+      const tB2b = r.tB2bSamples[i] as number;
+      expect(tB2b).toBeGreaterThanOrEqual(tau - 1e-9);
+      if (tB2b - tau > 1e-6) diverging += 1;
     }
+    // Re-entries should produce a material fraction of diverging paths.
+    expect(diverging).toBeGreaterThan(50);
   });
 
   it("MC P[ever crossed] matches firstPassageProb under pure GBM within 4·stderr", () => {
@@ -183,7 +206,7 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
     ];
     for (const c of cases) {
       const p = {
-        ...base, switchMode: "one-way" as const,
+        ...base,
         mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
         nPaths: 20_000, nSteps: 1_000,
       };
@@ -197,31 +220,14 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
     }
   });
 
-  it("firstCrossTimeSamples equals tB2bSamples path-by-path under one-way", () => {
-    // Under one-way the book latches at the first crossing, so the b2b
-    // occupation time is itself the first-crossing time (or T if no
-    // crossing). The two arrays should agree to machine precision.
-    const p = {
-      ...base, switchMode: "one-way" as const,
-      barrierRatio: 1.2, nPaths: 500, nSteps: 500, seed: 13,
-    };
-    const r = simulateSwitching(p);
-    for (let i = 0; i < r.tB2bSamples.length; i++) {
-      expect(r.firstCrossTimeSamples[i]).toBeCloseTo(
-        r.tB2bSamples[i] as number,
-        12,
-      );
-    }
-  });
-
-  it("MC E[first-crossing ∧ T] matches expectedHittingTime within 4·stderr", () => {
+  it("MC E[τ ∧ T] matches expectedHittingTime under pure GBM within 4·stderr", () => {
     const cases = [
       { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
       { h: 1.5, mu: 0.0, sigma: 0.5, T: 1.5 },
     ];
     for (const c of cases) {
       const p = {
-        ...base, switchMode: "one-way" as const,
+        ...base,
         mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
         nPaths: 20_000, nSteps: 1_000,
       };
@@ -232,9 +238,46 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
     }
   });
 
+  it("MC E[T_fee] matches expectedTimeAboveBarrier under pure GBM within 4·stderr", () => {
+    const cases = [
+      { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
+      { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
+      { h: 1.5, mu: 0.1, sigma: 0.5, T: 1.5 },
+    ];
+    for (const c of cases) {
+      const p = {
+        ...base,
+        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
+        nPaths: 30_000, nSteps: 1_000,
+      };
+      const r = simulateSwitching(p);
+      const s = summarize(r.tFeeSamples);
+      const cf = expectedTimeAboveBarrier(c.mu, c.sigma, c.T, c.h);
+      expect(Math.abs(s.mean - cf)).toBeLessThan(4 * s.stderr + 0.02);
+    }
+  });
+
+  it("MC E[I_fee] matches expectedIntegralAboveBarrier under pure GBM within 4·stderr", () => {
+    const cases = [
+      { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
+      { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
+    ];
+    for (const c of cases) {
+      const p = {
+        ...base, S0: 1,
+        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
+        nPaths: 30_000, nSteps: 1_000,
+      };
+      const r = simulateSwitching(p);
+      const s = summarize(r.IFeeSamples);
+      const cf = expectedIntegralAboveBarrier(p.S0, c.mu, c.sigma, c.T, c.h);
+      expect(Math.abs(s.mean - cf)).toBeLessThan(4 * s.stderr + 0.02);
+    }
+  });
+
   it("discrete-crossing bias decreases monotonically in nSteps", () => {
     const base1 = {
-      ...base, switchMode: "one-way" as const,
+      ...base,
       mu: 0.0, sigma: 0.4, barrierRatio: 1.3, nPaths: 30_000, seed: 9001,
     };
     const pCf = firstPassageProb(base1.mu, base1.sigma, base1.T, base1.barrierRatio);
@@ -252,7 +295,7 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
 
   it("compensated Merton jumps strictly raise P[ever crossed] at equal σ", () => {
     const shared = {
-      ...base, switchMode: "one-way" as const,
+      ...base,
       mu: 0.0, sigma: 0.3, barrierRatio: 1.4,
       nPaths: 30_000, nSteps: 500, seed: 4242,
     };
@@ -265,7 +308,7 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
 
   it("CVaR decomposition brackets the overall CVaR by the everCrossedMask partition", () => {
     const p = {
-      ...base, switchMode: "one-way" as const,
+      ...base,
       barrierRatio: 1.25, nPaths: 20_000, nSteps: 500, seed: 8888,
     };
     const r = simulateSwitching(p);
@@ -289,151 +332,8 @@ describe("simulateSwitching — one-way mode (legacy stopping-time formulation)"
   });
 });
 
-describe("simulateSwitching — two-way mode (Markov indicator formulation)", () => {
-  it("hand-computes switching_op = Q·λ·tB2b − P·λ·I_b2b + f_post·P·λ·I_fee", () => {
-    const p = {
-      ...base, switchMode: "two-way" as const,
-      barrierRatio: 1.2, nPaths: 30, nSteps: 40, seed: 1111,
-    };
-    const r = simulateSwitching(p);
-    const fPost = p.feePost ?? p.fee;
-    for (let i = 0; i < r.pnlSamples.length; i++) {
-      const tB2b = r.tB2bSamples[i] as number;
-      const IB2b = r.IB2bSamples[i] as number;
-      const IFee = r.IFeeSamples[i] as number;
-      const expected =
-        p.Q * p.lambda * tB2b -
-        p.P * p.lambda * IB2b +
-        fPost * p.P * p.lambda * IFee;
-      expect(r.pnlSamples[i]).toBeCloseTo(expected, 9);
-    }
-  });
-
-  it("produces paths with > 1 crossing when volatility and σ are sufficient", () => {
-    const p = {
-      ...base, switchMode: "two-way" as const,
-      mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
-      nPaths: 5_000, nSteps: 500, seed: 321,
-    };
-    const r = simulateSwitching(p);
-    let maxK = 0;
-    let totalK = 0;
-    for (let i = 0; i < r.nCrossingsSamples.length; i++) {
-      const k = r.nCrossingsSamples[i] as number;
-      totalK += k;
-      if (k > maxK) maxK = k;
-    }
-    expect(maxK).toBeGreaterThan(1);
-    expect(totalK / r.nCrossingsSamples.length).toBeGreaterThan(1);
-  });
-
-  it("firstCrossTimeSamples diverges from tB2bSamples on re-entering paths under two-way", () => {
-    // On any path that crosses H upward and falls back below, two-way
-    // accumulates extra tB2b time after τ, so tB2b > firstCrossTime; on
-    // paths that stay above H after the first crossing or never cross,
-    // they agree. Pick parameters that produce ample re-entry traffic.
-    const p = {
-      ...base, switchMode: "two-way" as const,
-      mu: 0.0, sigma: 0.6, barrierRatio: 1.05,
-      nPaths: 2_000, nSteps: 500, seed: 9,
-    };
-    const r = simulateSwitching(p);
-    let diverging = 0;
-    for (let i = 0; i < r.firstCrossTimeSamples.length; i++) {
-      const tau = r.firstCrossTimeSamples[i] as number;
-      const tB2b = r.tB2bSamples[i] as number;
-      // On every path tB2b ≥ τ up to discretisation: the spot is in b2b mode
-      // on [0, τ) by definition of τ. Re-entries widen the gap.
-      expect(tB2b).toBeGreaterThanOrEqual(tau - 1e-9);
-      if (tB2b - tau > 1e-6) diverging += 1;
-    }
-    expect(diverging).toBeGreaterThan(50);
-  });
-
-  it("MC E[first-crossing ∧ T] matches expectedHittingTime under two-way within 4·stderr", () => {
-    // τ is a path property — the Harrison oracle anchors its MC estimate
-    // under both modes. Under two-way the book doesn't latch at τ, but
-    // the stopping time itself is unchanged.
-    const cases = [
-      { h: 1.2, mu: 0.05, sigma: 0.3, T: 1 },
-      { h: 1.5, mu: 0.0, sigma: 0.5, T: 1.5 },
-    ];
-    for (const c of cases) {
-      const p = {
-        ...base, switchMode: "two-way" as const,
-        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
-        nPaths: 20_000, nSteps: 1_000,
-      };
-      const r = simulateSwitching(p);
-      const s = summarize(r.firstCrossTimeSamples);
-      const cfT = expectedHittingTime(c.mu, c.sigma, c.T, c.h);
-      expect(Math.abs(s.mean - cfT)).toBeLessThan(4 * s.stderr + 0.01);
-    }
-  });
-
-  it("MC E[T_fee] matches expectedTimeAboveBarrier under pure GBM within 4·stderr", () => {
-    const cases = [
-      { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
-      { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
-      { h: 1.5, mu: 0.1, sigma: 0.5, T: 1.5 },
-    ];
-    for (const c of cases) {
-      const p = {
-        ...base, switchMode: "two-way" as const,
-        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
-        nPaths: 30_000, nSteps: 1_000,
-      };
-      const r = simulateSwitching(p);
-      const s = summarize(r.tFeeSamples);
-      const cf = expectedTimeAboveBarrier(c.mu, c.sigma, c.T, c.h);
-      expect(Math.abs(s.mean - cf)).toBeLessThan(4 * s.stderr + 0.02);
-    }
-  });
-
-  it("MC E[I_fee] matches expectedIntegralAboveBarrier under pure GBM within 4·stderr", () => {
-    const cases = [
-      { h: 1.1, mu: 0.05, sigma: 0.3, T: 1 },
-      { h: 1.25, mu: 0.0, sigma: 0.4, T: 1 },
-    ];
-    for (const c of cases) {
-      const p = {
-        ...base, S0: 1, switchMode: "two-way" as const,
-        mu: c.mu, sigma: c.sigma, T: c.T, barrierRatio: c.h,
-        nPaths: 30_000, nSteps: 1_000,
-      };
-      const r = simulateSwitching(p);
-      const s = summarize(r.IFeeSamples);
-      const cf = expectedIntegralAboveBarrier(p.S0, c.mu, c.sigma, c.T, c.h);
-      expect(Math.abs(s.mean - cf)).toBeLessThan(4 * s.stderr + 0.02);
-    }
-  });
-
-  it("two-way P&L differs from one-way path-by-path when the spot recrosses", () => {
-    const shared = {
-      ...base, mu: 0.0, sigma: 0.5, barrierRatio: 1.1,
-      nPaths: 2_000, nSteps: 500, seed: 555,
-    };
-    const one = simulateSwitching({ ...shared, switchMode: "one-way" });
-    const two = simulateSwitching({ ...shared, switchMode: "two-way" });
-    let differingPaths = 0;
-    let equalOnNoCross = 0;
-    for (let i = 0; i < one.pnlSamples.length; i++) {
-      const a = one.pnlSamples[i] as number;
-      const b = two.pnlSamples[i] as number;
-      if (Math.abs(a - b) > 1e-6) differingPaths += 1;
-      if (!one.everCrossedMask[i] && !two.everCrossedMask[i]) {
-        // Never-crossed paths reduce to b2b under both modes.
-        expect(a).toBeCloseTo(b, 10);
-        equalOnNoCross += 1;
-      }
-    }
-    expect(differingPaths).toBeGreaterThan(10);
-    expect(equalOnNoCross).toBeGreaterThan(0);
-  });
-});
-
 describe("moments.ts — first-passage and above-barrier helpers", () => {
-  it("h ≤ 1 returns P = 1 and E[τ] = 0 (barrier already breached)", () => {
+  it("h ≤ 1 returns P = 1 and E[τ] = 0 (threshold already breached)", () => {
     expect(firstPassageProb(0.05, 0.3, 1, 1)).toBe(1);
     expect(firstPassageProb(0.05, 0.3, 1, 0.9)).toBe(1);
     expect(expectedHittingTime(0.05, 0.3, 1, 1)).toBe(0);

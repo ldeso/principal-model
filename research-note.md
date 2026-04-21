@@ -81,8 +81,8 @@ below in stopping times.
 | --- | --- |
 | $h \ge 1$ | Threshold multiple — switching book flips whenever $S_t$ crosses $h \cdot S_0$ |
 | $H := h \cdot S_0$ | Absolute threshold level |
-| $\mathsf{two}/\mathsf{one}$-way | Two-way: mode tracks $\mathbf{1}\{S_t \ge H\}$ symmetrically. One-way: the first upward crossing latches fee mode for the remainder of $[0, T]$. |
-| $\tau := \inf\{t : S_t \ge H\} \wedge T$ | First-passage time (defined under both modes; only drives the payoff under one-way) |
+| $\mathbf{1}^{\mathrm{fee}}_t := \mathbf{1}\{S_t \ge H\}$ | Fee-mode indicator — the book's mode is a pure state function of the spot |
+| $\tau := \inf\{t : S_t \ge H\} \wedge T$ | First-passage time (path property; anchors the Harrison oracle) |
 | $f_{\mathrm{post}}$ | Fee rate applied whenever the book is in fee mode |
 
 *Jumps (compensated Merton overlay; details in §[Jumps](#compensated-merton-jump-diffusion)).*
@@ -471,9 +471,10 @@ whenever $S_t$ sits above an upper threshold $H = h S_0$, every
 tonne retired while the spot is above $H$ earns the non-negative fee
 payoff and the loss tail is capped.
 
-The cleanest formulation is a **state-dependent mode indicator**. At
-every instant the book is in exactly one of two modes, determined by
-whether the spot is above or below the threshold:
+The book's mode is a **pure state function of the spot**: fee mode
+whenever $S_t$ is above the threshold, b2b mode whenever it is
+below. The indicator rides the spot across $H$ symmetrically, so the
+book flips back to b2b as soon as the spot falls below $H$ again:
 
 $$
 M_t := \begin{cases}
@@ -514,38 +515,8 @@ $$
 
 $h \to \infty$ gives $\mathbf{1}^{\mathrm{fee}}_t \equiv 0$ and
 recovers $\Pi_{\mathrm{b2b}}$; $h \le 1$ forces $\mathbf{1}^{\mathrm{fee}}_0
-= 1$ so the book starts in fee mode. The post-switch rate defaults
-to $f$ but is a free parameter.
-
-### Two-way vs. one-way
-
-The formulation above treats the mode as a pure state function of
-$S_t$, so the book flips **both** directions: fee mode whenever the
-spot is above $H$, b2b mode whenever it falls back below. This is the
-**two-way** variant — the default, and the only variant with a
-business interpretation that is symmetric in time. A reader's natural
-question ("what happens if the spot crosses back below $H$?") is
-answered directly by the indicator.
-
-The **one-way** variant is the monotone restriction that replaces
-$\mathbf{1}^{\mathrm{fee}}_t$ with $\mathbf{1}\{\tau \le t\}$, where
-$\tau := \inf\{t \in [0, T] : S_t \ge H\} \wedge T$ is the
-first-passage time to $H$. Under that substitution,
-$I_{\mathrm{b2b}} = I_\tau$, $I_{\mathrm{fee}} = J_\tau :=
-\int_\tau^T S_t \, dt$, $T_{\mathrm{b2b}} = \tau$, and the P&L reduces
-to the stopping-time expression
-
-$$
-\Pi_{\mathrm{sw}}^{\,\mathrm{one\text{-}way}}
-  = Q \lambda \tau - P \lambda I_\tau + f_{\mathrm{post}} \, P \lambda J_\tau,
-$$
-
-which is the legacy barrier-triggered form. The one-way book latches:
-once fee mode is entered it stays entered, regardless of subsequent
-price action. The two-way book un-latches whenever the spot dips back
-below $H$. Both variants coincide on the set of paths that cross $H$
-at most once — which under typical $(\mu, \sigma, T, h)$ is most of
-the paths.
+= 1$ so the book starts in fee mode. The fee-mode rate defaults to
+$f$ but is a free parameter.
 
 ### Closed-form anchors
 
@@ -592,10 +563,11 @@ Both are Simpson-quadrature-tractable and land in
 `expectedIntegralAboveBarrier`. The simulator z-tests its MC
 estimates against them on every run.
 
-The first-passage anchor is shared by both modes — it is the
-probability that the book *ever* enters fee mode on $[0, T]$, i.e.
-$\mathbb{P}[\tau \le T]$, which under pure GBM is (Harrison 1985;
-Borodin-Salminen Table 3.0.1)
+The first-passage time $\tau := \inf\{t : S_t \ge H\} \wedge T$ is a
+**path property**, independent of the book's response: it exists
+regardless of the switching rule. Its distribution under pure GBM is
+the Harrison / Borodin-Salminen hitting-time law (Harrison 1985;
+Borodin-Salminen Table 3.0.1):
 
 $$
 \mathbb{P}[\tau \le T]
@@ -605,14 +577,16 @@ $$
 $$
 
 with $\mathbb{E}[\tau \wedge T] = \int_0^T (1 - \mathbb{P}[\tau \le
-t]) \, dt$ as a tractable quadrature. Under one-way the latter equals
-$T - \mathbb{E}[T_{\mathrm{fee}}]$ exactly; under two-way the two
-anchors are independent measurements (the spot may spend time above
-$H$ after $\tau$ and also fall back below, so $T_{\mathrm{fee}}$ is
-*not* $T - \tau$).
+t]) \, dt$ as a tractable quadrature. $\mathbb{P}[\tau \le T]$ equals
+$\mathbb{P}[\text{path ever enters fee mode on }[0, T]]$, so it
+anchors the empirical switch probability; $\mathbb{E}[\tau \wedge T]$
+is the mean first-crossing time. Note $T_{\mathrm{fee}}$ is not
+$T - \tau$ in general — the spot may spend time above $H$ after
+$\tau$ and also fall back below, so $\mathbb{E}[\tau \wedge T]$ and
+$\mathbb{E}[T_{\mathrm{fee}}]$ are independent measurements.
 
-No closed-form density exists for $\Pi_{\mathrm{sw}}$ under either
-mode — tail quantiles (VaR, CVaR) require Monte Carlo.
+No closed-form density exists for $\Pi_{\mathrm{sw}}$ — tail
+quantiles (VaR, CVaR) require Monte Carlo.
 
 ### Why a tail-truncation claim, not just a rescaling
 
@@ -627,36 +601,34 @@ $$
     \mathrm{CVaR}_{95}^{\{\tau < T\}}[\Pi_{\mathrm{sw}}].
 $$
 
-On paths that never reach $H$, both variants coincide with
-$\Pi_{\mathrm{b2b}}$. On paths that do reach $H$, the fee-mode leg
-contributes non-negative revenue $f_{\mathrm{post}} \, P \lambda \,
-I_{\mathrm{fee}} \ge 0$. As $h \downarrow 1$ the first term's weight
+On paths that never reach $H$, the switching book coincides with
+$\Pi_{\mathrm{b2b}}$. On paths that do reach $H$, each fee-mode
+sub-interval contributes non-negative revenue $f_{\mathrm{post}} \,
+P \lambda \cdot (\text{integral of } S_t \text{ over that
+sub-interval}) \ge 0$. As $h \downarrow 1$ the first term's weight
 shrinks, the fee-mode leg's contribution grows, and the bound
 tightens. The simulator reports `CVaR95|no-switch` and
 `CVaR95|switched` separately so the truncation is visible on the
 instrument, not just in prose.
 
-**Two-way tempers the truncation with re-entry risk.** Paths that
-cross $H$ upward, earn fee revenue, then fall back below $H$ re-enter
-b2b mode and accumulate additional $-P \lambda I_{\mathrm{b2b}}$
-exposure. One-way locks in the fee-mode leg once entered, so its tail
-truncation is strictly more aggressive than two-way's at the same
-$h$; two-way tracks the spot's regime more faithfully but gives up
-some of the tail cap. The validation-page sweep plots both curves for
-eye comparison.
+The truncation is **tempered by re-entry risk**: paths that cross
+$H$ upward, earn fee revenue, then fall back below $H$ re-enter b2b
+mode and accumulate additional $-P \lambda \cdot (\text{integral
+below } H)$ exposure. That trade-off — regime fidelity bought at
+the cost of a looser tail cap — is the business content of the
+symmetric indicator.
 
 ### Operator decision surface
 
 Fix $(\mu, \sigma, f, f_{\mathrm{post}})$ and sweep $h$.
 $\mathbb{E}[\Pi_{\mathrm{sw}}]$ and $\mathrm{CVaR}_{95}[\Pi_{\mathrm{sw}}]$
-are monotone in $h$ in opposite directions under either mode: a
-tighter threshold lifts the mean (fee revenue replaces
-negative-skewed b2b exposure) and tightens the tail. The knee
-against the b2b reference is the operator's decision point. Optimal
-$h$ is a control-problem formulation (scope: Limitations). The
-eyeball-the-knee presentation is deliberate: matching means does not
-match distributions, and choosing a tail cap is a business decision,
-not a pricing optimum.
+are monotone in $h$ in opposite directions: a tighter threshold
+lifts the mean (fee revenue replaces negative-skewed b2b exposure)
+and tightens the tail. The knee against the b2b reference is the
+operator's decision point. Optimal $h$ is a control-problem
+formulation (scope: Limitations). The eyeball-the-knee presentation
+is deliberate: matching means does not match distributions, and
+choosing a tail cap is a business decision, not a pricing optimum.
 
 ## Direct comparison {#direct-comparison}
 
@@ -667,7 +639,7 @@ GBM:
 | --- | --- | --- | --- | --- | --- |
 | $\mathbb{E}[\Pi]$ | $f P \lambda \mathbb{E}[I_T]$ | $Q N - P \lambda \mathbb{E}[I_T]$ | $(1 - \beta) \mathbb{E}[\Pi_{\mathrm{b2b}}] + \pi_{\mathrm{syn}}$ | MC only; mode-level anchors on $\mathbb{E}[T_{\mathrm{fee}}]$, $\mathbb{E}[I_{\mathrm{fee}}]$ | $P \lambda \mathbb{E}[I_{\tau_{\mathrm{cov}}}] + k_{\mathrm{left}} S_0 e^{\mu T} - C_{\mathrm{basis}}$ |
 | $\mathrm{Var}[\Pi]$ | $(f P \lambda)^2 \mathrm{Var}[I_T]$ | $(P \lambda)^2 \mathrm{Var}[I_T]$ | $(1 - \beta)^2 \mathrm{Var}[\Pi_{\mathrm{b2b}}]$ | MC only | branch on $k_{\mathrm{left}}$ (see §Treasury) |
-| kVCM exposure | long | short | short, scaled by $1 - \beta$ | short while $S_t < H$, long while $S_t \ge H$ (two-way); short on $[0, \tau]$, long on $[\tau, T]$ (one-way) | long on $[0, \tau_{\mathrm{cov}}]$ plus $S_T$ exposure on leftover |
+| kVCM exposure | long | short | short, scaled by $1 - \beta$ | short while $S_t < H$, long while $S_t \ge H$ | long on $[0, \tau_{\mathrm{cov}}]$ plus $S_T$ exposure on leftover |
 | Downside | bounded below by $0$ | unbounded | $(1 - \beta) \times$ b2b | partially truncated — non-negative on every fee-mode sub-interval | $-C_{\mathrm{basis}}$ if $S \equiv 0$ |
 | Capital | none | none | none | none | $C_{\mathrm{basis}}$ sunk |
 | Counterparty | none | none | $\beta \cdot \Pi_{\mathrm{b2b}}$ upside | same as retained on the fee-mode leg | none |
@@ -774,7 +746,7 @@ anchor.
 | No historical calibration | Simulator — kVCM proxy (KLIMA, BCT, NCT) |
 | No discounting, gas, or on-chain slippage | Simulator — parameterised |
 | Passive treasury (no intraday rebalancing, over-hedge leftover marked at $S_T$) | Simulator — active consumption schedule is the baseline; dynamic delta hedge with perp/futures and tranched cessions pending |
-| Static-rate syndication and switching | Simulator — quota-share syndication at the b2b operating layer; two-way threshold-triggered switching is the default with one-way as a selectable monotone restriction; adaptive / optimal-$h$ control pending |
+| Static-rate syndication and switching | Simulator — quota-share syndication at the b2b operating layer; symmetric threshold-triggered switching (book flips whenever $S_t$ crosses $H$ in either direction); adaptive / optimal-$h$ control pending |
 | No credit / counterparty layer | Not scoped (syndication treats cession as default-free; tranching remains out of scope — non-linear in $I_T$, breaks the Dufresne backbone) |
 
 This table is the authoritative scope statement; the Summary page

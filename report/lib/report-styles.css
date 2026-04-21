@@ -219,49 +219,23 @@ nav#TOC > ul { font-size: 0.78rem; }
 
 /* --- Switching palette --------------------------------------------------- */
 /* Shared muted tones for anything describing the switching book across the
-   report (mode radio, threshold rules on plots, scorecard chips). Kept in
-   one place so simulator / index / validation speak the same visual
-   language for the fee-mode region. */
+   report — threshold rules on plots, fee-mode overlays, sweep curves.
+   Kept in one place so simulator / index / validation speak the same
+   visual language. */
 
 :root {
   --switch-accent: #a33b5b;      /* threshold / fee-mode marker */
   --switch-accent-soft: #f4e6eb; /* background tint for fee-mode bands */
-  --switch-oneway: #2a8b82;      /* validation-page sweep colour, one-way */
-  --switch-twoway: #a33b5b;      /* validation-page sweep colour, two-way */
 }
 
-/* Inline chip showing the active switching mode next to a scorecard row
-   or diagnostic label. Sits inline with text; re-uses the side-panel
-   type scale so it blends with the side-panel cards. */
-.switch-mode-chip {
-  display: inline-block;
-  padding: 0.05rem 0.4rem;
-  margin-left: 0.3rem;
-  border: 1px solid var(--switch-accent);
-  border-radius: 999px;
-  background: var(--switch-accent-soft);
-  color: var(--switch-accent);
-  font-family: ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-  vertical-align: 1px;
-}
-
-/* Plot overlay — any Plot.rect / Plot.areaY marking a fee-mode sub-interval
-   can use this class to inherit the shared palette instead of hardcoding
-   colours inline. Non-interactive (pointer-events: none) so the band does
-   not eat tooltips on top of it. */
+/* Plot overlay — any Plot.rect / Plot.areaY marking a fee-mode
+   sub-interval can use this class to inherit the shared palette instead
+   of hardcoding colours inline. Non-interactive (pointer-events: none)
+   so the band does not eat tooltips on top of it. */
 .fee-band {
   fill: var(--switch-accent-soft);
   fill-opacity: 0.55;
   stroke: var(--switch-accent);
   stroke-opacity: 0.25;
   pointer-events: none;
-}
-
-/* Radio/toggle row for the switching mode selector — slightly tightened
-   spacing so the 3-option `off / two-way / one-way` cluster fits on one
-   line in the side panel on laptop viewports. */
-.pc-controls form[class*="oi-"] input[type="radio"] + label {
-  margin-right: 0.35rem;
 }
