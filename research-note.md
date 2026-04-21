@@ -204,7 +204,7 @@ $$
 The fee book satisfies the same identity with the sign reversed and
 magnitude $f P \lambda (T - t)$. The natural static hedge for the
 b2b book at time $t$ is therefore $P \lambda (T - t)$ tokens of spot
-kVCM — exactly the treasury schedule at $k = N P$, which motivates
+kVCM, exactly the treasury schedule at $k = N P$, which motivates
 the next section.
 
 ## The active treasury {#treasury-book}

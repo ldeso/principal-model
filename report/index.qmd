@@ -26,7 +26,7 @@ or a **principal** price (a fixed USD quote, with balance-sheet
 exposure). The fee book has a non-negative revenue floor; the
 principal book has an unbounded loss tail. Both reduce to the same
 spot integral $I_T = \int_0^T S_t \, dt$, and at the break-even quote
-$Q^*$ they match in expectation — but not in shape: fee revenue is
+$Q^*$ they match in expectation, but not in shape: fee revenue is
 floored at zero while the b2b book stays capped above at $Q N$ and
 open below. Equal moments are not equal distributions. Derivations:
 [Model](model.qmd); symbol table:

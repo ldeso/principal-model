@@ -328,7 +328,7 @@ _Black: closed-form $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$._
 
 Every closed form on this page rolls up through $I_T = \int_0^T S_t
 \, dt$. Dufresne (2001) gives its mean and variance analytically,
-drawn as rules on the Monte Carlo histogram — solid at
+drawn as rules on the Monte Carlo histogram: solid at
 $\mathbb{E}[I_T]$, dashed at $\pm \mathrm{SD}[I_T]$. What you should
 see: the histogram centred on the solid rule, but with a visible
 right skew and a heavier left tail than a normal would predict. That
@@ -424,7 +424,7 @@ $$
 The dashed black rule is the 95th percentile, the solid black rule
 the 99th. What you should see: a right-skewed distribution with a
 non-trivial mass above zero even though terminal P&L is
-deterministic — size the funding buffer against the 99th line, not
+deterministic, so size the funding buffer against the 99th line, not
 against $V_T = 0$.
 
 ```{ojs}
@@ -471,8 +471,8 @@ viewof pickMu = Inputs.select(sweep.grid.mus, { value: -0.1, label: "drift μ (/
 Each point is one Monte Carlo cell at the picked $(\alpha, \mu)$,
 plotting the partial desk's $\mathrm{CVaR}_{95}$ against $\sigma$.
 What you should see: a monotone curve that heads more negative as
-volatility rises — more spread in $I_T$ translates directly into a
-deeper left tail.
+volatility rises, because more spread in $I_T$ translates directly
+into a deeper left tail.
 
 ```{ojs}
 //| echo: false
@@ -534,7 +534,7 @@ Plot.plot({
 Formulae: [Syndicating the back-to-back book](model.qmd#syndication).
 At $\theta = 0$, $\Pi_{\mathrm{ret}}$ is an affine rescaling of
 $\Pi_{\mathrm{b2b}}$ with slope $(1 - \beta)$, so the three charts
-below are closed-form projections off the same b2b moments — no
+below are closed-form projections off the same b2b moments, with no
 extra Monte Carlo. Pick $\sigma$, the counterparty load $\theta$,
 and the premium mode (the `cvar` factor
 $\phi(\Phi^{-1}(0.95))/0.05 \approx 2.063$ puts both modes on a
@@ -560,7 +560,7 @@ viewof pickMode = Inputs.radio(["sharpe", "cvar"], { value: "sharpe", label: "pr
 The retained tail loss as $\beta$ sweeps from 0 (no cession) to 1
 (full cession). What you should see: at $\theta = 0$, a line that
 decays linearly in $(1 - \beta)$ toward zero; at $\theta > 0$, the
-same shape lifted by $\beta \rho(\theta)$ — the counterparty takes
+same shape lifted by $\beta \rho(\theta)$. The counterparty takes
 more of the tail, but the load eats into the relief.
 
 ```{ojs}
@@ -664,7 +664,7 @@ Plot.plot({
 The same curves, now as $\mathbb{E}[\Pi_{\mathrm{ret}}] -
 \mathbb{E}[\Pi_{\mathrm{b2b}}]$. What you should see: flat at
 $\theta = 0$ (cession is a free rescaling of the tail, in
-expectation), sloping down linearly in $\beta$ once $\theta > 0$ —
+expectation), sloping down linearly in $\beta$ once $\theta > 0$, so
 every dollar of tail relief costs a slice of expected P&L.
 
 ```{ojs}
@@ -708,9 +708,9 @@ Plot.plot({
 
 Formulae: [Switching to fee above a threshold](model.qmd#switching).
 The P&L density has no closed form, so the two charts below use Monte
-Carlo and the table checks four pure-GBM mean anchors —
-$\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau \wedge T]$,
-$\mathbb{E}[T_{\mathrm{fee}}]$, $\mathbb{E}[I_{\mathrm{fee}}]$ —
+Carlo and the table checks four pure-GBM mean anchors
+($\mathbb{P}[\tau \le T]$, $\mathbb{E}[\tau \wedge T]$,
+$\mathbb{E}[T_{\mathrm{fee}}]$, $\mathbb{E}[I_{\mathrm{fee}}]$)
 against `src/core/moments.ts`. Jumps reshape the $\tau$ distribution,
 so under a Merton overlay those anchors also fall back to Monte
 Carlo.
@@ -754,8 +754,8 @@ switchingRows = switchingSweep.cells.map(c => ({
 The two charts below sweep the switching threshold $h$. What you
 should see: as $h$ falls toward $1$, the tail loss shrinks from the
 retained reference (dashed rule at $h = \infty$) toward fee-book
-levels — but not all the way, because paths re-enter below the
-threshold and resume b2b exposure — while $\mathbb{E}[\Pi]$ rises in
+levels (but not all the way, because paths re-enter below the
+threshold and resume b2b exposure), while $\mathbb{E}[\Pi]$ rises in
 the opposite direction.
 
 ```{ojs}
@@ -894,7 +894,7 @@ $$
 
 Each line plots this ratio as $T$ grows, one line per drift $\mu$.
 The dashed rule at 1.0 is the $\mu = 0$ limit; what you should see is
-a fan about it — positive drift lifts the curve above 1 and negative
+a fan about it: positive drift lifts the curve above 1 and negative
 drift pulls it below, with the gap widening with $T$.
 
 ```{ojs}
