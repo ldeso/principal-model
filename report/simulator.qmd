@@ -421,6 +421,7 @@ summaryRows = [
 ```{ojs}
 //| echo: false
 Inputs.table(summaryRows, {
+  select: false,
   columns: ["book","mean","sd","ci95","var95","var99","cvar95","cvar99","probLoss","sharpe"],
   header: {
     book: "book",
