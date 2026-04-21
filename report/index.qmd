@@ -120,10 +120,8 @@ buildDate = {
 ::: {.side-panel-left .side-panel .pc-controls}
 ### Inputs
 
-Inventory, contract, horizon, and price-process parameters. The
-Merton overlay ($\lambda_J$, $\mu_J$, $\sigma_J$) is on by default at
-the 5σ-bulk calibration of `data/kvcm-historical.json`; ranges and
-defaults match the [Simulator](simulator.qmd) page.
+Inventory, contract, horizon, and price-process parameters. Ranges
+and defaults match the [Simulator](simulator.qmd) page.
 
 ### Price process
 
