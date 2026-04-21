@@ -329,7 +329,7 @@ Plot.plot({
   grid: true,
   x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: formatTickCurrency },
   y: { label: "empirical density", labelAnchor: "center" },
-  fy: { label: null },
+  fy: { label: "book" },
   color: { legend: true, domain: pnlBooks, label: "book" },
   marks: [
     Plot.ruleY([0]),
