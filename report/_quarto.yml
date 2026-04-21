@@ -7,7 +7,7 @@ project:
   pre-render: npm --prefix .. run build:ojs
 
 website:
-  title: "Klima Protocol — Fee vs. Principal"
+  title: "Klima Protocol: Fee vs. Principal"
   description: "Revenue and risk for a carbon-retirement intermediary."
   navbar:
     left:

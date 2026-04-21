@@ -5,7 +5,7 @@
 :root {
   /* Content column stays at --content-w on every page. Sidebars take
      the full remaining gutter: max() handles narrow viewports where
-     the gutter would round below --side-min. No ceiling — at wider
+     the gutter would round below --side-min. No ceiling; at wider
      viewports the gutter is wide, so the sidebars are wide, which is
      exactly the "fill the space" behaviour we want. */
   --content-w: 900px;
@@ -64,7 +64,7 @@ nav#TOC > ul { font-size: 0.78rem; }
 /* Quarto auto-decorates every top-level block inside main.content with
    .page-columns .page-full, and its body-scoped rules
    (e.g. body.fullcontent:not(.floating):not(.docked) .page-columns) land
-   at specificity 0,4,1 — higher than any realistic class-based selector
+   at specificity 0,4,1, higher than any realistic class-based selector
    we can add here. !important is the cleanest way to reclaim control of
    display / grid / position for our own wrappers. */
 .side-panel-left {
@@ -85,14 +85,14 @@ nav#TOC > ul { font-size: 0.78rem; }
    --side-top once that threshold scrolls past. Because the panel lives
    inside main.content (max-width: --content-w, margin-inline: auto),
    `calc(var(--side-offset) - 50vw + 50%)` offsets from main.content's
-   centred left edge to the viewport edge — the same position the old
+   centred left edge to the viewport edge: the same position the old
    `left: var(--side-offset)` produced under position: fixed. Floating
    removes the panel from block flow so the next in-flow section (the
    one it's meant to sit beside) starts at the panel's own top rather
    than below it.
 
    Reserve equal padding on both sides of #quarto-content, unconditionally,
-   so the centred main column is the same width on every page — whether it
+   so the centred main column is the same width on every page, whether it
    carries a .side-panel-left, Quarto's TOC sidebar, or nothing at all. */
 @media (min-width: 1400px) {
   .side-panel-left {
@@ -106,8 +106,8 @@ nav#TOC > ul { font-size: 0.78rem; }
     margin-left: calc(var(--side-offset) - 50vw + 50%);
   }
 
-  /* Quarto's margin sidebar — where `toc-location: right` puts the TOC
-     (inside `nav#TOC`) — is emitted as a grid sibling of main.content,
+  /* Quarto's margin sidebar, where `toc-location: right` puts the TOC
+     (inside `nav#TOC`), is emitted as a grid sibling of main.content,
      not inline in markdown, so it can't use sticky-from-flow and stays
      on the fixed-to-viewport path. display/visibility overrides defeat
      Quarto's own hide-the-margin-sidebar rules at mid-range viewport
@@ -219,7 +219,7 @@ nav#TOC > ul { font-size: 0.78rem; }
 
 /* --- Switching palette --------------------------------------------------- */
 /* Shared muted tones for anything describing the switching book across the
-   report — threshold rules on plots, fee-mode overlays, sweep curves.
+   report: threshold rules on plots, fee-mode overlays, sweep curves.
    Kept in one place so simulator / index / validation speak the same
    visual language. */
 
@@ -228,7 +228,7 @@ nav#TOC > ul { font-size: 0.78rem; }
   --switch-accent-soft: #f4e6eb; /* background tint for fee-mode bands */
 }
 
-/* Plot overlay — any Plot.rect / Plot.areaY marking a fee-mode
+/* Plot overlay: any Plot.rect / Plot.areaY marking a fee-mode
    sub-interval can use this class to inherit the shared palette instead
    of hardcoding colours inline. Non-interactive (pointer-events: none)
    so the band does not eat tooltips on top of it. */

@@ -69,7 +69,7 @@ html`<div class="metric-grid">
 ## Per-book scorecard
 
 Each stochastic book gets a row. The switching row has no
-closed-form mean or SD — its density has no closed form — but its
+closed-form mean or SD (its density has no closed form), but its
 four mean-level anchors ($\mathbb{P}[\tau \le T]$,
 $\mathbb{E}[\tau \wedge T]$, $\mathbb{E}[T_{\mathrm{fee}}]$,
 $\mathbb{E}[I_{\mathrm{fee}}]$) appear in the pure-GBM table further
@@ -121,7 +121,7 @@ Inputs.table(run.rows, {
     cvar95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     cvar99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     probLoss: x => x.toFixed(3),
-    sharpe: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
+    sharpe: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
   }
 })
 ```
@@ -178,10 +178,10 @@ Inputs.table(deskRows, {
     sharpe: "Sharpe"
   },
   format: {
-    closedFormMean: x => Number.isFinite(x) ? (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2) : "—",
+    closedFormMean: x => Number.isFinite(x) ? (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2) : "n/a",
     mcMean: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     mcCi95: x => "±$" + x.toFixed(2),
-    closedFormSd: x => Number.isFinite(x) ? "$" + x.toFixed(2) : "—",
+    closedFormSd: x => Number.isFinite(x) ? "$" + x.toFixed(2) : "n/a",
     mcSd: x => "$" + x.toFixed(2),
     zScore: x => (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
     var95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
@@ -189,7 +189,7 @@ Inputs.table(deskRows, {
     cvar95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     cvar99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     probLoss: x => x.toFixed(3),
-    sharpe: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
+    sharpe: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3)
   }
 })
 ```
@@ -604,7 +604,7 @@ Plot.plot({
 
 ### Expected-P&L cost of syndication
 
-At $\theta = 0$ the curve is flat — no free lunch. When $\theta > 0$
+At $\theta = 0$ the curve is flat, no free lunch. When $\theta > 0$
 the load drags $\mathbb{E}[\Pi_{\mathrm{ret}}] -
 \mathbb{E}[\Pi_{\mathrm{b2b}}]$ down linearly in $\beta$.
 
@@ -771,16 +771,16 @@ Inputs.table(
     },
     format: {
       probSwitchMc: x => x.toFixed(3),
-      probSwitchCf: x => x === null ? "—" : x.toFixed(3),
+      probSwitchCf: x => x === null ? "n/a" : x.toFixed(3),
       expectedTauMc: x => x.toFixed(4),
-      expectedTauCf: x => x === null ? "—" : x.toFixed(4),
-      expectedTauZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
+      expectedTauCf: x => x === null ? "n/a" : x.toFixed(4),
+      expectedTauZ: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
       meanTimeInFeeMc: x => x.toFixed(4),
-      meanTimeInFeeCf: x => x === null ? "—" : x.toFixed(4),
-      meanTimeInFeeZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
+      meanTimeInFeeCf: x => x === null ? "n/a" : x.toFixed(4),
+      meanTimeInFeeZ: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
       meanIntegralFeeMc: x => x.toFixed(4),
-      meanIntegralFeeCf: x => x === null ? "—" : x.toFixed(4),
-      meanIntegralFeeZ: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
+      meanIntegralFeeCf: x => x === null ? "n/a" : x.toFixed(4),
+      meanIntegralFeeZ: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(2),
     }
   }
 )

@@ -93,7 +93,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\nOperating books + treasury — closed form vs MC`);
+  console.log(`\nOperating books + treasury: closed form vs MC`);
   console.log(
     "  book           E[Π] (cf)     E[Π] (mc)     ±CI95          SD (cf)       SD (mc)       z",
   );
@@ -109,7 +109,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
     );
   }
 
-  console.log(`\nTail risk (Monte Carlo) — operating books + treasury`);
+  console.log(`\nTail risk (Monte Carlo): operating books + treasury`);
   console.log(
     "  book           VaR95         VaR99         CVaR95        CVaR99        P[Π<0]    Sharpe",
   );
@@ -121,11 +121,11 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
         ` ${fmt(r.cvar95).padStart(12)}` +
         ` ${fmt(r.cvar99).padStart(12)}` +
         ` ${fmt(r.probLoss).padStart(8)}` +
-        ` ${(r.sharpe === null ? "—" : fmt(r.sharpe, 3)).padStart(8)}`,
+        ` ${(r.sharpe === null ? "n/a" : fmt(r.sharpe, 3)).padStart(8)}`,
     );
   }
 
-  console.log(`\nDesks (operating + treasury) — closed form vs MC`);
+  console.log(`\nDesks (operating + treasury): closed form vs MC`);
   console.log(
     `  matched          E[Π] = ${fmt(report.desks.matched.closedFormMean)}` +
       `  SD = 0 (deterministic, I_T cancels at α = 1)`,
@@ -169,7 +169,7 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
   if (report.switching) {
     const sw = report.switching;
     const fmtMaybe = (x: number | null, d = 3) =>
-      x === null || !isFinite(x) ? "—" : fmt(x, d);
+      x === null || !isFinite(x) ? "n/a" : fmt(x, d);
     console.log(
       `\nSwitching  h=${params.barrierRatio}  H=${fmt(sw.barrierLevel, 4)}` +
         `  f_post=${fmt(sw.feePost, 4)}` +

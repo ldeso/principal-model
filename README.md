@@ -1,8 +1,8 @@
 # principal-model
 
 `principal-model` simulates the books in
-[`research-note.md`](research-note.md) — *Klima Protocol — Fee-Based
-vs. Principal Model* — and builds the accompanying Quarto report. The
+[`research-note.md`](research-note.md), *Klima Protocol: Fee-Based
+vs. Principal Model*, and builds the accompanying Quarto report. The
 report has four pages: **Summary** (`index.qmd`), **Model**
 (`model.qmd`), **Validation** (`validation.qmd`), and **Simulator**
 (`simulator.qmd`).

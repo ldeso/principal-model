@@ -1,10 +1,10 @@
-# Klima Protocol — Fee-Based vs. Principal Model
+# Klima Protocol: Fee-Based vs. Principal Model
 
 A carbon-retirement intermediary buys kVCM tokens and burns them on
-behalf of clients. It can charge either a **fee** — a markup on the
-pass-through token cost, carrying no inventory and no price exposure —
-or a **principal** price — a fixed USD quote per tonne, set at
-inception. This note gives closed-form moments for both books, splits
+behalf of clients. It can charge either a **fee** (a markup on the
+pass-through token cost, carrying no inventory and no price exposure)
+or a **principal** price (a fixed USD quote per tonne, set at
+inception). This note gives closed-form moments for both books, splits
 the principal book into a zero-capital operating leg and a
 balance-sheet treasury, and studies three ways to reshape the
 principal loss tail: pre-purchased inventory $(k, C_{\mathrm{basis}})$,
@@ -189,7 +189,7 @@ $$
 
 The fee book satisfies the same identity with the sign reversed and
 magnitude $f P \lambda (T - t)$. The natural static hedge for the
-b2b book at time $t$ is $P \lambda (T - t)$ tokens of spot kVCM —
+b2b book at time $t$ is $P \lambda (T - t)$ tokens of spot kVCM:
 exactly the treasury schedule at $k = N P$.
 
 ## The active treasury {#treasury-book}
@@ -366,7 +366,7 @@ $$
 At $\theta = 0$ the premium is actuarially fair and
 $\mathbb{E}[\Pi_{\mathrm{ret}}]$ does not depend on $\beta$; for
 $\theta > 0$ the intermediary gives up expected P&L in exchange for
-tail relief. The `cvar` mode is a Gaussian surrogate — the tail of
+tail relief. The `cvar` mode is a Gaussian surrogate; the tail of
 $I_T$ is heavier than Gaussian, so Monte Carlo remains authoritative.
 Tranched cessions of the form $\max(L - K, 0)$ break the Dufresne
 backbone and are out of scope.
@@ -512,8 +512,8 @@ with $Q^* \to (1 + f) P S_0$ as $\mu \to 0$. A positive drift pushes
 $Q^*$ above that level, a negative drift below. At $Q = Q^*$ the two
 books share $I_T$ and therefore share variance, but they enter it
 with opposite signs: the fee book is bounded below, and the b2b book
-carries a left-skewed loss tail. This asymmetry — present even at
-moment-equalised $Q$ — is what the three dials work on.
+carries a left-skewed loss tail. This asymmetry, present even at
+moment-equalised $Q$, is what the three dials work on.
 
 ## Adding jumps {#jumps}
 
@@ -552,16 +552,16 @@ as a GBM anchor and leaves jump-aware tails to Monte Carlo.
 
 | Baseline | Lifted in |
 | --- | --- |
-| Deterministic demand | Simulator — compound-Poisson order flow |
-| GBM dynamics | Simulator — compensated Merton (above); regime switching pending |
-| No calibration | Simulator — kVCM proxy |
-| No discounting / gas / slippage | Simulator — parameterised |
-| Passive treasury | Simulator — active consumption schedule; dynamic delta hedge pending |
-| Static syndication / switching | Simulator — quota-share cession; symmetric threshold; optimal-$h$ pending |
+| Deterministic demand | Simulator: compound-Poisson order flow |
+| GBM dynamics | Simulator: compensated Merton (above); regime switching pending |
+| No calibration | Simulator: kVCM proxy |
+| No discounting / gas / slippage | Simulator: parameterised |
+| Passive treasury | Simulator: active consumption schedule; dynamic delta hedge pending |
+| Static syndication / switching | Simulator: quota-share cession; symmetric threshold; optimal-$h$ pending |
 | No credit layer | Out of scope |
 
 ## References
 
-- Dufresne, D. (2001). *The integral of geometric Brownian motion.* Adv. Appl. Probab. 33(1), 223–241.
+- Dufresne, D. (2001). *The integral of geometric Brownian motion.* Adv. Appl. Probab. 33(1), 223-241.
 - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*, §3.4.
 - Harrison, J. M. (1985). *Brownian Motion and Stochastic Flow Systems.*

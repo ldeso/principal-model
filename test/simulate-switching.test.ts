@@ -320,7 +320,7 @@ describe("simulateSwitching", () => {
   });
 });
 
-describe("moments — first-passage and above-barrier", () => {
+describe("moments: first-passage and above-barrier", () => {
   it("h ≤ 1 ⇒ P = 1, E[τ] = 0", () => {
     expect(firstPassageProb(0.05, 0.3, 1, 1)).toBe(1);
     expect(firstPassageProb(0.05, 0.3, 1, 0.9)).toBe(1);

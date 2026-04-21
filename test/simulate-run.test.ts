@@ -22,7 +22,7 @@ const base: SimulateRunInputs = {
   seed: 2026,
 };
 
-describe("simulateRun — active treasury", () => {
+describe("simulateRun: active treasury", () => {
   it("kPre = 0, cBasis = 0 ⇒ treasury ≡ 0", () => {
     const r = simulateRun({ ...base, kPre: 0, cBasis: 0 });
     expect(r.tauFrac).toBe(0);
@@ -109,7 +109,7 @@ describe("simulateRun — active treasury", () => {
   });
 });
 
-describe("simulateRun — syndicated-on-b2b", () => {
+describe("simulateRun: syndicated-on-b2b", () => {
   it("β = 0 ⇒ retained ≡ b2b, premium 0", () => {
     const r = simulateRun({ ...base, kPre: 50_000, cBasis: 4_000, beta: 0 });
     expect(r.premium).toBe(0);

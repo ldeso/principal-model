@@ -1,5 +1,5 @@
 ---
-title: "Klima Protocol — Fee vs. Principal"
+title: "Klima Protocol: Fee vs. Principal"
 subtitle: "Revenue and risk for a carbon-retirement intermediary"
 format:
   html:
@@ -33,8 +33,8 @@ positive sign (its revenue is non-negative), and the back-to-back
 book with a negative sign (its upside is capped at $Q N$ and its
 downside is unbounded). Equal moments are not equal distributions.
 
-A fully matched treasury — $k = N P$ tokens pre-bought at basis
-$C_{\mathrm{basis}} = N P S_0$ — cancels the $I_T$ term path by path,
+A fully matched treasury ($k = N P$ tokens pre-bought at basis
+$C_{\mathrm{basis}} = N P S_0$) cancels the $I_T$ term path by path,
 because treasury consumption contributes $+ P \lambda I_T$ against
 the back-to-back book's $- P \lambda I_T$. The desk collapses to
 $N(Q - P S_0)$, which is deterministic. Partial coverage
@@ -832,10 +832,10 @@ customScenario = {
   const customDesk = b2bOp + treasury;
 
   // Retained operating book: (1 − β) · b2b + premium. The premium scalar comes
-  // from the MC run (run.premium) — derived from the run's b2b sample moments.
+  // from the MC run (run.premium), derived from the run's b2b sample moments.
   const retainedOp = (1 - beta) * b2bOp + run.premium;
 
-  // Switching — walk the realised path, bucket trapezoid pieces into
+  // Switching: walk the realised path, bucket trapezoid pieces into
   // I_b2b / I_fee per the Markov fee-mode indicator 1{S_t ≥ H}. Matches
   // src/core/simulate-switching.ts exactly: the piece is bucketed by the
   // indicator at step entry (S_{k-1} vs H). h ≤ 1 starts above the

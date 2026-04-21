@@ -8,7 +8,7 @@ import { covarITST } from "../src/core/moments.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 import { conditionalVaR, summarize } from "../src/core/risk.js";
 
-describe("operating books — closed form ↔ MC", () => {
+describe("operating books: closed form ↔ MC", () => {
   const p = withOverrides(defaultParams, {
     nPaths: 50_000,
     nSteps: 200,
@@ -46,7 +46,7 @@ describe("operating books — closed form ↔ MC", () => {
   });
 });
 
-describe("treasury — closed form ↔ MC", () => {
+describe("treasury: closed form ↔ MC", () => {
   const base = withOverrides(defaultParams, {
     nPaths: 50_000,
     nSteps: 200,

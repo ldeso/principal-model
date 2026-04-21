@@ -94,7 +94,7 @@ describe("formatTickCurrency", () => {
     expect(formatTickCurrency(0.999)).toBe("$0.999");
   });
 
-  it("no suffix for 1–999", () => {
+  it("no suffix for 1 to 999", () => {
     expect(formatTickCurrency(1)).toBe("$1");
     expect(formatTickCurrency(250)).toBe("$250");
     expect(formatTickCurrency(999)).toBe("$999");

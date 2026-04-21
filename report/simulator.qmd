@@ -232,7 +232,7 @@ html`<div class="derived-stats">
   <div class="card"><div class="label">tokens needed N·P</div><div class="value">${derived.tokensNeeded.toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">coverage from inventory</div><div class="value">${(derived.coverageFrac * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">inventory runs out at (days)</div><div class="value">${isFinite(derived.coverageDays) ? Math.min(derived.coverageDays, Tdays).toFixed(1) : "∞"}</div></div>
-  <div class="card"><div class="label">implied basis per token</div><div class="value">${kPre > 0 ? "$" + derived.impliedCost.toFixed(3) : "—"}</div></div>
+  <div class="card"><div class="label">implied basis per token</div><div class="value">${kPre > 0 ? "$" + derived.impliedCost.toFixed(3) : "n/a"}</div></div>
   <div class="card"><div class="label">break-even Q* (USD / tonne)</div><div class="value">${"$" + derived.QStar.toFixed(3)}</div></div>
 </div>`
 ```
@@ -334,7 +334,7 @@ html`<div class="derived-stats">
   <div class="card"><div class="label">cession β</div><div class="value">${(beta * 100).toFixed(0)}%</div></div>
   <div class="card"><div class="label">premium π_syn received</div><div class="value">${(run.premium >= 0 ? "$" : "−$") + Math.abs(run.premium).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   <div class="card"><div class="label">custom desk CVaR₉₅</div><div class="value">${(run.customDesk.cvar95 >= 0 ? "$" : "−$") + Math.abs(run.customDesk.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
-  <div class="card"><div class="label">custom desk SD vs. b2b</div><div class="value">${run.b2b.sd > 0 ? (100 * (1 - run.customDesk.sd / run.b2b.sd)).toFixed(1) + "%" : "—"}</div></div>
+  <div class="card"><div class="label">custom desk SD vs. b2b</div><div class="value">${run.b2b.sd > 0 ? (100 * (1 - run.customDesk.sd / run.b2b.sd)).toFixed(1) + "%" : "n/a"}</div></div>
 </div>`
 ```
 
@@ -354,7 +354,7 @@ html`${switchOn
     <div class="card"><div class="label">switching E[Π]</div><div class="value">${(switchRun.summary.mean >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.mean).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
     <div class="card"><div class="label">switching CVaR₉₅</div><div class="value">${(switchRun.summary.cvar95 >= 0 ? "$" : "−$") + Math.abs(switchRun.summary.cvar95).toLocaleString(undefined, {maximumFractionDigits: 0})}</div></div>
   </div>`
-  : `<div class="derived-stats"><div class="card"><div class="label">switching</div><div class="value">off — toggle "enable switching" in the side panel to activate</div></div></div>`
+  : `<div class="derived-stats"><div class="card"><div class="label">switching</div><div class="value">off, toggle "enable switching" in the side panel to activate</div></div></div>`
 }`
 ```
 
@@ -422,7 +422,7 @@ Inputs.table(summaryRows, {
     cvar95: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     cvar99: x => (x >= 0 ? "$" : "−$") + Math.abs(x).toFixed(2),
     probLoss: x => x.toFixed(3),
-    sharpe: x => x === null ? "—" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3),
+    sharpe: x => x === null ? "n/a" : (x >= 0 ? "" : "−") + Math.abs(x).toFixed(3),
   }
 })
 ```
