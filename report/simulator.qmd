@@ -491,7 +491,7 @@ Plot.plot({
   grid: true,
   x: { label: "terminal P&L (USD)", tickFormat: formatTickCurrency },
   y: { label: "empirical density" },
-  fy: { label: "book" },
+  fy: { label: null },
   color: { legend: true, domain: [
     "fee","b2b","retained (syndicated-on-b2b)","treasury (k, C_basis)","custom desk = b2b + treasury",
     ...(includeSwitch ? [switchLabel] : []),
