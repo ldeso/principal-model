@@ -358,7 +358,8 @@ pathRecords = run.sampledPaths.flatMap((path, idx) =>
     t: k / run.params.nSteps,
     S: s,
     V: run.params.lambda * run.params.T * run.params.P * (1 - k / run.params.nSteps) * s,
-    id: idx
+    id: idx,
+    series: idx === 0 ? "first path" : "sampled paths",
   }))
 )
 ```
@@ -373,15 +374,20 @@ Plot.plot({
   grid: true,
   x: { label: "normalised time  t / T", labelAnchor: "center", labelOffset: 36, domain: [0, 1] },
   y: { label: "V_t  =  N·P·(1−t/T)·S_t    (USD)", labelAnchor: "center", tickFormat: formatTickCurrency },
+  color: {
+    legend: true,
+    domain: ["sampled paths", "first path"],
+    range: ["#888", "#c94"],
+  },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(pathRecords, { x: "t", y: "V", z: "id", stroke: "#888", strokeOpacity: 0.3 }),
-    Plot.line(pathRecords.filter(r => r.id === 0), { x: "t", y: "V", stroke: "#c94", strokeWidth: 2 })
+    Plot.line(pathRecords.filter(r => r.id !== 0), { x: "t", y: "V", z: "id", stroke: "series", strokeOpacity: 0.3 }),
+    Plot.line(pathRecords.filter(r => r.id === 0), { x: "t", y: "V", stroke: "series", strokeWidth: 2 })
   ]
 })
 ```
 
-_Grey: sampled NAV paths. Orange: first. $V_T = 0$ regardless of $S_T$._
+_$V_T = 0$ regardless of $S_T$._
 
 ## Matched treasury shortfall
 

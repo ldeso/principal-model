@@ -520,11 +520,13 @@ pathRecords = {
   const nS = run.inputs.nSteps;
   for (let idx = 0; idx < paths.length; idx++) {
     const path = paths[idx];
+    const series = idx === 0 ? "first path" : "sampled paths";
     for (let k = 0; k <= nS; k++) {
       rows.push({
         tDays: (k / nS) * Tdays,
         S: path[k],
         id: idx,
+        series,
       });
     }
   }
@@ -542,18 +544,30 @@ Plot.plot({
   grid: true,
   x: { label: "t (days)", domain: [0, Tdays], ticks: xTicksForHorizon(Tdays) },
   y: { label: "kVCM spot S_t (USD)", zero: true, tickFormat: formatTickCurrency },
+  color: {
+    legend: true,
+    domain: [
+      "sampled paths",
+      "first path",
+      "αT",
+      ...(switchOn ? ["H = h S₀"] : []),
+    ],
+    range: [
+      "#888",
+      "#c94",
+      "#2a7",
+      ...(switchOn ? ["#a36"] : []),
+    ],
+  },
   marks: [
     Plot.ruleY([0]),
-    Plot.line(pathRecords, { x: "tDays", y: "S", z: "id", stroke: "#888", strokeOpacity: 0.35 }),
-    Plot.line(pathRecords.filter(r => r.id === 0), { x: "tDays", y: "S", stroke: "#c94", strokeWidth: 2 }),
-    Plot.ruleX([run.tauFrac * Tdays], { stroke: "#2a7", strokeDasharray: "4 3", strokeWidth: 2 }),
+    Plot.line(pathRecords.filter(r => r.id !== 0), { x: "tDays", y: "S", z: "id", stroke: "series", strokeOpacity: 0.35 }),
+    Plot.line(pathRecords.filter(r => r.id === 0), { x: "tDays", y: "S", stroke: "series", strokeWidth: 2 }),
+    Plot.ruleX([{ t: run.tauFrac * Tdays, kind: "αT" }], { x: "t", stroke: "kind", strokeDasharray: "4 3", strokeWidth: 2 }),
     ...(switchOn
-      ? [Plot.ruleY([barrierRatio * derived.S0], { stroke: "#a36", strokeDasharray: "6 3", strokeWidth: 2 })]
+      ? [Plot.ruleY([{ y: barrierRatio * derived.S0, kind: "H = h S₀" }], { y: "y", stroke: "kind", strokeDasharray: "6 3", strokeWidth: 2 })]
       : []),
   ]
 })
 ```
-
-_Grey: sampled spot paths. Orange: first path. Green dashed: $\alpha
-T$. Maroon dashed (when switching is on): $H = h S_0$._
 
