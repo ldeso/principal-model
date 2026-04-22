@@ -965,6 +965,7 @@ pnlOverTime = {
   const H = barrierRatio * derived.S0;
   const includeSwitch = switchOn;
   const switchLabel = `switching (h=${barrierRatio.toFixed(2)})`;
+  const switchPlusTreasuryLabel = `switching + treasury (h=${barrierRatio.toFixed(2)})`;
   const fPost = feePost ?? fee;
 
   let I = 0;
@@ -1014,10 +1015,11 @@ pnlOverTime = {
     if (includeSwitch) {
       const switchPnl = Q * lam * tB2b - P * lam * Ib2b + fPost * P * lam * Ifee;
       rows.push({ tDays, book: switchLabel, pnl: switchPnl });
+      rows.push({ tDays, book: switchPlusTreasuryLabel, pnl: switchPnl + treasuryPnl });
     }
   }
 
-  return { rows, includeSwitch, switchLabel, treasuryOpen };
+  return { rows, includeSwitch, switchLabel, switchPlusTreasuryLabel, treasuryOpen };
 }
 ```
 
@@ -1045,7 +1047,9 @@ Plot.plot({
       "retained (syndicated-on-b2b)",
       "treasury",
       "custom desk = b2b + treasury",
-      ...(pnlOverTime.includeSwitch ? [pnlOverTime.switchLabel] : []),
+      ...(pnlOverTime.includeSwitch
+        ? [pnlOverTime.switchLabel, pnlOverTime.switchPlusTreasuryLabel]
+        : []),
       "αT",
     ],
     range: [
@@ -1054,7 +1058,7 @@ Plot.plot({
       "#e15759",
       "#76b7b2",
       "#59a14f",
-      ...(pnlOverTime.includeSwitch ? ["#edc949"] : []),
+      ...(pnlOverTime.includeSwitch ? ["#edc949", "#b07aa1"] : []),
       "#2a7",
     ],
   },
@@ -1103,12 +1107,21 @@ customRows = [
   { book: "treasury",                     pnl: customScenario.treasury,   mcMean: run.treasury.mean,   diff: customScenario.treasury   - run.treasury.mean },
   { book: "custom desk = b2b + treasury", pnl: customScenario.customDesk, mcMean: run.customDesk.mean, diff: customScenario.customDesk - run.customDesk.mean },
   ...(switchOn
-    ? [{
-        book: `switching (h=${barrierRatio.toFixed(2)})`,
-        pnl: customScenario.switchingOp,
-        mcMean: switchRun.summary.mean,
-        diff: customScenario.switchingOp - switchRun.summary.mean,
-      }]
+    ? [
+        {
+          book: `switching (h=${barrierRatio.toFixed(2)})`,
+          pnl: customScenario.switchingOp,
+          mcMean: switchRun.summary.mean,
+          diff: customScenario.switchingOp - switchRun.summary.mean,
+        },
+        {
+          book: `switching + treasury (h=${barrierRatio.toFixed(2)})`,
+          pnl: customScenario.switchingOp + customScenario.treasury,
+          mcMean: switchRun.summary.mean + run.treasury.mean,
+          diff: (customScenario.switchingOp + customScenario.treasury)
+                - (switchRun.summary.mean + run.treasury.mean),
+        },
+      ]
     : []),
 ]
 ```

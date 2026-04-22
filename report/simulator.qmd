@@ -346,6 +346,21 @@ switchRun = {
 
 ```{ojs}
 //| echo: false
+// Composed switching + treasury(k, C_basis) desk; shares seed with run
+// and switchRun so the sum is path-aligned.
+switchCustomDesk = {
+  if (!switchOn) return null;
+  const n = Math.min(switchRun.pnlSamples.length, run.treasurySamples.length);
+  const samples = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    samples[i] = switchRun.pnlSamples[i] + run.treasurySamples[i];
+  }
+  return { samples, summary: summarise(samples) };
+}
+```
+
+```{ojs}
+//| echo: false
 html`<div class="derived-stats">
   <div class="card"><div class="label">paths simulated</div><div class="value">${nPaths.toLocaleString()}</div></div>
   <div class="card"><div class="label">wall time</div><div class="value">${run.elapsedMs.toFixed(1)} ms</div></div>
@@ -413,7 +428,10 @@ summaryRows = [
   { book: "treasury (k, C_basis)", ...run.treasury },
   { book: "custom desk = b2b + treasury", ...run.customDesk },
   ...(switchOn
-    ? [{ book: `switching (h=${barrierRatio.toFixed(2)})`, ...switchRun.summary }]
+    ? [
+        { book: `switching (h=${barrierRatio.toFixed(2)})`, ...switchRun.summary },
+        { book: `switching + treasury (h=${barrierRatio.toFixed(2)})`, ...switchCustomDesk.summary },
+      ]
     : []),
 ]
 ```
@@ -461,6 +479,7 @@ custom-desk panel collapses to a spike at the matched limit.
 //| echo: false
 includeSwitch = switchOn
 switchLabel = includeSwitch ? `switching (h=${barrierRatio.toFixed(2)})` : null
+switchPlusTreasuryLabel = includeSwitch ? `switching + treasury (h=${barrierRatio.toFixed(2)})` : null
 ```
 
 ```{ojs}
@@ -474,7 +493,10 @@ pnlRecords = {
     rows.push({ book: "retained (syndicated-on-b2b)", pnl: run.retainedSamples[i] });
     rows.push({ book: "treasury (k, C_basis)", pnl: run.treasurySamples[i] });
     rows.push({ book: "custom desk = b2b + treasury", pnl: run.customDeskSamples[i] });
-    if (includeSwitch) rows.push({ book: switchLabel, pnl: switchRun.pnlSamples[i] });
+    if (includeSwitch) {
+      rows.push({ book: switchLabel, pnl: switchRun.pnlSamples[i] });
+      rows.push({ book: switchPlusTreasuryLabel, pnl: switchCustomDesk.samples[i] });
+    }
   }
   return rows;
 }
@@ -494,7 +516,7 @@ Plot.plot({
   fy: { label: null },
   color: { legend: true, domain: [
     "fee","b2b","retained (syndicated-on-b2b)","treasury (k, C_basis)","custom desk = b2b + treasury",
-    ...(includeSwitch ? [switchLabel] : []),
+    ...(includeSwitch ? [switchLabel, switchPlusTreasuryLabel] : []),
   ] },
   marks: [
     Plot.ruleY([0]),
@@ -506,7 +528,12 @@ Plot.plot({
       { book: "retained (syndicated-on-b2b)", x: run.retained.mean },
       { book: "treasury (k, C_basis)", x: run.treasury.mean },
       { book: "custom desk = b2b + treasury", x: run.customDesk.mean },
-      ...(includeSwitch ? [{ book: switchLabel, x: switchRun.summary.mean }] : []),
+      ...(includeSwitch
+        ? [
+            { book: switchLabel, x: switchRun.summary.mean },
+            { book: switchPlusTreasuryLabel, x: switchCustomDesk.summary.mean },
+          ]
+        : []),
     ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
   ]
 })

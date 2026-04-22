@@ -49,6 +49,8 @@ export interface Report {
     partial: ModelRow;
     syndicatedMatched: ModelRow;
     switchingMatched?: ModelRow;
+    /** switching + treasury(α·N·P, α·N·P·S_0); MC only. */
+    switchingPartial?: ModelRow;
   };
   drawdown: {
     mean: number;
@@ -70,6 +72,8 @@ export interface Report {
     navDrawdown: number[];
     /** Present only when barrierRatio finite. */
     switching?: number[];
+    /** switching + mc.treasury; present only when barrierRatio finite. */
+    switchingPartialDesk?: number[];
   };
   syndication: {
     beta: number;
@@ -216,6 +220,9 @@ export function buildReport(
   const syndMatchedClosedMean =
     matchedDeskMean + closed.premium.loaded - params.beta * closed.b2b.mean;
   const partialCf = partialDeskClosedForm(params);
+  const switchingPartialSamples = isFinite(params.barrierRatio)
+    ? sumSamples(switchingRun.pnlSamples, mc.treasury)
+    : null;
   const desks: Report["desks"] = {
     matched: { closedFormMean: matchedDeskMean, closedFormSd: 0 },
     partial: makeRow("partial_desk", partialCf.mean, partialCf.sd, partialDeskSamples),
@@ -225,13 +232,19 @@ export function buildReport(
       0,
       syndMatchedSamples,
     ),
-    ...(isFinite(params.barrierRatio)
+    ...(isFinite(params.barrierRatio) && switchingPartialSamples
       ? {
           switchingMatched: makeRow(
             "switching_matched_desk",
             NaN,
             NaN,
             sumSamples(switchingRun.pnlSamples, matchedTreasury),
+          ),
+          switchingPartial: makeRow(
+            "switching_partial_desk",
+            NaN,
+            NaN,
+            switchingPartialSamples,
           ),
         }
       : {}),
@@ -274,8 +287,11 @@ export function buildReport(
       treasury: subsample(mc.treasury, traceSize),
       partialDesk: subsample(partialDeskSamples, traceSize),
       navDrawdown: subsample(mc.navDrawdowns, traceSize),
-      ...(switching
-        ? { switching: subsample(switchingRun.pnlSamples, traceSize) }
+      ...(switching && switchingPartialSamples
+        ? {
+            switching: subsample(switchingRun.pnlSamples, traceSize),
+            switchingPartialDesk: subsample(switchingPartialSamples, traceSize),
+          }
         : {}),
     },
     syndication: {

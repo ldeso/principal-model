@@ -153,6 +153,10 @@ form. The `syndicated_matched` desk $= \mathrm{retained} +
 \mathrm{treasury}(N P, N P S_0)$ is still deterministic up to the
 premium. The `switching_matched` desk $= \mathrm{switching} +
 \mathrm{treasury}(N P, N P S_0)$ is reported from Monte Carlo only.
+The `switching_partial_desk` $= \mathrm{switching} +
+\mathrm{treasury}(\alpha N P, \alpha N P S_0)$ pairs the switching
+operating book with the $\alpha$-partial treasury at
+`run.params.alpha`; MC only.
 
 ```{ojs}
 //| echo: false
@@ -175,6 +179,7 @@ deskRows = [
   run.desks.partial,
   run.desks.syndicatedMatched,
   ...(run.desks.switchingMatched ? [run.desks.switchingMatched] : []),
+  ...(run.desks.switchingPartial ? [run.desks.switchingPartial] : []),
 ]
 ```
 
@@ -295,6 +300,7 @@ $\mathbb{P}[\Pi < 0]$.
 pnlBooks = [
   "fee", "b2b", "retained", "treasury", "partial_desk",
   ...(run.sampleTraces.switching ? ["switching"] : []),
+  ...(run.sampleTraces.switchingPartialDesk ? ["switching_partial_desk"] : []),
 ]
 
 pnlData = [
@@ -306,15 +312,21 @@ pnlData = [
   ...(run.sampleTraces.switching
     ? run.sampleTraces.switching.map(v => ({book: "switching", pnl: v}))
     : []),
+  ...(run.sampleTraces.switchingPartialDesk
+    ? run.sampleTraces.switchingPartialDesk.map(v => ({book: "switching_partial_desk", pnl: v}))
+    : []),
 ]
 
 // Closed-form means: operating rows from run.rows, partial desk from
-// run.desks.partial.
+// run.desks.partial. Switching-partial desk has no closed form; use MC mean.
 meanRuleRows = [
   ...run.rows
     .filter(r => pnlBooks.includes(r.name))
     .map(r => ({ book: r.name, x: Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean })),
   { book: "partial_desk", x: run.desks.partial.closedFormMean },
+  ...(run.desks.switchingPartial
+    ? [{ book: "switching_partial_desk", x: run.desks.switchingPartial.mcMean }]
+    : []),
 ]
 ```
 
