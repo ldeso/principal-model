@@ -148,6 +148,13 @@ function printMainTable(params: Params): ReturnType<typeof buildReport> {
         `  CVaR95=${fmt(swk.cvar95)}  (MC only)`,
     );
   }
+  if (report.desks.switchingPartial) {
+    const spk = report.desks.switchingPartial;
+    console.log(
+      `  switching-partial (α=${params.alpha})  E[Π] mc=${fmt(spk.mcMean)}` +
+        `  SD mc=${fmt(spk.mcSd)}  CVaR95=${fmt(spk.cvar95)}  (MC only)`,
+    );
+  }
 
   console.log(
     `\nMatched-inventory NAV shortfall  mean=${fmt(report.drawdown.mean)}` +

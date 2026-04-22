@@ -7,6 +7,8 @@ import {
 import { covarITST } from "../src/core/moments.js";
 import { defaultParams, withOverrides } from "../src/params.js";
 import { conditionalVaR, summarize } from "../src/core/risk.js";
+import { simulateSwitching } from "../src/core/simulate-switching.js";
+import type { Params } from "../src/params.js";
 
 describe("operating books: closed form ↔ MC", () => {
   const p = withOverrides(defaultParams, {
@@ -329,5 +331,61 @@ describe("syndicated-on-b2b operating book", () => {
     const loadS = cfS.premium.fair - cfS.premium.loaded;
     const loadC = cfC.premium.fair - cfC.premium.loaded;
     expect(loadC / loadS).toBeCloseTo(GAUSS, 10);
+  });
+});
+
+describe("switching-partial desk composition", () => {
+  const baseSwitch = withOverrides(defaultParams, {
+    nPaths: 5_000, nSteps: 100, seed: 2026,
+    lambdaJ: 0, muJ: 0, sigmaJ: 0,
+    barrierRatio: 1.25,
+  });
+
+  function runBoth(p: Params) {
+    const mc = simulate(p);
+    const sw = simulateSwitching({
+      S0: p.S0, mu: p.mu, sigma: p.sigma, P: p.P, lambda: p.lambda, T: p.T,
+      Q: p.Q, fee: p.f,
+      barrierRatio: p.barrierRatio, feePost: p.feePost,
+      lambdaJ: p.lambdaJ, muJ: p.muJ, sigmaJ: p.sigmaJ,
+      nPaths: p.nPaths, nSteps: p.nSteps, seed: p.seed,
+    });
+    return { mc, sw };
+  }
+
+  it("α = 0 ⇒ switching_partial_desk ≡ switching operating (treasury ≡ 0)", () => {
+    const p = withOverrides(baseSwitch, { alpha: 0 });
+    const { mc, sw } = runBoth(p);
+    for (let i = 0; i < p.nPaths; i++) {
+      expect(mc.treasury[i]).toBe(0);
+      const desk = (sw.pnlSamples[i] as number) + (mc.treasury[i] as number);
+      expect(desk).toBe(sw.pnlSamples[i] as number);
+    }
+  });
+
+  it("α = 1 ⇒ switching_partial_desk = switching_matched_desk path-wise", () => {
+    const p = withOverrides(baseSwitch, { alpha: 1, nPaths: 2_000, nSteps: 50 });
+    const { mc, sw } = runBoth(p);
+    const N = p.lambda * p.T;
+    for (let i = 0; i < p.nPaths; i++) {
+      const matchedT = p.P * p.lambda * (mc.IT[i] as number) - N * p.P * p.S0;
+      expect(mc.treasury[i]).toBeCloseTo(matchedT, 9);
+      const partial = (sw.pnlSamples[i] as number) + (mc.treasury[i] as number);
+      const matched = (sw.pnlSamples[i] as number) + matchedT;
+      expect(partial).toBeCloseTo(matched, 9);
+    }
+  });
+
+  it("α = 0.4: mean decomposes linearly; path-wise additivity holds", () => {
+    const p = withOverrides(baseSwitch, { alpha: 0.4 });
+    const { mc, sw } = runBoth(p);
+    const desk = new Float64Array(p.nPaths);
+    for (let i = 0; i < p.nPaths; i++) {
+      desk[i] = (sw.pnlSamples[i] as number) + (mc.treasury[i] as number);
+    }
+    const swS = summarize(sw.pnlSamples);
+    const tS = summarize(mc.treasury);
+    const dS = summarize(desk);
+    expect(Math.abs(dS.mean - (swS.mean + tS.mean))).toBeLessThan(1e-9);
   });
 });

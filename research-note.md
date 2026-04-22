@@ -292,6 +292,7 @@ $(k, C_{\mathrm{basis}})$ that, summed with it, gives the named desk.
 | Syndicated | retained | $(0, 0)$ |
 | Syndicated-matched | retained | $(N P, N P S_0)$ |
 | Switching | switching | $(0, 0)$ |
+| Switching-partial ($\alpha$) | switching | $(\alpha N P, \alpha N P S_0)$ |
 | Switching-matched | switching | $(N P, N P S_0)$ |
 
 At $(k, C_{\mathrm{basis}}) = (N P, N P S_0)$ the $I_T$ kernel cancels
