@@ -10,41 +10,42 @@ format:
     transition: fade
     width: 1280
     height: 760
+    include-in-header:
+      text: |
+        <style>
+          .reveal section .msg {
+            display: inline-block;
+            padding: 0.35rem 0.8rem;
+            margin-bottom: 0.6rem;
+            background: #f3f7fb;
+            border-left: 3px solid #4c78a8;
+            font-size: 0.75em;
+            color: #234;
+            text-align: left;
+          }
+          .reveal section h2 { font-size: 1.6em; margin-bottom: 0.3em; }
+          .reveal section h3 { font-size: 1.1em; }
+          .reveal section p, .reveal section li { font-size: 0.78em; }
+          .model-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+          .model-cards .card {
+            border: 1px solid #ccd; border-radius: 8px; padding: 0.9rem;
+            background: #fafcff; text-align: left;
+          }
+          .model-cards .card h3 { margin: 0 0 0.4rem; color: #234; }
+          .model-cards .card p { margin: 0.2rem 0; font-size: 0.72em; }
+          .model-cards .card .risk {
+            display: block; margin-top: 0.5rem; padding: 0.25rem 0.4rem;
+            border-radius: 4px; font-size: 0.66em; font-family: ui-monospace, monospace;
+          }
+          .risk.none { background: #e6f4ea; color: #1a5632; }
+          .risk.full { background: #fdecea; color: #8b1a10; }
+          .risk.capped { background: #fef3c7; color: #7a4a00; }
+          .assumptions, .next-steps { font-size: 0.78em; }
+          .footnote { font-size: 0.55em; color: #777; margin-top: 1.2em; }
+        </style>
 ---
 
-```{=html}
-<style>
-  .reveal section .msg {
-    display: inline-block;
-    padding: 0.35rem 0.8rem;
-    margin-bottom: 0.6rem;
-    background: #f3f7fb;
-    border-left: 3px solid #4c78a8;
-    font-size: 0.75em;
-    color: #234;
-    text-align: left;
-  }
-  .reveal section h2 { font-size: 1.6em; margin-bottom: 0.3em; }
-  .reveal section h3 { font-size: 1.1em; }
-  .reveal section p, .reveal section li { font-size: 0.78em; }
-  .model-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-  .model-cards .card {
-    border: 1px solid #ccd; border-radius: 8px; padding: 0.9rem;
-    background: #fafcff; text-align: left;
-  }
-  .model-cards .card h3 { margin: 0 0 0.4rem; color: #234; }
-  .model-cards .card p { margin: 0.2rem 0; font-size: 0.72em; }
-  .model-cards .card .risk {
-    display: block; margin-top: 0.5rem; padding: 0.25rem 0.4rem;
-    border-radius: 4px; font-size: 0.66em; font-family: ui-monospace, monospace;
-  }
-  .risk.none { background: #e6f4ea; color: #1a5632; }
-  .risk.full { background: #fdecea; color: #8b1a10; }
-  .risk.capped { background: #fef3c7; color: #7a4a00; }
-  .assumptions, .next-steps { font-size: 0.78em; }
-  .footnote { font-size: 0.55em; color: #777; margin-top: 1.2em; }
-</style>
-```
+## Three models, one service {.center}
 
 <!--
   This deck consumes `report/data/run-42.json`. Generate it with
@@ -62,13 +63,11 @@ run = FileAttachment("data/run-42.json").json()
 hasSwitch = run.switching != null && run.sampleTraces.switching != null
 ```
 
-## Three models, one service {.center}
-
 <span class="msg">**Message.** Same client service (retire tonnes of carbon), three very different risk profiles for the desk.</span>
 
 ::: {.model-cards}
 ::: {.card}
-### Fee
+<h3>Fee</h3>
 Pass-through cost plus a markup `f · π_t`.
 
 Desk never holds tokens; cost is recharged one-for-one to the client.
@@ -77,7 +76,7 @@ Desk never holds tokens; cost is recharged one-for-one to the client.
 :::
 
 ::: {.card}
-### Custom desk
+<h3>Custom desk</h3>
 Fixed quote `Q` per tonne, plus pre-purchased kVCM inventory.
 
 Coverage knob α tunes how much of the year is hedged by inventory.
@@ -86,7 +85,7 @@ Coverage knob α tunes how much of the year is hedged by inventory.
 :::
 
 ::: {.card}
-### Switching
+<h3>Switching</h3>
 Fixed quote `Q` by default; **flips to a fee** when kVCM spot rises above a threshold `H`.
 
 Caps the loss tail without pre-buying inventory.
