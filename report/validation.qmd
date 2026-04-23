@@ -289,9 +289,13 @@ html`<div class="metric-grid">
 
 The panels below show one empirical histogram per stochastic book;
 the x-axis is terminal P&L in USD, and the y-axis is empirical
-density. The black rule is the closed-form mean. The dashed grey
-rule sits at $\Pi = 0$, so the mass to its left is
-$\mathbb{P}[\Pi < 0]$.
+density. Each panel gets its own x-domain clipped to the
+$[0.5\%, 99.5\%]$ quantile window of that book's samples, so a
+heavy Merton tail in one book does not squash the others onto a
+single bin. The b2b, retained, and partial-desk panels use a
+symmetric-log x-axis to keep their wider tails legible. The black
+rule is the closed-form mean; the dashed grey rule sits at
+$\Pi = 0$, so the mass to its left is $\mathbb{P}[\Pi < 0]$.
 
 ```{ojs}
 //| echo: false
@@ -303,56 +307,181 @@ pnlBooks = [
   ...(run.sampleTraces.switchingPartialDesk ? ["switching_partial_desk"] : []),
 ]
 
-pnlData = [
-  ...run.sampleTraces.fee.map(v => ({book: "fee", pnl: v})),
-  ...run.sampleTraces.b2b.map(v => ({book: "b2b", pnl: v})),
-  ...run.sampleTraces.retained.map(v => ({book: "retained", pnl: v})),
-  ...run.sampleTraces.treasury.map(v => ({book: "treasury", pnl: v})),
-  ...run.sampleTraces.partialDesk.map(v => ({book: "partial_desk", pnl: v})),
-  ...(run.sampleTraces.switching
-    ? run.sampleTraces.switching.map(v => ({book: "switching", pnl: v}))
-    : []),
-  ...(run.sampleTraces.switchingPartialDesk
-    ? run.sampleTraces.switchingPartialDesk.map(v => ({book: "switching_partial_desk", pnl: v}))
-    : []),
-]
-
 // Closed-form means: operating rows from run.rows, partial desk from
 // run.desks.partial. Switching-partial desk has no closed form; use MC mean.
-meanRuleRows = [
-  ...run.rows
-    .filter(r => pnlBooks.includes(r.name))
-    .map(r => ({ book: r.name, x: Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean })),
-  { book: "partial_desk", x: run.desks.partial.closedFormMean },
-  ...(run.desks.switchingPartial
-    ? [{ book: "switching_partial_desk", x: run.desks.switchingPartial.mcMean }]
-    : []),
-]
+meanByBook = {
+  const rows = run.rows.filter(r => pnlBooks.includes(r.name));
+  const m = new Map(rows.map(r => [r.name, Number.isFinite(r.closedFormMean) ? r.closedFormMean : r.mcMean]));
+  m.set("partial_desk", run.desks.partial.closedFormMean);
+  if (run.desks.switchingPartial) {
+    m.set("switching_partial_desk", run.desks.switchingPartial.mcMean);
+  }
+  return m;
+}
 ```
 
 ```{ojs}
 //| echo: false
-Plot.plot({
-  width: 900,
-  height: 520,
-  marginLeft: 70,
-  marginRight: 30,
-  marginBottom: 50,
-  grid: true,
-  x: { label: "terminal P&L Π  (USD)", labelAnchor: "center", labelOffset: 36, tickFormat: formatTickCurrency },
-  y: { label: "empirical density", labelAnchor: "center" },
-  fy: { label: null },
-  color: { legend: true, domain: pnlBooks, label: "book" },
-  marks: [
-    Plot.ruleY([0]),
-    Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
-    Plot.rectY(pnlData, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "book", fy: "book", thresholds: 60 })),
-    Plot.ruleX(meanRuleRows, { x: "x", fy: "book", stroke: "black", strokeWidth: 2 })
-  ]
-})
+// Per-book panel helper (mirrors the Simulator page). Each panel has
+// its own quantile-clipped x-domain and Freedman–Diaconis binning;
+// wide-tailed books use a symmetric-log x-axis so their tails stay
+// readable next to the bulk.
+pnlPanel = {
+  function quantileSorted(sorted, p) {
+    const n = sorted.length;
+    if (n === 0) return NaN;
+    if (n === 1) return sorted[0];
+    const pos = p * (n - 1);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] * (hi - pos) + sorted[hi] * (pos - lo);
+  }
+  function sdOf(samples) {
+    const n = samples.length;
+    if (n < 2) return 0;
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += samples[i];
+    const mu = sum / n;
+    let sse = 0;
+    for (let i = 0; i < n; i++) {
+      const d = samples[i] - mu;
+      sse += d * d;
+    }
+    return Math.sqrt(sse / (n - 1));
+  }
+  return function ({ label, samples, mean, color, symlog, qLo = 0.005, qHi = 0.995 }) {
+    const n = samples.length;
+    if (n === 0) return null;
+    const sorted = Float64Array.from(samples).sort();
+    const qWindowLo = quantileSorted(sorted, qLo);
+    const qWindowHi = quantileSorted(sorted, qHi);
+    const q25 = quantileSorted(sorted, 0.25);
+    const q75 = quantileSorted(sorted, 0.75);
+    const iqr = q75 - q25;
+    const sd = sdOf(samples);
+    let xMin = Math.min(0, qWindowLo);
+    let xMax = Math.max(0, qWindowHi);
+    if (xMax - xMin < 1e-9) {
+      const pad = Math.max(1, Math.abs(mean) * 0.1);
+      xMin = mean - pad;
+      xMax = mean + pad;
+    }
+    let clippedLo = 0, clippedHi = 0;
+    const inWindow = [];
+    for (let i = 0; i < n; i++) {
+      const v = samples[i];
+      if (v < xMin) clippedLo++;
+      else if (v > xMax) clippedHi++;
+      else inWindow.push(v);
+    }
+    const fdWidth = iqr > 0 ? 2 * iqr / Math.cbrt(n) : 0;
+    const thresholds = fdWidth > 0
+      ? Math.min(120, Math.max(20, Math.ceil((xMax - xMin) / fdWidth)))
+      : 40;
+    const xConfig = {
+      label: "terminal P&L Π (USD)",
+      tickFormat: formatTickCurrency,
+      domain: [xMin, xMax],
+      nice: false,
+    };
+    if (symlog) {
+      xConfig.type = "symlog";
+      xConfig.constant = Math.max(1, iqr / 2, sd / 4);
+    }
+    const plot = Plot.plot({
+      width: 900,
+      height: 170,
+      marginLeft: 70,
+      marginRight: 20,
+      marginBottom: 36,
+      marginTop: 10,
+      grid: true,
+      x: xConfig,
+      y: { label: "density", ticks: 3 },
+      marks: [
+        Plot.ruleY([0]),
+        Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
+        Plot.rectY(inWindow, Plot.binX({ y: "proportion" }, {
+          x: d => d, fill: color, thresholds,
+        })),
+        Plot.ruleX([mean], { stroke: "black", strokeWidth: 2 }),
+      ],
+    });
+    const wrap = document.createElement("div");
+    wrap.className = "pnl-panel";
+    const header = document.createElement("div");
+    header.className = "pnl-panel-title";
+    const name = document.createElement("span");
+    name.className = "pnl-panel-name";
+    name.textContent = label;
+    header.appendChild(name);
+    if (symlog) {
+      const tag = document.createElement("span");
+      tag.className = "pnl-panel-tag";
+      tag.textContent = "symlog x";
+      header.appendChild(tag);
+    }
+    wrap.appendChild(header);
+    wrap.appendChild(plot);
+    const clippedPct = ((clippedLo + clippedHi) / n) * 100;
+    const footer = document.createElement("div");
+    footer.className = "pnl-panel-footer";
+    footer.textContent = clippedPct > 0
+      ? `window: ${(qLo * 100).toFixed(1)}%–${(qHi * 100).toFixed(1)}% quantile · ${clippedPct.toFixed(2)}% of ${n.toLocaleString()} paths outside (${clippedLo} below, ${clippedHi} above)`
+      : `window: ${(qLo * 100).toFixed(1)}%–${(qHi * 100).toFixed(1)}% quantile · all ${n.toLocaleString()} paths inside`;
+    wrap.appendChild(footer);
+    return wrap;
+  };
+}
 ```
 
-_Black: closed-form $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$._
+```{ojs}
+//| echo: false
+// Books with wide Merton tails use symlog; fee / treasury / switching
+// are narrow enough that linear panels read better.
+pnlSymlog = new Set(["b2b", "retained", "partial_desk", "switching_partial_desk"])
+pnlColors = {
+  "fee": "#4c78a8",
+  "b2b": "#f58518",
+  "retained": "#e45756",
+  "treasury": "#72b7b2",
+  "partial_desk": "#54a24b",
+  "switching": "#b279a2",
+  "switching_partial_desk": "#ff9da6",
+}
+
+pnlPanelsNode = {
+  const specs = [
+    { label: "fee", samples: run.sampleTraces.fee },
+    { label: "b2b", samples: run.sampleTraces.b2b },
+    { label: "retained", samples: run.sampleTraces.retained },
+    { label: "treasury", samples: run.sampleTraces.treasury },
+    { label: "partial_desk", samples: run.sampleTraces.partialDesk },
+    ...(run.sampleTraces.switching
+      ? [{ label: "switching", samples: run.sampleTraces.switching }]
+      : []),
+    ...(run.sampleTraces.switchingPartialDesk
+      ? [{ label: "switching_partial_desk", samples: run.sampleTraces.switchingPartialDesk }]
+      : []),
+  ];
+  const grid = document.createElement("div");
+  grid.className = "pnl-panels";
+  for (const spec of specs) {
+    const node = pnlPanel({
+      ...spec,
+      mean: meanByBook.get(spec.label),
+      color: pnlColors[spec.label] ?? "#4c78a8",
+      symlog: pnlSymlog.has(spec.label),
+    });
+    if (node) grid.appendChild(node);
+  }
+  return grid;
+}
+```
+
+_Black: closed-form $\mathbb{E}[\Pi]$. Dashed grey: $\Pi = 0$.
+Panels labelled "symlog x" use a symmetric-log x-scale with a
+linear region around zero; the others are linear._
 
 The black rule lands inside every histogram hump, confirming that
 the closed-form means match the empirical distributions.

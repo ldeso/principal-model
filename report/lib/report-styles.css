@@ -275,6 +275,53 @@ details.collapsible-section > summary:hover > :is(h1, h2, h3, h4, h5, h6)::befor
   color: #222;
 }
 
+/* --- P&L distribution panels -------------------------------------------- */
+/* One vertically stacked panel per book. Each panel has its own x-scale
+   (quantile-clipped) and an optional symlog flag for heavy-tailed books, so
+   one book's extreme tail no longer stretches every other panel's axis.
+   Rendered inside an ojs block as a plain <div> tree so Quarto does not
+   try to facet them together. */
+
+.pnl-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin: 0.75rem 0 1rem;
+}
+.pnl-panel {
+  border: 1px solid #e3e3e3;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem 0.5rem;
+  background: #fff;
+}
+.pnl-panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #222;
+  margin: 0 0 0.15rem 0.35rem;
+}
+.pnl-panel-name { font-family: ui-monospace, monospace; }
+.pnl-panel-tag {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #666;
+  background: #f0f0f0;
+  border: 1px solid #dcdcdc;
+  border-radius: 3px;
+  padding: 0.02rem 0.35rem;
+  letter-spacing: 0.02em;
+}
+.pnl-panel-footer {
+  font-size: 0.72rem;
+  color: #666;
+  margin: 0.1rem 0 0 0.35rem;
+  font-family: ui-monospace, monospace;
+}
+
 /* --- Switching palette --------------------------------------------------- */
 /* Shared muted tones for anything describing the switching book across the
    report: threshold rules on plots, fee-mode overlays, sweep curves.

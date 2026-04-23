@@ -469,11 +469,19 @@ Inputs.table(summaryRows, {
 ### P&L distributions
 
 The panels below show the empirical terminal-P&L density for each
-book, one panel per book. The x-axis is terminal P&L in USD and
-the y-axis is empirical density. The black rule in each panel is
-the Monte Carlo mean, and the dashed grey rule sits at $\Pi = 0$.
-The fee panel is non-negative and the b2b panel is its mirror. The
-custom-desk panel collapses to a spike at the matched limit.
+book, one panel per book. Each panel gets its own x-domain, clipped
+to the $[0.5\%, 99.5\%]$ quantile window of that book's samples (and
+widened to include $\Pi = 0$), so a heavy Merton tail in one book
+no longer compresses the others onto 1–2 bins. The fraction of
+paths outside the window is noted under each panel; those paths are
+summarised by the VaR$_{95}$ / CVaR$_{95}$ columns above. The b2b,
+retained, and custom-desk panels use a symmetric-log x-axis so
+their heavier tails stay readable next to the bulk; the fee,
+treasury, and switching panels are linear. Bin counts are chosen by
+Freedman–Diaconis. The black rule in each panel is the Monte Carlo
+mean and the dashed grey rule sits at $\Pi = 0$. The fee panel is
+non-negative and the b2b panel is its mirror. The custom-desk panel
+collapses to a spike at the matched limit.
 
 ```{ojs}
 //| echo: false
@@ -484,62 +492,147 @@ switchPlusTreasuryLabel = includeSwitch ? `switching + treasury (h=${barrierRati
 
 ```{ojs}
 //| echo: false
-pnlRecords = {
-  const rows = [];
-  const stride = Math.max(1, Math.floor(run.feeSamples.length / 2500));
-  for (let i = 0; i < run.feeSamples.length; i += stride) {
-    rows.push({ book: "fee", pnl: run.feeSamples[i] });
-    rows.push({ book: "b2b", pnl: run.b2bSamples[i] });
-    rows.push({ book: "retained (syndicated-on-b2b)", pnl: run.retainedSamples[i] });
-    rows.push({ book: "treasury (k, C_basis)", pnl: run.treasurySamples[i] });
-    rows.push({ book: "custom desk = b2b + treasury", pnl: run.customDeskSamples[i] });
-    if (includeSwitch) {
-      rows.push({ book: switchLabel, pnl: switchRun.pnlSamples[i] });
-      rows.push({ book: switchPlusTreasuryLabel, pnl: switchCustomDesk.samples[i] });
-    }
+// Per-book panel helper. Computes a quantile-clipped x-domain so
+// heavy Merton tails do not squash the bulk into a single bin, picks
+// Freedman–Diaconis bin counts, and (optionally) uses a symmetric-log
+// x-scale for the wide-tailed books. Clipped paths are counted and
+// reported under each panel.
+pnlPanel = {
+  function quantileSorted(sorted, p) {
+    const n = sorted.length;
+    if (n === 0) return NaN;
+    if (n === 1) return sorted[0];
+    const pos = p * (n - 1);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] * (hi - pos) + sorted[hi] * (pos - lo);
   }
-  return rows;
+  function sdOf(samples) {
+    const n = samples.length;
+    if (n < 2) return 0;
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += samples[i];
+    const mu = sum / n;
+    let sse = 0;
+    for (let i = 0; i < n; i++) {
+      const d = samples[i] - mu;
+      sse += d * d;
+    }
+    return Math.sqrt(sse / (n - 1));
+  }
+  return function ({ label, samples, mean, sd, color, symlog, qLo = 0.005, qHi = 0.995 }) {
+    const n = samples.length;
+    if (n === 0) return null;
+    const sorted = Float64Array.from(samples).sort();
+    const q005 = quantileSorted(sorted, qLo);
+    const q995 = quantileSorted(sorted, qHi);
+    const q25 = quantileSorted(sorted, 0.25);
+    const q75 = quantileSorted(sorted, 0.75);
+    const iqr = q75 - q25;
+    const sdResolved = sd != null && Number.isFinite(sd) ? sd : sdOf(samples);
+    let xMin = Math.min(0, q005);
+    let xMax = Math.max(0, q995);
+    if (xMax - xMin < 1e-9) {
+      const pad = Math.max(1, Math.abs(mean) * 0.1);
+      xMin = mean - pad;
+      xMax = mean + pad;
+    }
+    let clippedLo = 0, clippedHi = 0;
+    const inWindow = [];
+    for (let i = 0; i < n; i++) {
+      const v = samples[i];
+      if (v < xMin) clippedLo++;
+      else if (v > xMax) clippedHi++;
+      else inWindow.push(v);
+    }
+    const fdWidth = iqr > 0 ? 2 * iqr / Math.cbrt(n) : 0;
+    const thresholds = fdWidth > 0
+      ? Math.min(120, Math.max(20, Math.ceil((xMax - xMin) / fdWidth)))
+      : 40;
+    const xConfig = {
+      label: "terminal P&L Π (USD)",
+      tickFormat: formatTickCurrency,
+      domain: [xMin, xMax],
+      nice: false,
+    };
+    if (symlog) {
+      xConfig.type = "symlog";
+      xConfig.constant = Math.max(1, iqr / 2, sdResolved / 4);
+    }
+    const plot = Plot.plot({
+      width: 900,
+      height: 170,
+      marginLeft: 70,
+      marginRight: 20,
+      marginBottom: 36,
+      marginTop: 10,
+      grid: true,
+      x: xConfig,
+      y: { label: "density", ticks: 3 },
+      marks: [
+        Plot.ruleY([0]),
+        Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
+        Plot.rectY(inWindow, Plot.binX({ y: "proportion" }, {
+          x: d => d, fill: color, thresholds,
+        })),
+        Plot.ruleX([mean], { stroke: "black", strokeWidth: 2 }),
+      ],
+    });
+    const wrap = document.createElement("div");
+    wrap.className = "pnl-panel";
+    const header = document.createElement("div");
+    header.className = "pnl-panel-title";
+    const name = document.createElement("span");
+    name.className = "pnl-panel-name";
+    name.textContent = label;
+    header.appendChild(name);
+    if (symlog) {
+      const tag = document.createElement("span");
+      tag.className = "pnl-panel-tag";
+      tag.textContent = "symlog x";
+      header.appendChild(tag);
+    }
+    wrap.appendChild(header);
+    wrap.appendChild(plot);
+    const clippedPct = ((clippedLo + clippedHi) / n) * 100;
+    const footer = document.createElement("div");
+    footer.className = "pnl-panel-footer";
+    footer.textContent = clippedPct > 0
+      ? `window: ${(qLo * 100).toFixed(1)}%–${(qHi * 100).toFixed(1)}% quantile · ${clippedPct.toFixed(2)}% of ${n.toLocaleString()} paths outside (${clippedLo} below, ${clippedHi} above)`
+      : `window: ${(qLo * 100).toFixed(1)}%–${(qHi * 100).toFixed(1)}% quantile · all ${n.toLocaleString()} paths inside`;
+    wrap.appendChild(footer);
+    return wrap;
+  };
 }
 ```
 
 ```{ojs}
 //| echo: false
-Plot.plot({
-  width: 900,
-  height: 720,
-  marginLeft: 80,
-  marginRight: 30,
-  marginBottom: 50,
-  grid: true,
-  x: { label: "terminal P&L (USD)", tickFormat: formatTickCurrency },
-  y: { label: "empirical density" },
-  fy: { label: null },
-  color: { legend: true, domain: [
-    "fee","b2b","retained (syndicated-on-b2b)","treasury (k, C_basis)","custom desk = b2b + treasury",
-    ...(includeSwitch ? [switchLabel, switchPlusTreasuryLabel] : []),
-  ] },
-  marks: [
-    Plot.ruleY([0]),
-    Plot.ruleX([0], { stroke: "#888", strokeDasharray: "2 4" }),
-    Plot.rectY(pnlRecords, Plot.binX({ y: "proportion" }, { x: "pnl", fill: "book", fy: "book", thresholds: 50 })),
-    Plot.ruleX([
-      { book: "fee", x: run.fee.mean },
-      { book: "b2b", x: run.b2b.mean },
-      { book: "retained (syndicated-on-b2b)", x: run.retained.mean },
-      { book: "treasury (k, C_basis)", x: run.treasury.mean },
-      { book: "custom desk = b2b + treasury", x: run.customDesk.mean },
-      ...(includeSwitch
-        ? [
-            { book: switchLabel, x: switchRun.summary.mean },
-            { book: switchPlusTreasuryLabel, x: switchCustomDesk.summary.mean },
-          ]
-        : []),
-    ], { x: "x", fy: "book", stroke: "black", strokeWidth: 2 }),
-  ]
-})
+pnlPanelsNode = {
+  const specs = [
+    { label: "fee", samples: run.feeSamples, mean: run.fee.mean, sd: run.fee.sd, color: "#4c78a8", symlog: false },
+    { label: "b2b", samples: run.b2bSamples, mean: run.b2b.mean, sd: run.b2b.sd, color: "#f58518", symlog: true },
+    { label: "retained (syndicated-on-b2b)", samples: run.retainedSamples, mean: run.retained.mean, sd: run.retained.sd, color: "#e45756", symlog: true },
+    { label: "treasury (k, C_basis)", samples: run.treasurySamples, mean: run.treasury.mean, sd: run.treasury.sd, color: "#72b7b2", symlog: false },
+    { label: "custom desk = b2b + treasury", samples: run.customDeskSamples, mean: run.customDesk.mean, sd: run.customDesk.sd, color: "#54a24b", symlog: true },
+  ];
+  if (includeSwitch) {
+    specs.push({ label: switchLabel, samples: switchRun.pnlSamples, mean: switchRun.summary.mean, sd: switchRun.summary.sd, color: "#b279a2", symlog: false });
+    specs.push({ label: switchPlusTreasuryLabel, samples: switchCustomDesk.samples, mean: switchCustomDesk.summary.mean, sd: switchCustomDesk.summary.sd, color: "#ff9da6", symlog: true });
+  }
+  const grid = document.createElement("div");
+  grid.className = "pnl-panels";
+  for (const spec of specs) {
+    const node = pnlPanel(spec);
+    if (node) grid.appendChild(node);
+  }
+  return grid;
+}
 ```
 
-_Black: MC mean. Dashed grey: $\Pi = 0$._
+_Black: MC mean. Dashed grey: $\Pi = 0$. Panels labelled "symlog x"
+use a symmetric-log x-scale with a linear region around zero; the
+others are linear._
 
 ### Price paths
 
