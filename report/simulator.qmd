@@ -477,7 +477,9 @@ paths outside the window is noted under each panel; those paths are
 summarised by the VaR$_{95}$ / CVaR$_{95}$ columns above. The b2b,
 retained, and custom-desk panels use a symmetric-log x-axis so
 their heavier tails stay readable next to the bulk; the fee,
-treasury, and switching panels are linear. Bin counts are chosen by
+treasury, and switching panels are linear. The switching + treasury
+panel reuses the switching panel's linear x-domain so the two can be
+compared side by side. Bin counts are chosen by
 Freedman–Diaconis. The black rule in each panel is the Monte Carlo
 mean and the dashed grey rule sits at $\Pi = 0$. The fee panel is
 non-negative and the b2b panel is its mirror. The custom-desk panel
@@ -520,22 +522,23 @@ pnlPanel = {
     }
     return Math.sqrt(sse / (n - 1));
   }
-  return function ({ label, samples, mean, sd, color, symlog, qLo = 0.005, qHi = 0.995 }) {
+  return function ({ label, samples, mean, sd, color, symlog, qLo = 0.005, qHi = 0.995, domainSamples = null }) {
     const n = samples.length;
     if (n === 0) return null;
     const sorted = Float64Array.from(samples).sort();
-    const q005 = quantileSorted(sorted, qLo);
-    const q995 = quantileSorted(sorted, qHi);
     const q25 = quantileSorted(sorted, 0.25);
     const q75 = quantileSorted(sorted, 0.75);
     const iqr = q75 - q25;
     const sdResolved = sd != null && Number.isFinite(sd) ? sd : sdOf(samples);
-    let xMin = Math.min(0, q005);
-    let xMax = Math.max(0, q995);
+    const domainSorted = domainSamples ? Float64Array.from(domainSamples).sort() : sorted;
+    const domainMean = domainSamples ? null : mean;
+    let xMin = Math.min(0, quantileSorted(domainSorted, qLo));
+    let xMax = Math.max(0, quantileSorted(domainSorted, qHi));
     if (xMax - xMin < 1e-9) {
-      const pad = Math.max(1, Math.abs(mean) * 0.1);
-      xMin = mean - pad;
-      xMax = mean + pad;
+      const pad = Math.max(1, Math.abs(domainMean ?? 0) * 0.1);
+      const center = domainMean ?? 0;
+      xMin = center - pad;
+      xMax = center + pad;
     }
     let clippedLo = 0, clippedHi = 0;
     const inWindow = [];
@@ -617,8 +620,10 @@ pnlPanelsNode = {
     { label: "custom desk = b2b + treasury", samples: run.customDeskSamples, mean: run.customDesk.mean, sd: run.customDesk.sd, color: "#54a24b", symlog: true },
   ];
   if (includeSwitch) {
+    // switching + treasury borrows the switching panel's linear x-domain
+    // so the two panels can be compared side by side.
     specs.push({ label: switchLabel, samples: switchRun.pnlSamples, mean: switchRun.summary.mean, sd: switchRun.summary.sd, color: "#b279a2", symlog: false });
-    specs.push({ label: switchPlusTreasuryLabel, samples: switchCustomDesk.samples, mean: switchCustomDesk.summary.mean, sd: switchCustomDesk.summary.sd, color: "#ff9da6", symlog: true });
+    specs.push({ label: switchPlusTreasuryLabel, samples: switchCustomDesk.samples, mean: switchCustomDesk.summary.mean, sd: switchCustomDesk.summary.sd, color: "#ff9da6", symlog: false, domainSamples: switchRun.pnlSamples });
   }
   const grid = document.createElement("div");
   grid.className = "pnl-panels";
